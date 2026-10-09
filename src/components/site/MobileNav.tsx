@@ -39,7 +39,7 @@ export function MobileNav({ items }: { items: NavItem[] }) {
     <details className="mobile-nav" ref={ref}>
       <summary className="icon-button" aria-label="Abrir menu de navegação">
         <MenuIcon />
-        <span aria-hidden="true">Menu</span>
+        <span className="mobile-nav__label" aria-hidden="true">Menu</span>
       </summary>
       <nav className="mobile-nav__panel" aria-label="Navegação principal">
         <NavLinks items={items} className="mobile-nav__list" />

@@ -31,6 +31,10 @@
   border-top: 1px solid var(--line);
 }
 
+main:focus {
+  outline: none;
+}
+
 main {
   display: block;
   min-height: 60vh;
@@ -219,7 +223,40 @@ main {
   font-style: italic;
 }
 
-@media (max-width: 380px) {
+@media (max-width: 599px) {
+  .site-header__inner {
+    gap: var(--space-3);
+  }
+
+  .brand {
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .brand__mark {
+    width: 26px;
+    height: 26px;
+  }
+
+  .brand__name {
+    font-size: 1.1rem;
+    letter-spacing: 0.1em;
+  }
+
+  .brand__sub {
+    font-size: 0.6875rem;
+  }
+
+  .site-header__tools {
+    gap: 0;
+  }
+
+  .mobile-nav__label {
+    display: none;
+  }
+}
+
+@media (max-width: 359px) {
   .brand__sub {
     display: none;
   }
@@ -431,6 +468,11 @@ main {
 }
 
 .mobile-nav > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mobile-nav:not([open]) .mobile-nav__panel,
+.spoiler-control:not([open]) .spoiler-control__panel {
   display: none;
 }
 
@@ -939,7 +981,7 @@ main {
 
 .hero__cover {
   justify-self: center;
-  width: min(100%, 380px);
+  width: min(72%, 380px);
 }
 
 @media (min-width: 960px) {
