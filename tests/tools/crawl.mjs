@@ -24,8 +24,21 @@ while (queue.length) {
   const html = await res.text()
   for (const m of html.matchAll(/(?:href|src)="(\/[^"#]*)(?:#[^"]*)?"/g)) {
     const href = m[1].replace(/&amp;/g, '&')
+    if (href.startsWith('/_next/image')) {
+      // valida também a imagem original por trás do otimizador
+      const original = new URL(href, base).searchParams.get('url')
+      if (original && !seen.has(original)) queue.push(original)
+      continue
+    }
     if (href.startsWith('/_next') || href.startsWith('/admin') || href.startsWith('/api/preview')) continue
     if (!seen.has(href)) queue.push(href)
+  }
+  for (const m of html.matchAll(/srcSet="([^"]+)"/gi)) {
+    for (const part of m[1].split(',')) {
+      const url = part.trim().split(' ')[0].replace(/&amp;/g, '&')
+      const original = url.startsWith('/_next/image') ? new URL(url, base).searchParams.get('url') : null
+      if (original && !seen.has(original)) queue.push(original)
+    }
   }
 }
 console.log(`${seen.size} endereços verificados`)

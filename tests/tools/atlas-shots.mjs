@@ -1,0 +1,31 @@
+// Capturas do Atlas em 2D e 3D (uso interno de verificação).
+import { chromium } from '@playwright/test'
+const [,, base, out, vw = '1440', vh = '900'] = process.argv
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
+const page = await browser.newPage({ viewport: { width: +vw, height: +vh }, hasTouch: +vw < 800 })
+const logs = []
+page.on('console', (m) => { if (['error', 'warning'].includes(m.type())) logs.push(`${m.type()}: ${m.text()}`) })
+page.on('pageerror', (e) => logs.push(`pageerror: ${e.message}`))
+await page.goto(base + '/atlas', { waitUntil: 'networkidle' })
+await page.locator('#mapas').scrollIntoViewIfNeeded()
+await page.screenshot({ path: `${out}/atlas-2d-${vw}.png` })
+// seleciona Aurelion pela lista
+await page.getByRole('button', { name: /Aurelion/ }).last().click()
+await page.waitForTimeout(400)
+await page.screenshot({ path: `${out}/atlas-2d-sel-${vw}.png` })
+await page.getByRole('button', { name: 'Explorar em 3D' }).click()
+await page.waitForSelector('.world3d__canvas.is-visible', { timeout: 30000 })
+await page.waitForTimeout(3500)
+await page.screenshot({ path: `${out}/atlas-3d-${vw}.png` })
+// clica no centro do canvas (seleção por raycast)
+const box = await page.locator('.world3d__canvas').boundingBox()
+await page.mouse.click(box.x + box.width * 0.35, box.y + box.height * 0.45)
+await page.waitForTimeout(1500)
+await page.screenshot({ path: `${out}/atlas-3d-click-${vw}.png` })
+const panel = await page.locator('.atlas-panel h3').textContent().catch(() => null)
+await page.getByRole('button', { name: 'Voltar ao mapa 2D' }).click()
+await page.waitForTimeout(2000)
+const mode = await page.locator('.world-atlas').getAttribute('data-mode')
+const canvases = await page.locator('canvas').count()
+console.log(JSON.stringify({ panel, modeAfterExit: mode, canvasesAfterExit: canvases, logs }, null, 1))
+await browser.close()

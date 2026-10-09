@@ -93,7 +93,7 @@ export function Emblem({ image, name, accent }: { image: ImageData | null; name:
   if (image) {
     return (
       <div className="emblem" style={style}>
-        <Image src={image.src} width={image.width} height={image.height} alt={image.alt || `Emblema de ${name}`} sizes="240px" />
+        <Image src={image.src} width={image.width} height={image.height} alt={image.alt || `Emblema de ${name}`} sizes="240px" unoptimized={image.src.endsWith('.svg')} />
       </div>
     )
   }

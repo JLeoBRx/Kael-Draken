@@ -4,7 +4,8 @@ import { notFound } from 'next/navigation'
 import type { CSSProperties } from 'react'
 import { CertaintyBadge, EditorialBadges } from '@/components/ui/editorial'
 import { EntrySection, Facts, Gallery, HiddenNotice, PendingSections, RelatedList, SpoilerGate, TagList, Toc } from '@/components/ui/entry'
-import { Emblem, Figure } from '@/components/ui/media'
+import { Emblem, MediaImage } from '@/components/ui/media'
+import { ART, emblemArt } from '@/lib/atlas/art'
 import { PageHero } from '@/components/ui/PageHero'
 import { getKingdom, getTermLabels } from '@/lib/content/queries'
 import { prepareRichText } from '@/lib/content/rich'
@@ -51,6 +52,8 @@ export default async function KingdomPage({ params }: { params: Promise<{ slug: 
   if (!data.gallery.length) pending.push('Galeria de imagens e documentos')
   const hidden = sections.reduce((n, s) => n + s.result.hiddenCount, 0)
   const capital = data.locations.find((l) => l.isCapital)
+  const emblem = data.emblem ?? emblemArt(k.slug)
+  const panorama = data.image ?? ART.reino[k.slug] ?? null
 
   const tocItems = [
     ...filled.map((s) => ({ id: s.id, title: s.title })),
@@ -69,12 +72,18 @@ export default async function KingdomPage({ params }: { params: Promise<{ slug: 
       >
         <EditorialBadges canon={k.canon} spoiler={k.spoiler} status={k.status} preview={viewer.preview} />
       </PageHero>
+      {panorama ? (
+        <figure className="kingdom-panorama">
+          <MediaImage image={panorama} sizes="100vw" priority />
+          {panorama.caption ? <figcaption>{panorama.caption}</figcaption> : null}
+        </figure>
+      ) : null}
 
       <div className="container entry-layout">
         <aside className="entry-aside">
           <div className="infobox">
             <div className="infobox__media">
-              <Emblem image={data.emblem} name={k.name} accent={k.accent} />
+              <Emblem image={emblem} name={k.name} accent={k.accent} />
             </div>
             <div className="infobox__body">
               <Facts
@@ -84,13 +93,10 @@ export default async function KingdomPage({ params }: { params: Promise<{ slug: 
                   { label: 'Lugares documentados', value: String(data.locations.length) },
                   { label: 'Personagens associados', value: String(data.characters.length) },
                   {
-                    label: 'No mapa',
-                    value: data.markers.length ? (
-                      <Link href={data.markers[0].isPrimary ? `${paths.atlas}?marcador=${data.markers[0].id}` : `${paths.map(data.markers[0].mapSlug)}?marcador=${data.markers[0].id}`}>Ver no atlas</Link>
-                    ) : (
-                      <span className="muted">Posição ainda não marcada</span>
-                    ),
+                    label: 'No atlas',
+                    value: <Link href={`${paths.atlas}?regiao=${k.slug}#mapas`}>Ver a zona conceitual no mapa</Link>,
                   },
+                  { label: 'Brasão', value: data.emblem ? null : <span className="muted">Proposta heráldica (não aprovada)</span> },
                 ]}
               />
               <TagList tags={data.tags} />
@@ -109,7 +115,6 @@ export default async function KingdomPage({ params }: { params: Promise<{ slug: 
             </p>
           ) : null}
           <HiddenNotice count={hidden} level={viewer.spoiler} />
-          {data.image ? <Figure image={data.image} priority /> : null}
 
           {filled.map((s) => (
             <EntrySection key={s.id} id={s.id} title={s.title} result={s.result}>

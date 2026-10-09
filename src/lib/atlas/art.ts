@@ -86,7 +86,7 @@ const ENTITY_ART: Record<ArtTarget, Record<string, ArtEntry>> = {
     'mitologia/a-ascensao-do-caos': ART.caos,
     'mitologia/o-aparecimento-dos-seis-reinos': ART.painelReinos,
     'mitologia/o-templo-da-chama': ART.templo,
-    'mitologia/safra-e-a-noite-das-cinzas': ART.quedaSafra,
+    'mitologia/safra-e-a-noite-das-cinzas': ART.reino.safra,
     'mitologia/o-seculo-perdido': ART.seculoPerdido,
     'mitologia/lendas-e-tradicoes': ART.manuscritos,
     'mitologia/o-surgimento-do-mundo': ART.terrasIncognitas,

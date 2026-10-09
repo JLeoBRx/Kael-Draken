@@ -1,11 +1,14 @@
 import Link from 'next/link'
-import { MapPreview } from '@/components/atlas/MapPreview'
 import { PortolanTexture } from '@/components/atlas/Cartography'
+import { WorldPreview } from '@/components/atlas/WorldPreview'
+import Image from 'next/image'
+import { ART } from '@/lib/atlas/art'
+import { getAtlasRegions } from '@/lib/atlas/regions'
 import { CanonBadge, Reliability } from '@/components/ui/editorial'
 import { ArrowRight } from '@/components/ui/icons'
 import { BookCover, MediaImage } from '@/components/ui/media'
 import { getOfficialCover } from '@/lib/content/media'
-import { getPrimaryMap, getRecentEntries, getSectionCounts, getTermLabels, listArticles, listBooks, listDocuments, listKingdoms, listPosts } from '@/lib/content/queries'
+import { getRecentEntries, getSectionCounts, getTermLabels, listArticles, listBooks, listDocuments, listKingdoms, listPosts } from '@/lib/content/queries'
 import { getSettings } from '@/lib/content/settings'
 import { getViewer } from '@/lib/content/viewer'
 import { ENTITY_LABELS } from '@/lib/editorial'
@@ -16,10 +19,10 @@ import type { CSSProperties } from 'react'
 export default async function HomePage() {
   const viewer = await getViewer()
   const settings = await getSettings()
-  const [cover, kingdoms, map, posts, recent, documents, counts, mythology, resonance, books, docTypes, postCategories] = await Promise.all([
+  const [cover, kingdoms, regions, posts, recent, documents, counts, mythology, resonance, books, docTypes, postCategories] = await Promise.all([
     getOfficialCover(settings.cover_media_id, 'Capa oficial de Kael Draken — O Sussurro da Chama Antiga'),
     listKingdoms(viewer),
-    getPrimaryMap(viewer),
+    getAtlasRegions(viewer),
     listPosts(viewer, { limit: 3 }),
     getRecentEntries(viewer, 6),
     listDocuments(viewer),
@@ -36,6 +39,9 @@ export default async function HomePage() {
   return (
     <>
       <section className="hero" aria-labelledby="titulo-principal">
+        <div className="hero__art" aria-hidden="true">
+          <Image src={ART.capa.src} alt="" width={ART.capa.width} height={ART.capa.height} priority sizes="(min-width: 960px) 50vw, 100vw" />
+        </div>
         <div className="hero__bg">
           <PortolanTexture />
         </div>
@@ -98,7 +104,7 @@ export default async function HomePage() {
             </Link>
           </header>
           <div className="home-atlas__grid">
-            {map ? <MapPreview title={map.map.title} image={map.image} markers={map.markers} provisional={map.map.provisional} href={paths.atlas} /> : null}
+            <WorldPreview regions={regions} href={paths.atlas} />
             <ol className="kingdom-index" aria-label="Reinos">
               {kingdoms.map((k, i) => (
                 <li key={k.id}>
