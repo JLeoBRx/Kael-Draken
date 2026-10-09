@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-label="Brasão conceitual de Safra (proposta)">
+<title>Brasão conceitual de Safra — proposta heráldica</title>
+<defs><linearGradient id="g-safra" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".10"/><stop offset=".55" stop-color="#ffffff" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity=".25"/></linearGradient></defs>
+<path d="M120 12 L222 36 V128 C222 198 176 246 120 270 C64 246 18 198 18 128 V36 Z" fill="#5c170f" stroke="#8d7240" stroke-width="5"/>
+<path d="M120 26 L208 47 V129 C208 189 169 232 120 254 C71 232 32 189 32 129 V47 Z" fill="none" stroke="#cdb27f" stroke-width="1.6" opacity=".7"/>
+<circle cx="120" cy="170" r="44" fill="none" stroke="#cdb27f" stroke-width="9"/>
+<circle cx="120" cy="170" r="44" fill="none" stroke="#120d09" stroke-width="1.5" opacity=".6"/>
+<path d="M120 58 C134 88 160 104 152 140 C148 160 134 172 120 176 C106 172 92 160 88 140 C84 118 98 104 104 88 C108 102 114 108 118 112 C114 92 116 74 120 58 Z" fill="#cdb27f" stroke="#120d09" stroke-width="2.5"/>
+<path d="M120 112 C128 126 138 134 134 150 C131 162 126 166 120 168 C114 166 109 162 106 150 C104 140 110 132 114 124 C116 132 118 134 120 136 Z" fill="#5c170f"/>
+<path d="M120 12 L222 36 V128 C222 198 176 246 120 270 C64 246 18 198 18 128 V36 Z" fill="url(#g-safra)"/>
+</svg>

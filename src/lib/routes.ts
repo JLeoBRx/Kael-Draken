@@ -24,6 +24,7 @@ export const paths = {
   news: '/novidades',
   post: (slug: string) => `/novidades/${slug}`,
   search: '/busca',
+  mysteries: '/misterios',
   about: '/sobre',
 }
 

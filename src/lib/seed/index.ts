@@ -12,7 +12,6 @@ import {
   SEED_EVENTS,
   SEED_KINGDOMS,
   SEED_LOCATIONS,
-  SEED_MAP,
   SEED_MYSTERIES,
   SEED_POST,
   SEED_SETTINGS,
@@ -234,16 +233,6 @@ export async function seedDatabase(db: Database, opts: { log?: (msg: string) => 
       }
     }
 
-    // Atlas
-    await tx.insert(s.maps).values({
-      slug: SEED_MAP.slug,
-      title: SEED_MAP.title,
-      description: SEED_MAP.description,
-      isPrimary: true,
-      provisional: true,
-      canon: 'em_desenvolvimento',
-      ...published,
-    })
 
     // Livro I
     await tx.insert(s.books).values({

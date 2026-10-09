@@ -109,9 +109,9 @@ export interface SeedKingdom extends Editorial {
 }
 
 const FIVE_KINGDOMS_RELATION = (name: string) =>
-  `:::spoiler 1
-${name} está entre os cinco reinos que decidiram exterminar a população de Safra, movidos pela inveja de seu poder. O papel específico de ${name} nesse acontecimento ainda não foi definido.
-:::`
+  `${name} está entre os cinco reinos que decidiram destruir a população de [[reinos/safra|Safra]], movidos pela inveja de seu poder. O papel específico de ${name} nessa decisão ainda não foi definido.
+
+Depois da [[mitologia/safra-e-a-noite-das-cinzas|Noite das Cinzas]], Safra foi apagada da história oficial: a versão reconhecida pelos reinos admite apenas cinco.`
 
 const FRAGMENT_RESONANCE =
   'Como os demais reinos, está ligado a fragmentos do poder primordial da Chama. A natureza dessa ligação ainda não foi documentada.'
@@ -125,14 +125,16 @@ export const SEED_KINGDOMS: SeedKingdom[] = [
     name: 'Safra',
     epithet: 'O reino desaparecido',
     summary: 'O reino que possuía uma ligação excepcional com as chamas — e que desapareceu.',
-    body: 'Entre os seis reinos estabelecidos depois da criação, **Safra** possuía uma ligação excepcional com as chamas. Hoje é lembrado como o reino desaparecido.',
+    body: 'Entre os seis reinos estabelecidos depois da criação, **Safra** possuía uma ligação excepcional com as chamas. Destruída na [[mitologia/safra-e-a-noite-das-cinzas|Noite das Cinzas]], foi apagada da história oficial — os mapas reconhecidos mostram apenas cinco reinos.',
     resonance: 'Safra possuía uma ligação excepcional com as chamas. A natureza exata dessa ligação ainda não foi documentada.',
-    history: `Safra foi destruído.
+    history: `Os outros cinco reinos decidiram destruir a população de Safra, movidos pela inveja de seu poder. Na catástrofe conhecida como **Noite das Cinzas**, Safra foi destruída, e a linhagem real se perdeu. Durante esse mesmo período, a Chama desapareceu.
 
 :::spoiler 1
-Os outros cinco reinos decidiram exterminar a população de Safra, movidos pela inveja de seu poder. O reino foi destruído, e um herdeiro sobreviveu após ser enviado por um portal.
-:::`,
-    mysteries: 'O destino completo de Safra permanece um mistério preservado. Os detalhes definitivos de sua destruição ainda não foram estabelecidos.',
+Um herdeiro sobreviveu após ser enviado por um portal.
+:::
+
+Depois da destruição, Safra foi apagada da história oficial.`,
+    mysteries: 'O destino completo de Safra e de sua linhagem real permanece um mistério preservado. Os detalhes definitivos da destruição ainda não foram estabelecidos.',
     accent: '#8f2a1d',
     canon: 'canonico',
   },
@@ -209,7 +211,7 @@ export const SEED_LOCATIONS: SeedLocation[] = [
     name: 'Brumafunda',
     category: 'vilarejo',
     summary: 'O vilarejo distante onde Kael Draken cresceu. Nome provisório.',
-    body: 'Vilarejo distante onde Kael cresceu, criado por uma família humilde e amorosa. O nome **Brumafunda** é provisório, e a localização do vilarejo ainda não foi definida.',
+    body: 'Vilarejo distante onde Kael cresceu, criado por uma família adotiva, humilde e amorosa. O nome **Brumafunda** é provisório, e a localização do vilarejo ainda não foi definida.',
     canon: 'provisorio',
     notes: 'Nome provisório. Reino e localização ainda não definidos.',
   },
@@ -217,9 +219,21 @@ export const SEED_LOCATIONS: SeedLocation[] = [
     slug: 'templo-da-chama',
     name: 'Templo da Chama',
     category: 'templo',
-    summary: 'Sua localização e sua história completa permanecem desconhecidas.',
-    history: 'A localização e a história completa do Templo da Chama são um dos mistérios preservados do universo.',
-    canon: 'desconhecido',
+    summary: 'Lugar central à história dos reinos, ligado à proteção da Chama. Localização e destino atual desconhecidos.',
+    body: 'O Templo da Chama era um lugar central relacionado à proteção da [[mitologia/a-chama-do-dragao|Chama]].',
+    history: 'Sua localização exata, sua história completa e seu destino atual são mistérios preservados do universo.',
+    canon: 'canonico',
+  },
+  {
+    slug: 'ruinas-de-safra',
+    name: 'Ruínas de Safra',
+    kingdom: 'safra',
+    category: 'ruina',
+    summary: 'O que restou do reino destruído na Noite das Cinzas. Localização ainda não definida.',
+    body: 'Restos do reino de [[reinos/safra|Safra]], destruído na [[mitologia/safra-e-a-noite-das-cinzas|Noite das Cinzas]] e apagado da história oficial.',
+    history: 'A localização, a extensão e o estado atual das ruínas ainda não foram definidos.',
+    canon: 'provisorio',
+    notes: 'Existência implícita na bíblia narrativa; detalhes a definir.',
   },
 ]
 
@@ -247,10 +261,10 @@ export const SEED_CHARACTERS: SeedCharacter[] = [
     summary: 'Tem dezesseis anos e cresceu em um vilarejo distante. No início da história, seus sonhos começam a se intensificar.',
     personality:
       'Kael é inteligente, gentil, educado e alegre, mas também pode ser reservado e impulsivo. Sua dificuldade em lidar com a raiva fez com que desenvolvesse máscaras sociais para ser aceito.',
-    history: `Kael cresceu em um vilarejo distante — provisoriamente chamado [[locais/brumafunda|Brumafunda]] —, criado por uma família humilde e amorosa.
+    history: `Kael cresceu em um vilarejo distante — provisoriamente chamado [[locais/brumafunda|Brumafunda]] —, criado por uma família adotiva, humilde e amorosa.
 
 No início da história, seus sonhos começam a se intensificar, apresentando lugares impossíveis, imagens do passado e acontecimentos que desafiam sua compreensão do mundo.`,
-    family: 'Criado por uma família humilde e amorosa. Os membros da família ainda não foram documentados.',
+    family: 'Criado por uma família adotiva, humilde e amorosa. Os membros da família ainda não foram documentados.',
     storyRole: 'Protagonista de [[livros/o-sussurro-da-chama-antiga|Livro I — O Sussurro da Chama Antiga]].',
     secrets: `:::spoiler 1
 Seu nome de nascimento permanece desconhecido.
@@ -281,22 +295,28 @@ export const SEED_ERAS: SeedEra[] = [
     canon: 'provisorio',
     notes: 'Nome do período é organizacional, não canônico.',
   },
-  { slug: 'a-queda-de-safra', name: 'A Queda de Safra', dateLabel: 'Data não estabelecida', summary: 'O reino ligado às chamas é destruído.', canon: 'provisorio', notes: 'Nome do período é organizacional.' },
   {
-    slug: 'o-desaparecimento-da-chama',
-    name: 'O Desaparecimento da Chama',
-    dateLabel: 'Data desconhecida',
-    summary: 'A Chama desaparece. A verdadeira causa permanece desconhecida.',
-    canon: 'desconhecido',
+    slug: 'a-noite-das-cinzas',
+    name: 'A Noite das Cinzas',
+    dateLabel: 'Data não estabelecida',
+    summary: 'Safra é destruída pelos outros cinco reinos; durante esse período, a Chama desaparece.',
+    canon: 'canonico',
   },
   {
     slug: 'o-seculo-perdido',
     name: 'O Século Perdido',
-    dateLabel: 'Seiscentos anos',
-    summary: 'Seiscentos anos cujos acontecimentos permanecem desconhecidos.',
-    canon: 'desconhecido',
+    dateLabel: 'Cerca de seiscentos anos',
+    summary: 'Aproximadamente seiscentos anos de história perdida.',
+    canon: 'canonico',
+    notes: 'Apesar do nome, o período abrange cerca de 600 anos. Manter assim.',
   },
-  { slug: 'a-ascensao-do-caos', name: 'A Ascensão do Caos', dateLabel: 'Data não estabelecida', summary: 'Período em desenvolvimento na bíblia narrativa.', canon: 'em_desenvolvimento' },
+  {
+    slug: 'a-ascensao-do-caos',
+    name: 'A Ascensão do Caos',
+    dateLabel: 'Data não estabelecida',
+    summary: 'Sem a Chama, o equilíbrio se rompe e o Caos se torna uma ameaça.',
+    canon: 'canonico',
+  },
   { slug: 'o-tempo-de-kael', name: 'O Tempo de Kael', dateLabel: 'Livro I', summary: 'O presente narrativo de O Sussurro da Chama Antiga.', canon: 'provisorio', notes: 'Nome do período é organizacional.' },
 ]
 
@@ -337,12 +357,12 @@ export const SEED_EVENTS: SeedEvent[] = [
   },
   {
     slug: 'o-surgimento-do-caos',
-    title: 'O Caos surge junto da Chama',
+    title: 'O Caos surge com a criação',
     era: 'a-criacao',
     dateLabel: 'Origem do mundo',
     certainty: 'confirmado',
     eventType: 'mito',
-    summary: 'Junto da Chama do Dragão, surge o Caos. Sua natureza integral permanece desconhecida.',
+    summary: 'Com a criação surge o Caos, a princípio contido — mantido sob controle — pela Chama. Sua natureza integral permanece desconhecida.',
     canon: 'canonico',
   },
   {
@@ -358,26 +378,34 @@ export const SEED_EVENTS: SeedEvent[] = [
     canon: 'canonico',
   },
   {
-    slug: 'a-destruicao-de-safra',
-    title: 'A destruição de Safra',
-    era: 'a-queda-de-safra',
+    slug: 'a-decisao-dos-cinco-reinos',
+    title: 'A decisão dos cinco reinos',
+    era: 'a-noite-das-cinzas',
+    dateLabel: 'Antes da Noite das Cinzas',
+    certainty: 'confirmado',
+    eventType: 'guerra',
+    summary: 'Movidos pela inveja do poder de Safra, os outros cinco reinos decidem destruir sua população.',
+    kingdoms: ['safra', 'aurelion', 'nacaris', 'kharveth', 'elyndor', 'rhovaryn'],
+    canon: 'canonico',
+  },
+  {
+    slug: 'a-noite-das-cinzas',
+    title: 'A Noite das Cinzas',
+    era: 'a-noite-das-cinzas',
     dateLabel: 'Data não estabelecida',
     certainty: 'confirmado',
     eventType: 'catastrofe',
-    summary: 'Safra, o reino de ligação excepcional com as chamas, é destruído.',
-    body: `:::spoiler 1
-Os outros cinco reinos decidem exterminar a população de Safra, movidos pela inveja de seu poder.
-:::
-
-Os detalhes definitivos da destruição ainda não foram estabelecidos.`,
+    summary: 'Safra, o reino de ligação excepcional com as chamas, é destruída, e sua linhagem real se perde.',
+    body: 'Os detalhes definitivos da destruição ainda não foram estabelecidos.',
     kingdoms: ['safra'],
+    locations: ['ruinas-de-safra'],
     canon: 'canonico',
   },
   {
     slug: 'o-herdeiro-atravessa-o-portal',
     title: 'Um herdeiro sobrevive',
-    era: 'a-queda-de-safra',
-    dateLabel: 'Durante a destruição de Safra',
+    era: 'a-noite-das-cinzas',
+    dateLabel: 'Durante a Noite das Cinzas',
     certainty: 'confirmado',
     eventType: 'catastrofe',
     summary: 'Um herdeiro de Safra sobrevive após ser enviado por um portal.',
@@ -388,22 +416,33 @@ Os detalhes definitivos da destruição ainda não foram estabelecidos.`,
   {
     slug: 'o-desaparecimento-da-chama',
     title: 'O desaparecimento da Chama',
-    era: 'o-desaparecimento-da-chama',
-    dateLabel: 'Data desconhecida',
-    certainty: 'desconhecido',
+    era: 'a-noite-das-cinzas',
+    dateLabel: 'Durante o período da catástrofe',
+    certainty: 'confirmado',
     eventType: 'catastrofe',
-    summary: 'A Chama desaparece. A verdadeira causa é um dos mistérios preservados.',
-    canon: 'desconhecido',
+    summary: 'A Chama desaparece durante o período da catástrofe. A verdadeira causa é um dos mistérios preservados.',
+    canon: 'canonico',
   },
   {
-    slug: 'a-ascensao-do-caos',
-    title: 'A ascensão do Caos',
+    slug: 'o-apagamento-de-safra',
+    title: 'Safra é apagada da história oficial',
+    era: 'a-noite-das-cinzas',
+    dateLabel: 'Depois da catástrofe — período não estabelecido',
+    certainty: 'confirmado',
+    eventType: 'governo',
+    summary: 'A história oficial passa a reconhecer apenas cinco reinos.',
+    kingdoms: ['safra'],
+    canon: 'canonico',
+  },
+  {
+    slug: 'o-caos-se-torna-ameaca',
+    title: 'O Caos se torna uma ameaça',
     era: 'a-ascensao-do-caos',
-    dateLabel: 'Data não estabelecida',
-    certainty: 'planejado',
+    dateLabel: 'Depois do desaparecimento da Chama',
+    certainty: 'confirmado',
     eventType: 'mito',
-    summary: 'Movimento central da mitologia, ainda em desenvolvimento.',
-    canon: 'em_desenvolvimento',
+    summary: 'O desaparecimento da Chama perturba o equilíbrio e permite que o Caos se torne uma ameaça.',
+    canon: 'canonico',
   },
   {
     slug: 'os-sonhos-de-kael',
@@ -412,18 +451,18 @@ Os detalhes definitivos da destruição ainda não foram estabelecidos.`,
     dateLabel: 'Início do Livro I',
     certainty: 'confirmado',
     eventType: 'personagem',
-    summary: 'Os sonhos de Kael passam a apresentar lugares impossíveis, imagens do passado e acontecimentos que desafiam sua compreensão do mundo.',
+    summary: 'Aos dezesseis anos, os sonhos de Kael passam a apresentar lugares impossíveis, imagens do passado e acontecimentos que desafiam sua compreensão do mundo.',
     characters: ['kael-draken'],
     locations: ['brumafunda'],
     canon: 'canonico',
   },
   {
-    slug: 'a-fundacao-do-templo-da-chama',
+    slug: 'o-templo-da-chama',
     title: 'O Templo da Chama',
-    dateLabel: 'Data e localização desconhecidas',
+    dateLabel: 'Fundação e localização desconhecidas',
     certainty: 'desconhecido',
     eventType: 'fundacao',
-    summary: 'A origem, a localização e a história completa do Templo da Chama permanecem desconhecidas.',
+    summary: 'Lugar central ligado à proteção da Chama. Quando foi erguido, onde fica e qual é seu destino atual permanece desconhecido.',
     locations: ['templo-da-chama'],
     canon: 'desconhecido',
   },
@@ -456,10 +495,12 @@ export const SEED_ARTICLES: SeedArticle[] = [
     slug: 'a-chama-do-dragao',
     title: 'A Chama do Dragão',
     subtitle: 'A força que criou o mundo',
-    summary: 'A Chama do Dragão criou o mundo. Junto dela surgiu o Caos.',
-    body: `A **Chama do Dragão** criou o mundo. Junto dela surgiu o [[mitologia/a-ascensao-do-caos|Caos]].
+    summary: 'A Chama do Dragão criou o mundo. Com a criação surgiu o Caos, que a Chama a princípio manteve contido.',
+    body: `A **Chama do Dragão** criou o mundo. Com a criação surgiu o [[mitologia/a-ascensao-do-caos|Caos]], que a Chama inicialmente conteve — manteve sob controle.
 
-Posteriormente, [[mitologia/o-aparecimento-dos-seis-reinos|seis reinos]] foram estabelecidos, cada um ligado a fragmentos desse poder primordial.
+Posteriormente, [[mitologia/o-aparecimento-dos-seis-reinos|seis reinos]] foram estabelecidos, cada um ligado a fragmentos desse poder primordial. O [[mitologia/o-templo-da-chama|Templo da Chama]] era um lugar central relacionado à proteção da Chama.
+
+Durante o período da catástrofe que destruiu [[reinos/safra|Safra]], a Chama [[mitologia/o-desaparecimento-da-chama|desapareceu]]. Sem ela, o equilíbrio se rompeu.
 
 A natureza do Dragão e da própria Chama ainda está em desenvolvimento.`,
     canon: 'canonico',
@@ -470,10 +511,10 @@ A natureza do Dragão e da própria Chama ainda está em desenvolvimento.`,
     slug: 'o-surgimento-do-mundo',
     title: 'O surgimento do mundo',
     subtitle: 'Criação e Caos',
-    summary: 'O mundo nasce da Chama do Dragão — e, junto da Chama, surge o Caos.',
-    body: `O mundo foi criado pela [[mitologia/a-chama-do-dragao|Chama do Dragão]]. Junto da Chama surgiu o Caos.
+    summary: 'O mundo nasce da Chama do Dragão — e, com a criação, surge o Caos.',
+    body: `O mundo foi criado pela [[mitologia/a-chama-do-dragao|Chama do Dragão]]. Com a criação surgiu o Caos, contido pela Chama.
 
-A forma do mundo recém-criado, sua geografia original e o intervalo entre a criação e o estabelecimento dos reinos ainda não foram descritos.`,
+A forma do mundo recém-criado, sua geografia original e o intervalo entre a criação e o estabelecimento dos reinos ainda não foram descritos. Os mapas do [[atlas|Atlas]] são composições conceituais.`,
     canon: 'canonico',
   },
   {
@@ -494,7 +535,7 @@ Os nomes atualmente propostos são:
 - [[reinos/elyndor|Elyndor]] — conselho religioso e civil;
 - [[reinos/rhovaryn|Rhovaryn]] — liga de territórios autônomos.
 
-Nomes, capitais e características dos cinco reinos conhecidos ainda estão em desenvolvimento.`,
+Nomes, capitais e características dos cinco reinos conhecidos ainda estão em desenvolvimento. Os brasões exibidos no arquivo são propostas heráldicas.`,
     canon: 'canonico',
   },
   {
@@ -502,25 +543,59 @@ Nomes, capitais e características dos cinco reinos conhecidos ainda estão em d
     group: 'reinos',
     slug: 'o-templo-da-chama',
     title: 'O Templo da Chama',
-    subtitle: 'Um lugar sem coordenadas',
-    summary: 'A localização e a história completa do Templo da Chama permanecem um mistério preservado.',
-    body: `A localização e a história completa do [[locais/templo-da-chama|Templo da Chama]] permanecem um mistério preservado.`,
-    canon: 'desconhecido',
+    subtitle: 'O lugar que guardava a Chama',
+    summary: 'Lugar central à história dos reinos, relacionado à proteção da Chama. Sua localização exata e seu destino atual não são definidos.',
+    body: `O [[locais/templo-da-chama|Templo da Chama]] era um lugar central relacionado à proteção da [[mitologia/a-chama-do-dragao|Chama]], e por isso ocupa um lugar central também na história dos reinos.
+
+Onde ele fica, como era sua história completa e o que lhe aconteceu depois do [[mitologia/o-desaparecimento-da-chama|desaparecimento da Chama]] permanecem mistérios preservados.`,
+    canon: 'canonico',
   },
   {
     section: 'mitologia',
     group: 'queda',
-    slug: 'a-destruicao-de-safra',
-    title: 'A destruição de Safra',
-    subtitle: 'O reino desaparecido',
-    summary: 'Safra, que possuía uma ligação excepcional com as chamas, foi destruído.',
-    body: `[[reinos/safra|Safra]] possuía uma ligação excepcional com as chamas. O reino foi destruído.
+    slug: 'safra-e-a-noite-das-cinzas',
+    title: 'Safra e a Noite das Cinzas',
+    subtitle: 'A ferida da história',
+    summary: 'A vida de uma civilização ligada às chamas, a decisão dos cinco reinos, a catástrofe, a linhagem perdida, as ruínas e o apagamento.',
+    body: `## Uma civilização viva
+
+[[reinos/safra|Safra]] era um dos seis reinos, e possuía uma ligação excepcional com as chamas. Era um povo com suas cidades, suas ruas, sua arquitetura e sua cultura — uma civilização que existiu de verdade.
+
+![Uma cidade de Safra ao entardecer, com terraços, cúpulas e ruas iluminadas.](/images/atlas/safra-antes.webp "Safra antes da destruição — conceito artístico.")
+
+Os detalhes de sua cultura, de suas cidades e de seus costumes ainda estão em desenvolvimento.
+
+## A decisão dos cinco reinos
+
+Os outros cinco reinos decidiram destruir a população de Safra, movidos pela inveja de seu poder.
+
+## A Noite das Cinzas
+
+Safra foi destruída. A catástrofe é lembrada como a **Noite das Cinzas**. Durante esse mesmo período, a [[mitologia/o-desaparecimento-da-chama|Chama desapareceu]].
+
+![A cidade em chamas sob uma coluna de fumaça; silhuetas distantes observam.](/images/atlas/queda-safra.webp "A Noite das Cinzas — conceito artístico.")
+
+Os detalhes definitivos da destruição não foram estabelecidos.
+
+## A linhagem perdida
+
+Com Safra, perdeu-se a sua linhagem real.
 
 :::spoiler 1
-Os outros cinco reinos decidiram exterminar sua população por inveja de seu poder. Um herdeiro sobreviveu após ser enviado por um portal.
+Um herdeiro sobreviveu após ser enviado por um portal.
 :::
 
-Os detalhes definitivos da destruição e o destino completo de Safra permanecem desconhecidos.`,
+## As ruínas
+
+Restaram [[locais/ruinas-de-safra|ruínas]]. Sua localização e seu estado atual ainda não foram definidos.
+
+![Arcos partidos cobertos de cinza sob a luz fria da aurora.](/images/atlas/ruinas-safra.webp "Ruínas de Safra — conceito artístico.")
+
+## O apagamento
+
+Depois da destruição, Safra foi apagada da história oficial. A versão reconhecida pelos reinos admite apenas cinco — como mostra o mapa do mundo conhecido no [[atlas|Atlas]].
+
+O destino completo de Safra permanece um mistério preservado.`,
     canon: 'canonico',
   },
   {
@@ -529,31 +604,39 @@ Os detalhes definitivos da destruição e o destino completo de Safra permanecem
     slug: 'o-desaparecimento-da-chama',
     title: 'O desaparecimento da Chama',
     subtitle: 'Uma ausência sem causa conhecida',
-    summary: 'A Chama desapareceu. A verdadeira causa é um dos mistérios preservados do universo.',
-    body: 'A [[mitologia/a-chama-do-dragao|Chama]] desapareceu. A verdadeira causa desse desaparecimento é um dos mistérios preservados do universo.',
-    canon: 'desconhecido',
+    summary: 'A Chama desapareceu durante o período da catástrofe. Sua ausência rompeu o equilíbrio e permitiu que o Caos se tornasse uma ameaça.',
+    body: `A [[mitologia/a-chama-do-dragao|Chama]] desapareceu durante o período da catástrofe que destruiu Safra — a [[mitologia/safra-e-a-noite-das-cinzas|Noite das Cinzas]].
+
+O desaparecimento perturbou o equilíbrio do mundo e permitiu que o [[mitologia/a-ascensao-do-caos|Caos]] se tornasse uma ameaça.
+
+A verdadeira causa desse desaparecimento é um dos mistérios preservados do universo.`,
+    canon: 'canonico',
   },
   {
     section: 'mitologia',
     group: 'queda',
     slug: 'o-seculo-perdido',
     title: 'O Século Perdido',
-    subtitle: 'Seiscentos anos sem registro',
-    summary: 'Seiscentos anos conhecidos como Século Perdido. Seus acontecimentos permanecem desconhecidos.',
-    body: 'Chamam-se **Século Perdido** os seiscentos anos cujos acontecimentos permanecem desconhecidos.',
-    canon: 'desconhecido',
+    subtitle: 'Cerca de seiscentos anos sem registro',
+    summary: 'Aproximadamente seiscentos anos de história perdida. Seus acontecimentos permanecem desconhecidos.',
+    body: `Chama-se **Século Perdido** um período de aproximadamente seiscentos anos de história perdida. Apesar do nome, ele não corresponde a um único século.
+
+O que aconteceu durante esses anos permanece desconhecido.`,
+    canon: 'canonico',
   },
   {
     section: 'mitologia',
     group: 'queda',
     slug: 'a-ascensao-do-caos',
     title: 'A ascensão do Caos',
-    subtitle: 'O que nasceu junto da Chama',
-    summary: 'O Caos surgiu junto da Chama na criação do mundo. Sua natureza integral não é revelada neste arquivo.',
-    body: `O Caos surgiu junto da [[mitologia/a-chama-do-dragao|Chama do Dragão]], na criação do mundo.
+    subtitle: 'O que nasceu com a criação',
+    summary: 'O Caos surgiu com a criação e foi contido pela Chama. Sem ela, tornou-se uma ameaça. Sua natureza integral não é revelada neste arquivo.',
+    body: `O Caos surgiu com a criação do mundo e foi inicialmente contido — mantido sob controle — pela [[mitologia/a-chama-do-dragao|Chama do Dragão]].
 
-A ascensão do Caos é um dos movimentos da mitologia ainda em desenvolvimento. Sua natureza integral permanece desconhecida.`,
-    canon: 'em_desenvolvimento',
+Quando a Chama [[mitologia/o-desaparecimento-da-chama|desapareceu]], o equilíbrio se rompeu, e o Caos pôde se tornar uma ameaça.
+
+O que o Caos é, por inteiro, permanece desconhecido.`,
+    canon: 'canonico',
   },
   {
     section: 'mitologia',
@@ -572,9 +655,9 @@ A ascensão do Caos é um dos movimentos da mitologia ainda em desenvolvimento. 
     slug: 'a-natureza-da-chama',
     title: 'A natureza da Chama',
     summary: 'A Chama do Dragão é a origem do mundo e do poder primordial.',
-    body: `A [[mitologia/a-chama-do-dragao|Chama do Dragão]] criou o mundo. Os seis reinos estão ligados a fragmentos desse poder primordial, e [[reinos/safra|Safra]] possuía uma ligação excepcional com as chamas.
+    body: `A [[mitologia/a-chama-do-dragao|Chama do Dragão]] criou o mundo e conteve o Caos que surgiu com a criação. Os seis reinos estão ligados a fragmentos desse poder primordial, e [[reinos/safra|Safra]] possuía uma ligação excepcional com as chamas.
 
-Como a Chama se relaciona com a Ressonância ainda está em desenvolvimento.`,
+A Chama desapareceu durante o período da catástrofe que destruiu Safra. Como ela se relaciona com a Ressonância ainda está em desenvolvimento.`,
     canon: 'em_desenvolvimento',
   },
   {
@@ -678,30 +761,59 @@ export interface SeedMystery {
 export const SEED_MYSTERIES: SeedMystery[] = [
   {
     slug: 'causa-do-desaparecimento-da-chama',
-    title: 'A verdadeira causa do desaparecimento da Chama',
-    description: 'Por que a Chama desapareceu?',
+    title: 'Por que a Chama desapareceu?',
+    description: 'Ela desapareceu durante o período da catástrofe. A verdadeira causa permanece desconhecida.',
     relatedHref: '/mitologia/o-desaparecimento-da-chama',
   },
-  { slug: 'destino-de-safra', title: 'O destino completo de Safra', description: 'O que realmente aconteceu ao reino desaparecido?', relatedHref: '/reinos/safra' },
+  {
+    slug: 'linhagem-de-safra',
+    title: 'O destino da linhagem real de Safra',
+    description: 'Com a destruição de Safra, sua linhagem real se perdeu. O que aconteceu a ela?',
+    relatedHref: '/mitologia/safra-e-a-noite-das-cinzas',
+  },
+  {
+    slug: 'o-portal',
+    title: 'O portal',
+    description: 'Que portal levou o herdeiro de Safra — e para onde?',
+    relatedHref: '/mitologia/safra-e-a-noite-das-cinzas',
+    spoiler: 1,
+  },
+  {
+    slug: 'natureza-do-caos',
+    title: 'A natureza integral do Caos',
+    description: 'O que é, por inteiro, aquilo que surgiu com a criação e foi contido pela Chama?',
+    relatedHref: '/mitologia/a-ascensao-do-caos',
+  },
+  {
+    slug: 'acontecimentos-do-seculo-perdido',
+    title: 'O que aconteceu no Século Perdido?',
+    description: 'Cerca de seiscentos anos de história perdida.',
+    relatedHref: '/mitologia/o-seculo-perdido',
+  },
+  {
+    slug: 'templo-da-chama',
+    title: 'Onde está o Templo da Chama?',
+    description: 'Sua localização exata, sua história completa e seu destino atual não são conhecidos.',
+    relatedHref: '/locais/templo-da-chama',
+  },
+  {
+    slug: 'skrugheim',
+    title: 'O que é Skrugheim?',
+    description: 'A profecia diz que Skrugheim abrirá suas portas. Sua natureza permanece desconhecida.',
+    relatedHref: '/manuscritos/quando-a-chama-despertar',
+  },
+  {
+    slug: 'destino-de-safra',
+    title: 'O destino completo de Safra',
+    description: 'O que realmente aconteceu ao reino apagado da história oficial?',
+    relatedHref: '/reinos/safra',
+  },
   {
     slug: 'nome-de-nascimento-de-kael',
     title: 'O nome de nascimento de Kael',
     description: 'O nome com que Kael nasceu permanece desconhecido.',
     relatedHref: '/personagens/kael-draken',
     spoiler: 1,
-  },
-  { slug: 'natureza-do-caos', title: 'A natureza integral do Caos', description: 'O que é, por inteiro, aquilo que surgiu junto da Chama?', relatedHref: '/mitologia/a-ascensao-do-caos' },
-  {
-    slug: 'acontecimentos-do-seculo-perdido',
-    title: 'Os acontecimentos do Século Perdido',
-    description: 'O que aconteceu durante os seiscentos anos sem registro?',
-    relatedHref: '/mitologia/o-seculo-perdido',
-  },
-  {
-    slug: 'templo-da-chama',
-    title: 'A localização e a história do Templo da Chama',
-    description: 'Onde fica o Templo da Chama, e qual é sua história completa?',
-    relatedHref: '/locais/templo-da-chama',
   },
 ]
 
@@ -731,26 +843,19 @@ e a morte caminhará entre os vivos.`,
     origin: 'Desconhecida.',
     dateLabel: 'Desconhecida',
     context:
-      'Frase de referência associada a [[livros/o-sussurro-da-chama-antiga|Livro I — O Sussurro da Chama Antiga]]. Seus significados não são explicados neste arquivo.',
+      'Frase de referência associada a [[livros/o-sussurro-da-chama-antiga|Livro I — O Sussurro da Chama Antiga]]. Seus significados não são explicados neste arquivo, e a natureza de Skrugheim permanece desconhecida.',
     reliability: 'desconhecido',
     canon: 'canonico',
     tags: ['profecia', 'chama'],
   },
 ]
 
-export const SEED_MAP = {
-  slug: 'mapa-geral',
-  title: 'Mapa geral dos Seis Reinos',
-  description:
-    'Carta geral do mundo. A geografia oficial ainda está em desenvolvimento: enquanto não houver um mapa aprovado, o atlas exibe uma carta-base sem posições geográficas.',
-}
-
 export const SEED_BOOK = {
   slug: 'o-sussurro-da-chama-antiga',
   volume: 1,
   title: 'O Sussurro da Chama Antiga',
   subtitle: 'Kael Draken — Livro I',
-  synopsis: `Kael tem dezesseis anos e cresceu em um vilarejo distante, criado por uma família humilde e amorosa. É inteligente, gentil e alegre — mas também reservado e impulsivo, e aprendeu a usar máscaras sociais para esconder a dificuldade de lidar com a própria raiva.
+  synopsis: `Kael tem dezesseis anos e cresceu em um vilarejo distante, criado por uma família adotiva, humilde e amorosa. É inteligente, gentil e alegre — mas também reservado e impulsivo, e aprendeu a usar máscaras sociais para esconder a dificuldade de lidar com a própria raiva.
 
 Quando seus sonhos começam a se intensificar, eles trazem lugares impossíveis, imagens do passado e acontecimentos que desafiam tudo o que ele entende sobre o mundo.`,
   editorialInfo: `- **Saga:** Kael Draken
@@ -774,7 +879,7 @@ O universo está em construção. Por isso, cada verbete traz seu estado editori
 
 Você também pode escolher o seu nível de spoiler no topo da página. Por padrão, o arquivo não revela nada além do que se pode saber antes de abrir o livro.
 
-Comece pelo [[atlas|Atlas dos Seis Reinos]] ou pela [[mitologia|mitologia]].`,
+Comece pelo [[atlas|Atlas dos Seis Reinos]] — que pode ser explorado em três dimensões — ou pela [[mitologia|mitologia]].`,
 }
 
 export const SEED_SETTINGS: Record<string, string> = {

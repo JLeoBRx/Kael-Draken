@@ -9,24 +9,24 @@ export type CanonState = (typeof CANON_STATES)[number]
 
 export const CANON_INFO: Record<CanonState, { label: string; short: string; description: string }> = {
   canonico: {
-    label: 'Canônico',
-    short: 'Canônico',
-    description: 'Confirmado para a história.',
+    label: 'Estabelecido',
+    short: 'Estabelecido',
+    description: 'Confirmado pelo autor para a história (canônico).',
   },
   provisorio: {
-    label: 'Provisório',
-    short: 'Provisório',
-    description: 'Proposta que ainda pode mudar.',
+    label: 'Proposta',
+    short: 'Proposta',
+    description: 'Proposta de trabalho que ainda pode mudar (provisório).',
   },
   em_desenvolvimento: {
-    label: 'Em desenvolvimento',
-    short: 'Em desenvolvimento',
-    description: 'Conteúdo sendo escrito.',
+    label: 'Em aberto',
+    short: 'Em aberto',
+    description: 'Ainda não decidido; conteúdo em desenvolvimento.',
   },
   desconhecido: {
-    label: 'Desconhecido',
+    label: 'Desconhecido no mundo',
     short: 'Mistério',
-    description: 'Mistério intencionalmente não resolvido.',
+    description: 'Mistério intencionalmente não resolvido — também desconhecido dentro do mundo.',
   },
   arquivado: {
     label: 'Arquivado',

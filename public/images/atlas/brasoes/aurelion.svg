@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-label="Brasão conceitual de Aurelion (proposta)">
+<title>Brasão conceitual de Aurelion — proposta heráldica</title>
+<defs><linearGradient id="g-aurelion" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".10"/><stop offset=".55" stop-color="#ffffff" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity=".25"/></linearGradient></defs>
+<path d="M120 12 L222 36 V128 C222 198 176 246 120 270 C64 246 18 198 18 128 V36 Z" fill="#3b2f17" stroke="#8d7240" stroke-width="5"/>
+<path d="M120 26 L208 47 V129 C208 189 169 232 120 254 C71 232 32 189 32 129 V47 Z" fill="none" stroke="#cdb27f" stroke-width="1.6" opacity=".7"/>
+<path d="M64 106 L120 72 L176 106 Z" fill="#cdb27f" stroke="#120d09" stroke-width="2.5"/>
+<rect x="66" y="106" width="108" height="10" fill="#cdb27f" stroke="#120d09" stroke-width="2"/>
+<g fill="#cdb27f" stroke="#120d09" stroke-width="2">
+<rect x="74" y="118" width="11" height="52"/><rect x="98" y="118" width="11" height="52"/><rect x="131" y="118" width="11" height="52"/><rect x="155" y="118" width="11" height="52"/>
+</g>
+<rect x="62" y="170" width="116" height="10" fill="#cdb27f" stroke="#120d09" stroke-width="2"/>
+<path d="M58 206 C80 196 100 216 120 206 C140 196 160 216 182 206" fill="none" stroke="#cdb27f" stroke-width="6"/>
+<path d="M70 226 C88 218 104 234 120 226 C136 218 152 234 170 226" fill="none" stroke="#cdb27f" stroke-width="5"/>
+<path d="M120 12 L222 36 V128 C222 198 176 246 120 270 C64 246 18 198 18 128 V36 Z" fill="url(#g-aurelion)"/>
+</svg>

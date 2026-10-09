@@ -18,7 +18,10 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "db:setup": "npm run db:migrate && npm run db:seed",
-    "admin:hash": "tsx scripts/hash-password.ts"
+    "admin:hash": "tsx scripts/hash-password.ts",
+    "art": "python3 scripts/art/world.py && python3 scripts/art/scenes.py && python3 scripts/art/emblems.py && node scripts/art/panel.mjs",
+    "art:mapas": "python3 scripts/art/world.py",
+    "art:regioes": "python3 scripts/art/world.py --regenerar"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

@@ -9,6 +9,7 @@ export function buildNav(bookHref: string): NavItem[] {
     { href: '/ressonancia', label: 'Ressonância', match: ['/ressonancia'] },
     { href: '/locais', label: 'Locais', match: ['/locais'] },
     { href: '/manuscritos', label: 'Manuscritos', match: ['/manuscritos'] },
+    { href: '/misterios', label: 'Mistérios', match: ['/misterios'] },
     { href: bookHref, label: 'Livro I', match: ['/livros'] },
     { href: '/novidades', label: 'Novidades', match: ['/novidades'] },
   ]

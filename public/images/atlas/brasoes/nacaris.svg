@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-label="Brasão conceitual de Nácaris (proposta)">
+<title>Brasão conceitual de Nácaris — proposta heráldica</title>
+<defs><linearGradient id="g-nacaris" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".10"/><stop offset=".55" stop-color="#ffffff" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity=".25"/></linearGradient></defs>
+<path d="M120 12 L222 36 V128 C222 198 176 246 120 270 C64 246 18 198 18 128 V36 Z" fill="#18303f" stroke="#8d7240" stroke-width="5"/>
+<path d="M120 26 L208 47 V129 C208 189 169 232 120 254 C71 232 32 189 32 129 V47 Z" fill="none" stroke="#cdb27f" stroke-width="1.6" opacity=".7"/>
+<path d="M120 52 L126 70 L144 76 L126 82 L120 100 L114 82 L96 76 L114 70 Z" fill="#cdb27f" stroke="#120d09" stroke-width="2"/>
+<path d="M116 104 V174" stroke="#cdb27f" stroke-width="6"/>
+<path d="M120 108 L162 164 L120 164 Z" fill="#cdb27f" stroke="#120d09" stroke-width="2.5"/>
+<path d="M112 116 L84 160 L112 160 Z" fill="#cdb27f" stroke="#120d09" stroke-width="2.5"/>
+<path d="M70 176 L170 176 L156 196 L84 196 Z" fill="#cdb27f" stroke="#120d09" stroke-width="2.5"/>
+<path d="M52 214 C70 204 86 224 104 214 C122 204 138 224 156 214 C170 206 180 214 188 214" fill="none" stroke="#cdb27f" stroke-width="6"/>
+<path d="M120 12 L222 36 V128 C222 198 176 246 120 270 C64 246 18 198 18 128 V36 Z" fill="url(#g-nacaris)"/>
+</svg>
