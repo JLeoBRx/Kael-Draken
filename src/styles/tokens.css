@@ -1,0 +1,113 @@
+/* ────────────────────────────────────────────────────────────
+   Kael Draken — tokens de design
+   Carvão · grafite · pedra · dourado envelhecido · vermelho profundo · pergaminho
+   ──────────────────────────────────────────────────────────── */
+
+:root {
+  color-scheme: dark;
+
+  /* Carvão e grafite */
+  --ink-1000: #090807;
+  --ink-950: #0e0d0c;
+  --ink-900: #131210;
+  --ink-850: #181715;
+  --ink-800: #1f1d1b;
+  --ink-700: #2a2825;
+  --ink-600: #393632;
+
+  /* Pedra */
+  --stone-500: #5c5751;
+  --stone-400: #8a847b;
+  --stone-300: #aba497;
+  --stone-200: #cbc4b5;
+
+  /* Marfim e pergaminho */
+  --ivory-100: #ebe4d4;
+  --ivory-50: #f5f0e5;
+  --parchment-100: #ece3cd;
+  --parchment-200: #e2d6b9;
+  --parchment-300: #d2c29d;
+  --parchment-ink: #2a2118;
+  --parchment-muted: #5b4e3f;
+  --parchment-line: #c4b38d;
+
+  /* Dourado envelhecido (texto pequeno usa --gold-400 para manter o contraste) */
+  --gold-600: #96773f;
+  --gold-500: #b8975a;
+  --gold-400: #cdb27f;
+  --gold-300: #ddc9a2;
+
+  /* Vermelho profundo — fogo, Safra, Caos */
+  --ember-900: #3d0f0a;
+  --ember-800: #5a160e;
+  --ember-700: #7a1f14;
+  --ember-600: #9c2c1c;
+  --ember-400: #d9735c;
+
+  /* Papéis semânticos */
+  --bg: var(--ink-950);
+  --bg-raised: var(--ink-900);
+  --surface: var(--ink-850);
+  --surface-2: var(--ink-800);
+  --line: #2f2c28;
+  --line-strong: #46423c;
+  --text: var(--ivory-100);
+  --text-muted: var(--stone-300);
+  --text-faint: var(--stone-400);
+  --accent: var(--gold-500);
+  --accent-text: var(--gold-400);
+  --fire: var(--ember-700);
+  --fire-text: var(--ember-400);
+  --focus: #e8c987;
+
+  /* Tipografia */
+  --font-display: var(--font-cormorant), 'Cormorant Garamond', 'Garamond', Georgia, serif;
+  --font-body: var(--font-literata), 'Literata', Georgia, 'Times New Roman', serif;
+  --font-ui: var(--font-literata), 'Literata', Georgia, serif;
+
+  --fs-xs: 0.8125rem;
+  --fs-sm: 0.9375rem;
+  --fs-base: 1.0625rem;
+  --fs-md: 1.1875rem;
+  --fs-lg: 1.375rem;
+  --fs-xl: clamp(1.6rem, 1.1rem + 1.6vw, 2.1rem);
+  --fs-2xl: clamp(2rem, 1.2rem + 2.6vw, 2.9rem);
+  --fs-3xl: clamp(2.5rem, 1.3rem + 4.2vw, 4.25rem);
+  --fs-display: clamp(3rem, 1.4rem + 6vw, 5.75rem);
+
+  /* Espaçamento */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --space-9: 6rem;
+  --space-10: 8rem;
+
+  --gutter: 16px;
+  --container: 1240px;
+  --container-wide: 1440px;
+  --measure: 68ch;
+
+  --radius: 2px;
+  --header-h: 64px;
+
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --dur: 220ms;
+}
+
+@media (min-width: 720px) {
+  :root {
+    --gutter: 32px;
+    --header-h: 72px;
+  }
+}
+
+@media (min-width: 1200px) {
+  :root {
+    --gutter: 48px;
+  }
+}

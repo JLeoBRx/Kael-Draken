@@ -1,0 +1,27 @@
+# dependências
+/node_modules
+
+# build
+/.next/
+/out/
+/build
+*.tsbuildinfo
+next-env.d.ts
+
+# dados locais (banco SQLite e imagens enviadas)
+/data/*
+!/data/.gitkeep
+
+# testes
+/test-results/
+/playwright-report/
+/coverage/
+
+# ambiente
+.env
+.env*.local
+!.env.example
+
+# sistema
+.DS_Store
+npm-debug.log*
