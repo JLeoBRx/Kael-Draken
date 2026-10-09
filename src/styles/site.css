@@ -2568,6 +2568,7 @@ main {
 
 .timeline-layout {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-6);
   padding-block: var(--space-7) var(--space-8);
 }
@@ -2578,6 +2579,10 @@ main {
     gap: var(--space-8);
     align-items: start;
   }
+}
+
+.timeline-layout > aside {
+  min-width: 0;
 }
 
 .era-nav {
@@ -3665,5 +3670,29 @@ main {
 
   .hero__art img {
     opacity: 0.6;
+  }
+}
+
+@media (max-width: 999px) {
+  .infobox__media {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-4);
+  }
+
+  .infobox__media > * {
+    width: min(100%, 240px);
+  }
+}
+
+@media (max-width: 599px) {
+  .world-preview .map-viewer__ribbon {
+    display: none;
+  }
+
+  .world-preview__cta {
+    right: var(--space-2);
+    bottom: var(--space-2);
+    font-size: 0.6875rem;
   }
 }

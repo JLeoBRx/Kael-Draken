@@ -67,7 +67,7 @@ export async function getOfficialCover(settingValue: string | undefined, alt: st
     if (image) return { ...image, alt: image.alt || alt }
   }
   for (const name of COVER_CANDIDATES) {
-    const file = path.join(process.cwd(), 'public', 'capa', name)
+    const file = path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'capa', name)
     if (existsSync(file)) {
       try {
         const size = imageSize(readFileSync(file))

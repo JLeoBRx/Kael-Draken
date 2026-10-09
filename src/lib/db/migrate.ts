@@ -4,7 +4,7 @@ import type { Client } from '@libsql/client'
 import type { Database } from './connect'
 
 /** Aplica as migrações SQL versionadas na pasta ./drizzle. */
-export async function runMigrations(db: Database, client: Client, migrationsFolder = path.resolve(process.cwd(), 'drizzle')) {
+export async function runMigrations(db: Database, client: Client, migrationsFolder = path.resolve(/*turbopackIgnore: true*/ process.cwd(), 'drizzle')) {
   const url = process.env.DATABASE_URL ?? ''
   if (!url || url.startsWith('file:')) {
     // WAL melhora leituras concorrentes no SQLite local; a configuração persiste no arquivo.

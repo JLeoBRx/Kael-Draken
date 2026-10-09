@@ -1,0 +1,15 @@
+.git
+node_modules
+.next
+data
+test-results
+playwright-report
+coverage
+scripts/art/.build
+scripts/art/.preview
+**/__pycache__
+*.tsbuildinfo
+.env
+.env*.local
+Dockerfile
+.dockerignore

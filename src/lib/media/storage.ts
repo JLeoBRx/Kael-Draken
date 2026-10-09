@@ -14,7 +14,7 @@ export const ACCEPTED_TYPES: Record<string, string> = {
 }
 
 export function uploadsDir(): string {
-  return path.resolve(process.env.UPLOADS_DIR?.trim() || './data/uploads')
+  return path.resolve(/*turbopackIgnore: true*/ process.env.UPLOADS_DIR?.trim() || './data/uploads')
 }
 
 export function maxUploadBytes(): number {
@@ -25,7 +25,7 @@ export function maxUploadBytes(): number {
 /** Resolve um caminho relativo dentro da pasta de uploads, recusando travessia de diretórios. */
 export function resolveUploadPath(relative: string): string | null {
   const base = uploadsDir()
-  const full = path.resolve(base, relative)
+  const full = path.resolve(/*turbopackIgnore: true*/ base, relative)
   if (full !== base && full.startsWith(base + path.sep)) return full
   return null
 }
@@ -62,8 +62,8 @@ export async function storeUpload(file: File): Promise<StoredFile> {
   const relative = `${folder}/${randomUUID()}.${ext}`
   const full = resolveUploadPath(relative)
   if (!full) throw new UploadError('Caminho de upload inválido.')
-  await mkdir(path.dirname(full), { recursive: true })
-  await writeFile(full, buffer)
+  await mkdir(path.dirname(/*turbopackIgnore: true*/ full), { recursive: true })
+  await writeFile(/*turbopackIgnore: true*/ full, buffer)
 
   return {
     path: relative,
@@ -79,7 +79,7 @@ export async function readUpload(relative: string): Promise<Buffer | null> {
   const full = resolveUploadPath(relative)
   if (!full) return null
   try {
-    return await readFile(full)
+    return await readFile(/*turbopackIgnore: true*/ full)
   } catch {
     return null
   }
@@ -88,5 +88,5 @@ export async function readUpload(relative: string): Promise<Buffer | null> {
 export async function removeUpload(relative: string) {
   const full = resolveUploadPath(relative)
   if (!full) return
-  await unlink(full).catch(() => {})
+  await unlink(/*turbopackIgnore: true*/ full).catch(() => {})
 }

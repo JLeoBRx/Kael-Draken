@@ -289,6 +289,7 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
       const el = document.createElement('button')
       el.type = 'button'
       el.className = `world3d__label${r.erased ? ' is-erased' : ''}`
+      el.dataset.region = r.id
       el.textContent = r.erased ? opts.labelText.erased : r.name
       el.setAttribute('aria-label', r.erased ? `${opts.labelText.erased} — região apagada da história oficial` : `${r.name} — ver detalhes`)
       el.addEventListener('click', () => opts.onSelect(r.id))
@@ -339,6 +340,9 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
       renderer.render(scene, camera)
       updateLabels()
       needsRender = false
+      // Estado da câmera exposto para testes automatizados e depuração.
+      canvas.dataset.distance = camera.position.distanceTo(controls.target).toFixed(2)
+      canvas.dataset.azimuth = controls.getAzimuthalAngle().toFixed(3)
     }
   })
 
@@ -387,15 +391,44 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
     for (const r of regions) if (pointInPolygon(u, v, r.polygon)) return r.id
     return null
   }
-  let down: { x: number; y: number; t: number } | null = null
+  let down: { x: number; y: number; t: number; label: string | null } | null = null
+  let forwardedLabel: string | null = null
   const onPointerDown = (e: PointerEvent) => {
-    down = { x: e.clientX, y: e.clientY, t: performance.now() }
+    down = { x: e.clientX, y: e.clientY, t: performance.now(), label: forwardedLabel }
+    forwardedLabel = null
   }
   const onPointerUp = (e: PointerEvent) => {
     if (!down || !controls.enabled) return
     const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y)
-    if (moved < 7 && performance.now() - down.t < 600) opts.onSelect(pick(e.clientX, e.clientY))
+    if (moved < 7 && performance.now() - down.t < 600) opts.onSelect(down.label ?? pick(e.clientX, e.clientY))
     down = null
+  }
+  // Em telas de toque os rótulos cobrem parte do terreno: um gesto que começa
+  // sobre um deles é repassado aos controles da câmera (girar, pinçar). Um toque
+  // curto continua selecionando a região do rótulo, via onPointerUp.
+  const onLabelPointerDown = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse' || !controls.enabled) return
+    const label = (e.target as HTMLElement).closest<HTMLElement>('.world3d__label')
+    if (!label) return
+    forwardedLabel = label.dataset.region ?? null
+    canvas.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: e.pointerId,
+        pointerType: e.pointerType,
+        isPrimary: e.isPrimary,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        screenX: e.screenX,
+        screenY: e.screenY,
+        button: e.button,
+        buttons: e.buttons,
+        width: e.width,
+        height: e.height,
+        pressure: e.pressure,
+      }),
+    )
   }
   let hoverFrame = 0
   const onPointerMove = (e: PointerEvent) => {
@@ -432,6 +465,7 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
     }
   }
   canvas.addEventListener('pointerdown', onPointerDown)
+  labelLayer.addEventListener('pointerdown', onLabelPointerDown)
   canvas.addEventListener('pointerup', onPointerUp)
   canvas.addEventListener('pointermove', onPointerMove)
   canvas.addEventListener('keydown', onKeyDown)
@@ -544,6 +578,7 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
       if (hoverFrame) cancelAnimationFrame(hoverFrame)
       observer.disconnect()
       canvas.removeEventListener('pointerdown', onPointerDown)
+      labelLayer.removeEventListener('pointerdown', onLabelPointerDown)
       canvas.removeEventListener('pointerup', onPointerUp)
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('keydown', onKeyDown)

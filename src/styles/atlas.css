@@ -54,7 +54,7 @@
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--stone-300);
 }
 
 .world-atlas__version-note {
@@ -236,6 +236,7 @@
   letter-spacing: 0.04em;
   white-space: nowrap;
   pointer-events: auto;
+  touch-action: none;
   transition: opacity 200ms var(--ease);
 }
 

@@ -14,7 +14,7 @@ export function resolveDatabaseUrl(): string {
 export function connect(url = resolveDatabaseUrl()): { client: Client; db: Database } {
   if (url.startsWith('file:')) {
     const filePath = url.slice('file:'.length)
-    mkdirSync(path.dirname(path.resolve(filePath)), { recursive: true })
+    mkdirSync(path.dirname(path.resolve(/*turbopackIgnore: true*/ filePath)), { recursive: true })
   }
   const client = createClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN || undefined })
   return { client, db: drizzle(client, { schema }) }
