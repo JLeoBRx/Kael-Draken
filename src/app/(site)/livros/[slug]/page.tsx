@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { IllustrationStrip } from '@/components/book/IllustrationViews'
 import { EditorialBadges } from '@/components/ui/editorial'
 import { EntrySection, Gallery, RelatedList, SpoilerGate, TagList } from '@/components/ui/entry'
 import { BookCover } from '@/components/ui/media'
 import { PageHero } from '@/components/ui/PageHero'
+import { listBookIllustrations, toIllustrationItems } from '@/lib/content/illustrations'
 import { getOfficialCover } from '@/lib/content/media'
 import { getBook } from '@/lib/content/queries'
 import { prepareRichText } from '@/lib/content/rich'
@@ -39,6 +41,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const synopsis = render(b.synopsis, { headingOffset: 1 })
   const editorial = render(b.editorialInfo, { headingOffset: 1 })
   const materials = render(b.materials, { headingOffset: 1 })
+  const illustrations = toIllustrationItems(await listBookIllustrations(b, viewer))
 
   return (
     <article>
@@ -84,6 +87,12 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
               <p className="timeline-empty">Nenhum capítulo ou trecho foi autorizado para publicação até o momento.</p>
             )}
           </section>
+          <IllustrationStrip
+            items={illustrations}
+            galleryHref={paths.bookIllustrations(b.slug)}
+            volume={toRoman(b.volume)}
+            intro="Imagens que acompanham os primeiros passos de Kael Draken e os vestígios de uma história que o mundo tentou esquecer."
+          />
           <div className="related-grid">
             <RelatedList title="Personagens" items={data.characters.map((c) => ({ title: c.name, href: paths.character(c.slug) }))} />
             <RelatedList title="Lugares" items={data.locations.map((l) => ({ title: l.name, href: paths.location(l.slug) }))} />

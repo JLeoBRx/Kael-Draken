@@ -6,8 +6,9 @@ import { EntityForm } from '@/components/admin/EntityForm'
 import { MarkerEditor } from '@/components/admin/MarkerEditor'
 import { RelationEditor } from '@/components/admin/RelationEditor'
 import { COLLECTIONS, isCollectionKey } from '@/lib/admin/collections'
-import { entityOptions, loadForm, vocabularyOptions } from '@/lib/admin/data'
+import { entityOptions, illustrationStatus, loadForm, vocabularyOptions } from '@/lib/admin/data'
 import { db, schema as s } from '@/lib/db'
+import { effectiveDpi, PRINT_SPEC, ratioDeviation } from '@/lib/illustrations'
 
 export const metadata: Metadata = { title: 'Editar' }
 
@@ -56,6 +57,47 @@ export default async function EditEntityPage({ params, searchParams }: { params:
     )
   }
 
+  let illustrationInfo = null
+  if (collection === 'ilustracoes' && data.row) {
+    const info = await illustrationStatus(data.row)
+    illustrationInfo = (
+      <section className="adm-card adm-illustration" aria-labelledby="ilustracao-atual">
+        <h2 id="ilustracao-atual">Imagem atual</h2>
+        {info.src ? (
+          <div className="adm-illustration__body">
+            {/* eslint-disable-next-line @next/next/no-img-element -- miniatura do painel, sem otimização */}
+            <img src={info.src} alt="" width={info.width} height={info.height} className="adm-illustration__thumb" />
+            <dl className="adm-illustration__facts">
+              <div>
+                <dt>Origem</dt>
+                <dd>{info.source === 'painel' ? 'Imagem escolhida no painel' : `Arquivo versionado ${info.src}`}</dd>
+              </div>
+              <div>
+                <dt>Dimensões</dt>
+                <dd>
+                  {info.width} × {info.height} px · {effectiveDpi(info.width)} DPI em {String(PRINT_SPEC.widthCm).replace('.', ',')} × {PRINT_SPEC.heightCm} cm
+                </dd>
+              </div>
+              <div>
+                <dt>Proporção</dt>
+                <dd>{ratioDeviation(info.width, info.height) <= 0.02 ? '31:46 (15,5 × 23 cm)' : `${(info.width / info.height).toFixed(3)} — esperado 0,674 (31:46)`}</dd>
+              </div>
+            </dl>
+          </div>
+        ) : (
+          <p className="adm-help">Nenhuma imagem ainda. O site mostra “Arte em produção” para este capítulo.</p>
+        )}
+        {info.warnings.length ? (
+          <ul className="adm-warnings">
+            {info.warnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
+    )
+  }
+
   return (
     <>
       <header className="adm-head">
@@ -64,6 +106,7 @@ export default async function EditEntityPage({ params, searchParams }: { params:
         </p>
         <h1>{title || def.singular}</h1>
       </header>
+      {illustrationInfo}
       <EntityForm
         collection={collection}
         def={data.def}

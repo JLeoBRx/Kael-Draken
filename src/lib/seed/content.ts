@@ -892,3 +892,141 @@ export const SEED_SETTINGS: Record<string, string> = {
   author_name: '',
   cover_media_id: '',
 }
+
+/**
+ * Livro I — capítulos I a X, com os títulos do manuscrito (Edição Profissional
+ * Ilustrada). Só os títulos: os textos não são publicados automaticamente (os
+ * capítulos entram como rascunho, sem trecho).
+ */
+export const SEED_CHAPTERS: Array<{ number: number; title: string }> = [
+  { number: 1, title: 'O lugar que não existia' },
+  { number: 2, title: 'O peso do despertar' },
+  { number: 3, title: 'A casa no fim da estrada' },
+  { number: 4, title: 'O caminho do bosque' },
+  { number: 5, title: 'Aquilo que ficou à porta' },
+  { number: 6, title: 'O que pode ser provado' },
+  { number: 7, title: 'O arquivo sob a poeira' },
+  { number: 8, title: 'A versão oficial' },
+  { number: 9, title: 'O homem dos estábulos' },
+  { number: 10, title: 'A chave de ferro' },
+]
+
+export interface SeedIllustration {
+  chapter: number
+  /** Identificador e nome do arquivo em public/images/livro-1/ilustracoes/. */
+  slug: string
+  artState: 'final' | 'estudo' | 'pendente'
+  alt: string
+  caption: string
+  /** Direção de arte (privada): orientação para o ilustrador. */
+  direction: string
+  /** Anotação privada sobre a origem e o estado do arquivo. */
+  notes: string
+}
+
+const FROM_MANUSCRIPT =
+  'Imagem extraída do manuscrito "Kael_Draken_Edicao_Profissional_Ilustrada_1.docx" — versão de impressão, 1831 × 2717 px, 300 DPI, tons de cinza. Ilustrador não identificado no arquivo: preencha o campo Créditos.'
+
+export const SEED_ILLUSTRATIONS: SeedIllustration[] = [
+  {
+    chapter: 1,
+    slug: 'capitulo-01-lugar-que-nao-existia',
+    artState: 'final',
+    caption: 'Um céu sem estrelas e uma cidade que Kael não reconhece.',
+    alt: 'Gravura em preto e branco. De costas, um rapaz está num terraço de pedra entre dois braseiros acesos e contempla uma cidade imensa de torres e pináculos góticos, pontes em arcos e cascatas. No alto, um templo monumental se ergue sob um halo de luz circular, contra um céu escuro e revolto.',
+    direction:
+      'Uma cidade sem estrelas, torres monumentais, lanternas cujas chamas permanecem imóveis e cinzas que sobem em vez de cair. Ao fundo, um templo gigantesco. Em primeiro plano, uma fonte contendo uma chama incomum. Incluir discretamente um mapa ou uma superfície gravada com cinco linhas convergindo e uma sexta linha incompleta. Uma figura encapuzada pode aparecer distante, sem revelar sua identidade.',
+    notes: `${FROM_MANUSCRIPT} No pedido de ilustração este capítulo aparecia como "O sonho impossível"; o manuscrito o intitula "O lugar que não existia".`,
+  },
+  {
+    chapter: 2,
+    slug: 'capitulo-02-peso-do-despertar',
+    artState: 'estudo',
+    caption: 'O vale visto do alto, na manhã depois do sonho.',
+    alt: 'Imagem em preto e branco, em baixa resolução. Uma figura de manto e capuz, apoiada num cajado, observa do alto de uma rocha um vale coberto de mata, com montanhas ao longe sob um céu nublado.',
+    direction:
+      'O interior de uma casa humilde, com móveis de madeira, mesa simples e luz entrando por uma janela. Kael tenta retomar sua rotina depois do sonho perturbador. Incluir um pequeno vestígio de cinza e um desenho ou folha incompleta. A imagem deve contrastar o cotidiano acolhedor com a inquietação que começa a acompanhá-lo.',
+    notes:
+      'Única versão no manuscrito: 1240 × 1820 px (cerca de 200 DPI em 15,5 × 23 cm), ampliada e sem nitidez, com uma linha branca no canto superior direito. Não serve para impressão: refazer em 1831 × 2717 px e, ao enviar a nova imagem, mudar o estado para "Arte final".',
+  },
+  {
+    chapter: 3,
+    slug: 'capitulo-03-casa-fim-da-estrada',
+    artState: 'final',
+    caption: 'A casa de pedra, junto ao muro e à grande árvore.',
+    alt: 'Gravura em preto e branco. Uma casa de pedra com telhado de colmo, chaminé, janelas iluminadas e um alpendre, ao lado de uma grande árvore. Um caminho de terra passa junto a um muro de pedras soltas; ao fundo, montanhas.',
+    direction:
+      'Uma casa simples no final de uma estrada de aldeia, cercada por uma paisagem rural e árvores que conduzem visualmente até um bosque distante. Kael aparece como um jovem de dezesseis anos, com roupas práticas e comuns. A composição deve transmitir pertencimento, simplicidade e um mistério que ainda está longe de ser compreendido.',
+    notes: FROM_MANUSCRIPT,
+  },
+  {
+    chapter: 4,
+    slug: 'capitulo-04-caminho-do-bosque',
+    artState: 'final',
+    caption: 'Um arco de pedra esquecido no bosque.',
+    alt: 'Gravura em preto e branco. Num bosque denso, um rapaz de manto com capuz, visto de costas, observa um antigo arco de pedra coberto de entalhes; através do arco, a trilha segue para uma claridade enevoada.',
+    direction:
+      'Um arco de pedra antigo, coberto por musgo, escondido em um bosque envolto em névoa. Na pedra está gravado o símbolo incompleto das seis linhas. Kael observa o arco com cautela. Uma figura encapuzada pode surgir ao fundo da trilha. Não acrescentar monstros, combates ou poderes que não estejam presentes na narrativa.',
+    notes: `${FROM_MANUSCRIPT} É a imagem que o manuscrito usa no capítulo IV. Há no arquivo outra cena de arco no bosque (um rapaz com bolsa a tiracolo), usada no prólogo.`,
+  },
+  {
+    chapter: 5,
+    slug: 'capitulo-05-aquilo-ficou-porta',
+    artState: 'final',
+    caption: 'Um disco de metal escuro, à luz da lamparina.',
+    alt: 'Gravura em preto e branco. Sobre uma mesa de madeira, um disco de metal escuro com um emblema ramificado em relevo, semelhante a uma chama, e uma borda de marcas gravadas; um cordão está preso a ele. Ao fundo, livros antigos e uma lamparina acesa.',
+    direction:
+      'Uma cena noturna no interior da casa. Sobre uma mesa está um pequeno disco de metal escuro com o símbolo incompleto. Kael e sua mãe adotiva observam o objeto à luz de uma lamparina. A porta fechada deve sugerir que algo desconhecido aconteceu do lado de fora. Não mostrar explicitamente quem deixou o objeto.',
+    notes: FROM_MANUSCRIPT,
+  },
+  {
+    chapter: 6,
+    slug: 'capitulo-06-o-que-pode-ser-provado',
+    artState: 'final',
+    caption: 'Um caderno antigo, entre desenhos e anotações.',
+    alt: 'Gravura em preto e branco. Um caderno antigo aberto sobre a mesa, à luz de uma lamparina: numa página, o esboço de uma cidade de torres e alguns diagramas; na outra, um emblema ramificado dentro de um círculo, cercado de anotações manuscritas ilegíveis.',
+    direction:
+      'Um caderno antigo aberto sobre uma mesa, cercado por papéis envelhecidos, páginas arrancadas e anotações parcialmente apagadas. O símbolo das seis linhas aparece discretamente em uma das margens. A imagem deve representar investigação, memória e a tentativa de provar algo que foi escondido. Não inventar inscrições legíveis ou nomes que ainda não tenham sido estabelecidos.',
+    notes: `${FROM_MANUSCRIPT} O manuscrito reutiliza esta mesma imagem no capítulo XXI.`,
+  },
+  {
+    chapter: 7,
+    slug: 'capitulo-07-arquivo-sob-poeira',
+    artState: 'final',
+    caption: 'O arquivo e os registros esquecidos.',
+    alt: 'Gravura em preto e branco. Uma sala de arquivo com estantes altas de livros e um janelão por onde entram feixes de luz. Sobre as mesas, livros de registro empilhados, pergaminhos enrolados, documentos espalhados e uma esfera armilar.',
+    direction:
+      'Um arquivo antigo com estantes, caixas de madeira, livros de registro e documentos cobertos de poeira. Kael examina cuidadosamente uma página, enquanto o ambiente sugere que alguém esteve ali recentemente. Incluir uma rasura ou um registro incompleto. A cena deve parecer parte de uma instituição da aldeia, sem transformar o local em uma biblioteca monumental ou mágica.',
+    notes: FROM_MANUSCRIPT,
+  },
+  {
+    chapter: 8,
+    slug: 'capitulo-08-versao-oficial',
+    artState: 'final',
+    caption: 'O responsável pelos registros da aldeia.',
+    alt: 'Gravura em preto e branco. Um homem de cabelos grisalhos e barba, de casaco escuro e medalhão ao peito, lê um documento sentado à mesa de registros, entre papéis, livros e um tinteiro. Atrás dele, na parede de madeira, pende um estandarte com brasão.',
+    direction:
+      'Uma mesa de registros com documentos antigos, datas divergentes e páginas parcialmente apagadas. Kael e sua mãe adotiva estão diante de Orven, o responsável pelos registros da aldeia. A composição deve transmitir a tensão entre os documentos oficiais e as lembranças de quem conheceu o passado. Não retratar Orven automaticamente como vilão.',
+    notes: FROM_MANUSCRIPT,
+  },
+  {
+    chapter: 9,
+    slug: 'capitulo-09-homem-dos-estabulos',
+    artState: 'final',
+    caption: 'Os antigos estábulos de Darel.',
+    alt: 'Gravura em preto e branco. No estábulo, um homem mais velho, de cabelos grisalhos e barba, de camisa com as mangas arregaçadas e avental de couro, está sentado com as mãos marcadas pelo trabalho apoiadas nos joelhos e a expressão cansada. Atrás dele, um cavalo de cabresto; ao lado, uma lanterna e arreios pendurados.',
+    direction:
+      'Os antigos estábulos de Darel, com arreios, ferramentas, tábuas envelhecidas e um cavalo ao fundo. Darel aparece como um homem mais velho, de cabelos grisalhos, expressão cansada e mãos marcadas pelo trabalho. A imagem pode sugerir, de modo discreto, a lembrança de uma mulher ferida chegando à noite com uma criança envolta em uma manta. Não revele identidades ainda desconhecidas.',
+    notes: FROM_MANUSCRIPT,
+  },
+  {
+    chapter: 10,
+    slug: 'capitulo-10-chave-de-ferro',
+    artState: 'final',
+    caption: 'Uma porta de ferro sob a pedra.',
+    alt: 'Gravura em preto e branco. Num salão subterrâneo de pedra, uma porta de ferro em arco, de dois batentes, com ferragens e um grande emblema ramificado, em forma de chama, no centro. Velas ardem dos dois lados, e o chão de lajes molhadas reflete a luz.',
+    direction:
+      'Uma porta de ferro antiga, localizada em um espaço subterrâneo de pedra. Na porta, há uma fechadura estreita e a marca de uma chama atravessada por uma linha. Ao redor, mostrar vestígios de um arquivo antigo, caixas e sombras profundas. Não revelar o que está atrás da porta. A ilustração deve preparar o leitor para os próximos acontecimentos sem antecipar as respostas.',
+    notes: FROM_MANUSCRIPT,
+  },
+]

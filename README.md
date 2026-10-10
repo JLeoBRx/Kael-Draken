@@ -24,6 +24,7 @@ arquivar todo esse conteúdo.
 - [Atlas interativo 2D → 3D](#atlas-interativo-2d--3d)
 - [Imagens do Atlas](#imagens-do-atlas)
 - [Capa oficial do Livro I](#capa-oficial-do-livro-i)
+- [Ilustrações dos capítulos](#ilustrações-dos-capítulos)
 - [Testes](#testes)
 - [Publicação](#publicação)
 - [Estrutura do projeto](#estrutura-do-projeto)
@@ -214,6 +215,45 @@ ativá-la (a página do livro mostra um espaço reservado até lá):
 
 O site não inventa ISBN, data de lançamento nem sinopse oficial.
 
+## Ilustrações dos capítulos
+
+Página: `/livros/o-sussurro-da-chama-antiga/ilustracoes` (também há uma seção
+com as miniaturas na página do Livro I). Os dez primeiros capítulos aparecem em
+ordem, cada um com número, título e o **estado da arte**:
+
+| Estado | Selo | Quando usar |
+| --- | --- | --- |
+| `final` | Arte final | ilustração definitiva, no formato de impressão |
+| `estudo` | Versão provisória | imagem que ainda será substituída |
+| `pendente` | Arte em produção | ainda não há imagem (o site mostra uma moldura vazia) |
+
+Cada cartão abre a imagem ampliada (Esc, o botão Fechar ou o Voltar do
+navegador fecham e devolvem o foco ao cartão; setas ou gesto lateral passam de
+capítulo). O endereço recebe `#identificador`, então cada ilustração pode ser
+compartilhada. Quando um capítulo for publicado, sua ilustração aparece também
+na abertura da página do capítulo.
+
+**Formato:** vertical, 15,5 × 23 cm (31:46), preto e branco; para impressão a
+300 DPI, **1831 × 2717 px**. É o tamanho da ilustração, não da página do miolo.
+
+**Arquivos:** `public/images/livro-1/ilustracoes/capitulo-NN-titulo.png` — os
+originais em resolução de impressão (o site gera versões menores sob demanda).
+As imagens atuais vieram do manuscrito *Kael Draken — Edição Profissional
+Ilustrada*: capítulos I e III–X em 1831 × 2717 px; o capítulo II só existe ali
+em 1240 × 1820 px, por isso está como versão provisória.
+
+**Trocar uma ilustração:** no painel, em **Ilustrações**, abra o capítulo,
+envie a nova imagem no campo *Imagem* e mude o estado para *Arte final*; ou
+substitua o arquivo de mesmo nome na pasta acima. A tela de edição mostra a
+origem da imagem, as dimensões, o DPI equivalente e avisa se a proporção ou a
+resolução não servem para impressão. A *Direção de arte* e as anotações de
+cada ilustração ficam só no painel.
+
+Os capítulos I–X existem no painel como **rascunho, só com o título**: nenhum
+trecho do manuscrito é publicado, e um capítulo não pode ser publicado com o
+trecho vazio. Em bancos que já tinham conteúdo, esses registros são criados
+uma única vez na inicialização.
+
 ## Testes
 
 ```bash
@@ -227,7 +267,9 @@ aleatória gerada a cada execução. Perfis: **desktop**, **tablet**, **mobile**
 (Pixel 5, com gestos de toque no 3D) e **sem-webgl** (alternativa 2D). Cobrem
 navegação, filtro de spoilers no servidor, acessibilidade (axe), mapa 2D, entrada
 e saída do 3D (com verificação de pixels renderizados), gestos de toque, login,
-criação/publicação/arquivamento e upload de imagens no painel.
+criação/publicação/arquivamento e upload de imagens no painel, e a galeria de
+ilustrações (ordem, proporção sem cortes, visualização ampliada com teclado e
+botão Voltar, ilustração na página do capítulo em pré-visualização).
 
 `node tests/tools/crawl.mjs http://localhost:3000` visita todas as páginas
 públicas e confere links e imagens.
@@ -290,3 +332,5 @@ drizzle/             migrações SQL versionadas
   nomes provisórios, sem vínculo com reinos.
 - **Brumafunda e Ruínas de Safra:** propostas de local.
 - **Capa oficial:** espaço pronto, arquivo não fornecido.
+- **Ilustração do capítulo II:** versão provisória em baixa resolução; precisa
+  de um arquivo em 1831 × 2717 px. Créditos das ilustrações não informados.

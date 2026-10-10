@@ -3696,3 +3696,449 @@ main {
     font-size: 0.6875rem;
   }
 }
+
+/* ── Ilustrações do livro ─────────────────────────────────── */
+
+.illus-page {
+  display: grid;
+  gap: var(--space-6);
+  padding-block: var(--space-7) var(--space-9);
+}
+
+.illus-intro {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 46rem;
+  color: var(--stone-200);
+  font-size: var(--fs-md);
+  line-height: 1.65;
+}
+
+.illus-intro__counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.illus-intro__counts strong {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--gold-300);
+}
+
+.illus-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 900px) {
+  /* dez capítulos: duas fileiras de cinco */
+  .illus-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-7) var(--space-5);
+  }
+}
+
+.illus-card {
+  scroll-margin-top: calc(var(--header-h) + var(--space-5));
+}
+
+.illus-card__figure {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.illus-card__frame {
+  position: relative;
+  display: block;
+  aspect-ratio: 31 / 46;
+  border: 1px solid var(--line-strong);
+  background: var(--ink-1000);
+  overflow: hidden;
+  transition: border-color var(--dur) var(--ease);
+}
+
+/* filete interno, como a moldura de uma gravura */
+.illus-card__frame::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(184, 151, 90, 0.22);
+  pointer-events: none;
+}
+
+a.illus-card__frame:hover,
+a.illus-card__frame:focus-visible {
+  border-color: var(--gold-500);
+}
+
+.illus-card__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 700ms var(--ease);
+}
+
+a.illus-card__frame:hover .illus-card__img {
+  transform: scale(1.025);
+}
+
+.illus-card__frame--pending .image-slot {
+  height: 100%;
+}
+
+.illus-card__caption {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+}
+
+.illus-card__num {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.illus-card__title {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--ivory-50);
+  margin-bottom: var(--space-1);
+}
+
+/* Estado da arte */
+
+.art-state {
+  white-space: normal;
+}
+
+.art-state--final {
+  color: var(--gold-300);
+  border-color: rgba(184, 151, 90, 0.55);
+}
+
+.art-state--final .badge__mark {
+  background: currentColor;
+}
+
+.art-state--estudo {
+  border-style: dashed;
+  color: var(--stone-200);
+}
+
+.art-state--pendente {
+  color: var(--stone-300);
+}
+
+.art-state--pendente .badge__mark {
+  transform: none;
+  border-radius: 50%;
+}
+
+.illus-page__back {
+  margin: 0;
+}
+
+/* Visualização ampliada */
+
+html:has(.illus-dialog[open]) {
+  overflow: hidden;
+}
+
+.illus-dialog {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(9, 8, 7, 0.97);
+  color: var(--text);
+  overscroll-behavior: contain;
+}
+
+.illus-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.illus-dialog[open] {
+  animation: illus-fade 220ms var(--ease);
+}
+
+@keyframes illus-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.illus-dialog__inner {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto;
+  min-height: 100%;
+}
+
+.illus-dialog__stage {
+  display: grid;
+  place-items: center;
+  padding: var(--space-8) var(--space-4) var(--space-4);
+  touch-action: pan-y;
+}
+
+.illus-dialog__img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 64svh;
+  border: 1px solid var(--line-strong);
+  background: var(--ink-1000);
+}
+
+.illus-dialog__info {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  padding: var(--space-5) var(--space-5) var(--space-7);
+  border-top: 1px solid var(--line);
+}
+
+.illus-dialog__title {
+  font-size: var(--fs-xl);
+  line-height: 1.1;
+}
+
+.illus-dialog__count {
+  color: var(--text-faint);
+}
+
+.illus-dialog__state {
+  margin-top: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.illus-dialog__caption {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-style: italic;
+  color: var(--parchment-200);
+  line-height: 1.4;
+}
+
+.illus-dialog__alt summary {
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  color: var(--gold-300);
+}
+
+.illus-dialog__alt p {
+  margin-top: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--stone-200);
+  line-height: 1.6;
+}
+
+.illus-dialog__credit {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+}
+
+.illus-dialog__info .btn {
+  justify-self: start;
+}
+
+.illus-dialog__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.illus-dialog__close {
+  position: absolute;
+  z-index: 1;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--ink-900);
+  color: var(--ivory-50);
+  cursor: pointer;
+}
+
+.illus-dialog__close:hover {
+  border-color: var(--gold-500);
+}
+
+@media (min-width: 900px) {
+  .illus-dialog__inner {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+    grid-template-rows: none;
+    height: 100%;
+  }
+
+  .illus-dialog__stage {
+    min-height: 0;
+    padding: var(--space-6);
+  }
+
+  .illus-dialog__img {
+    max-height: calc(100svh - 2 * var(--space-6));
+  }
+
+  .illus-dialog__info {
+    overflow-y: auto;
+    padding: var(--space-9) var(--space-6) var(--space-6);
+    border-top: 0;
+    border-left: 1px solid var(--line);
+  }
+}
+
+/* Miniaturas na página do livro */
+
+.illus-strip__intro {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-style: italic;
+  color: var(--parchment-200);
+  line-height: 1.45;
+}
+
+.illus-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.illus-strip__item {
+  position: relative;
+  display: block;
+  text-decoration: none;
+  aspect-ratio: 31 / 46;
+  border: 1px solid var(--line-strong);
+  background: var(--ink-1000);
+  overflow: hidden;
+}
+
+.illus-strip__item:hover,
+.illus-strip__item:focus-visible {
+  border-color: var(--gold-500);
+}
+
+.illus-strip__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.illus-strip__item .image-slot {
+  height: 100%;
+}
+
+.illus-strip__item .image-slot__inner {
+  padding: var(--space-1);
+}
+
+.illus-strip__item .image-slot__label {
+  font-size: 0.6rem;
+}
+
+.illus-strip__num {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding: 0.1rem 0.45rem;
+  background: rgba(9, 8, 7, 0.82);
+  border-top: 1px solid var(--line-strong);
+  border-right: 1px solid var(--line-strong);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--gold-300);
+}
+
+/* Ilustração na abertura do capítulo */
+
+.chapter-illustration {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+  max-width: 420px;
+  margin: 0 auto var(--space-7);
+}
+
+.chapter-illustration__frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 31 / 46;
+  border: 1px solid var(--line-strong);
+  background: var(--ink-1000);
+}
+
+.chapter-illustration__frame .image-slot {
+  height: 100%;
+}
+
+.chapter-illustration__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.chapter-illustration__caption {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.chapter-illustration__credit {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .illus-dialog[open] {
+    animation: none;
+  }
+
+  .illus-card__img {
+    transition: none;
+  }
+
+  a.illus-card__frame:hover .illus-card__img {
+    transform: none;
+  }
+}

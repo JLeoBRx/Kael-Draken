@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { ChapterIllustration } from '@/components/book/IllustrationViews'
 import { EditorialBadges } from '@/components/ui/editorial'
 import { HiddenNotice, SpoilerGate } from '@/components/ui/entry'
 import { PageHero } from '@/components/ui/PageHero'
 import { Prose } from '@/components/ui/Prose'
+import { getChapterIllustration, toIllustrationItems } from '@/lib/content/illustrations'
 import { getChapter } from '@/lib/content/queries'
 import { prepareRichText } from '@/lib/content/rich'
 import { getViewer } from '@/lib/content/viewer'
@@ -33,6 +35,8 @@ export default async function ChapterPage({ params }: { params: Params }) {
   if (isLocked(data.chapter, viewer)) return <SpoilerGate level={data.chapter.spoiler} />
   const render = await prepareRichText(viewer, [data.chapter.body])
   const body = render(data.chapter.body)
+  const illustration = await getChapterIllustration(data.book, data.chapter.id, viewer)
+  const [illustrationItem] = illustration ? toIllustrationItems([illustration]) : []
 
   return (
     <article>
@@ -49,6 +53,7 @@ export default async function ChapterPage({ params }: { params: Params }) {
         <EditorialBadges canon={data.chapter.canon} spoiler={data.chapter.spoiler} status={data.chapter.status} preview={viewer.preview} />
       </PageHero>
       <div className="container container--narrow reading">
+        {illustrationItem ? <ChapterIllustration item={illustrationItem} galleryHref={paths.bookIllustrations(data.book.slug)} /> : null}
         <HiddenNotice count={body.hiddenCount} level={viewer.spoiler} />
         <Prose result={body} />
         <nav className="pager" aria-label="Capítulos" style={{ marginTop: 'var(--space-8)' }}>

@@ -21,6 +21,8 @@ export const paths = {
   books: '/livros',
   book: (slug: string) => `/livros/${slug}`,
   chapter: (bookSlug: string, number: number) => `/livros/${bookSlug}/capitulos/${number}`,
+  bookIllustrations: (bookSlug: string) => `/livros/${bookSlug}/ilustracoes`,
+  illustration: (bookSlug: string, slug: string) => `/livros/${bookSlug}/ilustracoes#${slug}`,
   news: '/novidades',
   post: (slug: string) => `/novidades/${slug}`,
   search: '/busca',
@@ -41,4 +43,5 @@ export const ADMIN_COLLECTION_FOR: Record<EntityType, string> = {
   book: 'livros',
   chapter: 'capitulos',
   post: 'publicacoes',
+  illustration: 'ilustracoes',
 }

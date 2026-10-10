@@ -151,6 +151,7 @@ async function mediaUsage(id: number): Promise<string[]> {
   await check('mapas', db.select({ id: s.maps.id }).from(s.maps).where(eq(s.maps.imageId, id)))
   await check('livros', db.select({ id: s.books.id }).from(s.books).where(eq(s.books.coverId, id)))
   await check('publicações', db.select({ id: s.posts.id }).from(s.posts).where(eq(s.posts.imageId, id)))
+  await check('ilustrações', db.select({ id: s.illustrations.id }).from(s.illustrations).where(eq(s.illustrations.imageId, id)))
   await check('galerias', db.select({ id: s.mediaLinks.id }).from(s.mediaLinks).where(eq(s.mediaLinks.mediaId, id)))
   await check('capa oficial', db.select().from(s.settings).where(and(eq(s.settings.key, 'cover_media_id'), eq(s.settings.value, String(id)))))
   return uses

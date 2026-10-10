@@ -6,6 +6,8 @@ import { CANON_STATES, ENTITY_LABELS, PUBLICATION_STATES, SPOILER_LEVELS, type E
 import { paths } from '../routes'
 import { SLUG_PATTERN, slugify } from '../slug'
 import { getLinkedIds, removeAllLinks, replaceLinks } from '../content/links'
+import { findIllustrationFile } from '../content/illustrations'
+import { defaultIllustrationSlug, illustrationTitle, printWarnings } from '../illustrations'
 import { allFields, COLLECTIONS, type CollectionDef, type CollectionKey, type FieldDef } from './collections'
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- acesso genérico às tabelas a partir das definições */
@@ -22,6 +24,7 @@ export const TABLES: Record<CollectionKey, SQLiteTable & Record<string, any>> = 
   mapas: s.maps,
   livros: s.books,
   capitulos: s.chapters,
+  ilustracoes: s.illustrations,
   publicacoes: s.posts,
 }
 
@@ -38,6 +41,7 @@ export const ENTITY_TABLE: Record<EntityType, CollectionKey> = {
   book: 'livros',
   chapter: 'capitulos',
   post: 'publicacoes',
+  illustration: 'ilustracoes',
 }
 
 type Row = Record<string, any>
@@ -75,6 +79,8 @@ export function publicPathFor(key: CollectionKey, row: Row, extra: { bookSlug?: 
       return paths.book(row.slug)
     case 'capitulos':
       return extra.bookSlug ? paths.chapter(extra.bookSlug, row.number) : null
+    case 'ilustracoes':
+      return extra.bookSlug ? paths.illustration(extra.bookSlug, row.slug) : null
     case 'publicacoes':
       return paths.post(row.slug)
   }
@@ -89,7 +95,7 @@ export async function entityOptions(entity: EntityType): Promise<Option[]> {
   const rows: Row[] = await db
     .select()
     .from(table)
-    .orderBy(asc(titleColumn(def)))
+    .orderBy(...(key === 'capitulos' ? [asc(table.bookId), asc(table.number)] : [asc(titleColumn(def))]))
   return rows.map((r) => {
     let label = String(r[def.titleField])
     if (key === 'capitulos') label = `Cap. ${r.number} — ${label}`
@@ -166,10 +172,42 @@ export async function loadForm(key: CollectionKey, id: number | null) {
   if (row) {
     let bookSlug: string | undefined
     if (key === 'capitulos') bookSlug = (await db.select({ slug: s.books.slug }).from(s.books).where(eq(s.books.id, row.bookId)))[0]?.slug
+    if (key === 'ilustracoes') bookSlug = (await chapterContext(row.chapterId))?.book.slug
     previewPath = publicPathFor(key, row, { bookSlug })
   }
 
   return { def, values: serializeValues(values), options, media: await mediaOptions(), previewPath, row }
+}
+
+/** Capítulo e livro de uma ilustração. */
+async function chapterContext(chapterId: number | null | undefined) {
+  if (!chapterId) return null
+  const [found] = await db
+    .select({ chapter: s.chapters, book: s.books })
+    .from(s.chapters)
+    .innerJoin(s.books, eq(s.books.id, s.chapters.bookId))
+    .where(eq(s.chapters.id, chapterId))
+  return found ?? null
+}
+
+export interface IllustrationStatus {
+  source: 'painel' | 'arquivo' | null
+  src: string | null
+  width: number
+  height: number
+  warnings: string[]
+}
+
+/** De onde vem a imagem de uma ilustração e se ela atende ao formato de impressão. */
+export async function illustrationStatus(row: Row): Promise<IllustrationStatus> {
+  const ctx = await chapterContext(row.chapterId)
+  if (row.imageId) {
+    const [m] = await db.select().from(s.media).where(eq(s.media.id, row.imageId))
+    if (m) return { source: 'painel', src: `/media/${m.path}`, width: m.width, height: m.height, warnings: printWarnings(m.width, m.height) }
+  }
+  const file = ctx ? findIllustrationFile(ctx.book.volume, String(row.slug ?? '')) : null
+  if (file) return { source: 'arquivo', src: file.src, width: file.width, height: file.height, warnings: printWarnings(file.width, file.height) }
+  return { source: null, src: null, width: 0, height: 0, warnings: [] }
 }
 
 /** Converte valores para strings/arrays simples (campos de formulário). */
@@ -310,9 +348,19 @@ export async function saveRow(key: CollectionKey, id: number | null, form: FormD
   row.spoiler = (SPOILER_LEVELS as readonly number[]).includes(spoiler) ? spoiler : 0
   row.notes = String(form.get('notes') ?? '')
 
+  let defaultSlug: string | null = null
+  if (key === 'ilustracoes') {
+    const ctx = await chapterContext(row.chapterId as number | null)
+    if (!ctx) errors.push('Escolha um capítulo existente.')
+    else {
+      row.title = illustrationTitle(ctx.chapter.number, ctx.chapter.title)
+      defaultSlug = defaultIllustrationSlug(ctx.chapter.number, ctx.chapter.title)
+    }
+  }
+
   if (def.hasSlug) {
     let slug = String(form.get('slug') ?? '').trim()
-    if (!slug) slug = slugify(String(row[def.titleField] ?? ''))
+    if (!slug) slug = defaultSlug ?? slugify(String(row[def.titleField] ?? ''))
     if (!SLUG_PATTERN.test(slug)) errors.push('O identificador (slug) deve conter apenas letras minúsculas, números e hífens.')
     row.slug = slug
   }
@@ -329,6 +377,11 @@ export async function saveRow(key: CollectionKey, id: number | null, form: FormD
       const [{ value }] = await db.select({ value: count() }).from(table).where(where)
       if (value > 0) errors.push(key === 'capitulos' ? 'Já existe um capítulo com este número neste livro.' : 'Já existe um item com este identificador (slug).')
     }
+    if (key === 'ilustracoes') {
+      const sameChapter = eq(table.chapterId, row.chapterId)
+      const [{ value }] = await db.select({ value: count() }).from(table).where(id ? and(sameChapter, ne(table.id, id)) : sameChapter)
+      if (value > 0) errors.push('Este capítulo já tem uma ilustração cadastrada.')
+    }
   }
 
   const version = Date.now()
@@ -344,6 +397,9 @@ export async function saveRow(key: CollectionKey, id: number | null, form: FormD
   if (intent === 'publicar') status = 'publicado'
   else if (intent === 'despublicar') status = 'rascunho'
   else if (intent === 'arquivar') status = 'arquivado'
+  if (key === 'capitulos' && status === 'publicado' && !String(row.body ?? '').trim()) {
+    return { ok: false, errors: ['Um capítulo só pode ser publicado com o trecho autorizado preenchido.'], values: submitted, version }
+  }
   row.status = status
   if (status === 'publicado' && !row.publishedAt && !current?.publishedAt) row.publishedAt = now
   if (key !== 'publicacoes' && current?.publishedAt && !row.publishedAt) row.publishedAt = current.publishedAt
@@ -371,8 +427,22 @@ export async function saveRow(key: CollectionKey, id: number | null, form: FormD
     }
   }
 
+  if (key === 'capitulos') {
+    await db
+      .update(s.illustrations)
+      .set({ title: illustrationTitle(Number(row.number), String(row.title)) })
+      .where(eq(s.illustrations.chapterId, savedId!))
+  }
+
   const messages: Record<string, string> = { publicar: 'Publicado.', despublicar: 'Retirado do site (rascunho).', arquivar: 'Arquivado.', salvar: 'Alterações salvas.' }
-  return { ok: true, id: savedId!, errors: [], message: messages[intent] ?? 'Salvo.', version }
+  let message = messages[intent] ?? 'Salvo.'
+  if (key === 'ilustracoes') {
+    const info = await illustrationStatus({ ...row, id: savedId })
+    const notes = [...info.warnings]
+    if (!info.src && row.artState !== 'pendente') notes.push('Ainda não há imagem para esta ilustração: o site mostrará “Arte em produção”.')
+    if (notes.length) message += ` Atenção: ${notes.join(' ')}`
+  }
+  return { ok: true, id: savedId!, errors: [], message, version }
 }
 
 export async function setRowStatus(key: CollectionKey, id: number, status: 'rascunho' | 'publicado' | 'arquivado') {
@@ -380,6 +450,8 @@ export async function setRowStatus(key: CollectionKey, id: number, status: 'rasc
   const now = new Date().toISOString()
   const [row] = await db.select().from(table).where(eq(table.id, id))
   if (!row) return
+  // capítulo sem trecho autorizado nunca vai ao ar
+  if (key === 'capitulos' && status === 'publicado' && !String(row.body ?? '').trim()) return
   await db
     .update(table)
     .set({ status, updatedAt: now, ...(status === 'publicado' && !row.publishedAt ? { publishedAt: now } : {}) })
@@ -404,9 +476,13 @@ export async function deleteRow(key: CollectionKey, id: number) {
   if (key === 'mapas') await db.delete(s.mapMarkers).where(eq(s.mapMarkers.mapId, id))
   if (key === 'livros') {
     const chapterIds = (await db.select({ id: s.chapters.id }).from(s.chapters).where(eq(s.chapters.bookId, id))).map((c) => c.id)
-    for (const cid of chapterIds) await removeAllLinks('chapter', cid)
+    for (const cid of chapterIds) {
+      await removeAllLinks('chapter', cid)
+      await db.delete(s.illustrations).where(eq(s.illustrations.chapterId, cid))
+    }
     await db.delete(s.chapters).where(eq(s.chapters.bookId, id))
   }
+  if (key === 'capitulos') await db.delete(s.illustrations).where(eq(s.illustrations.chapterId, id))
   await removeAllLinks(def.entity, id)
   await db.delete(table).where(eq(table.id, id))
 }

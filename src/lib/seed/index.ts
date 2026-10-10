@@ -1,15 +1,18 @@
-import { count, eq } from 'drizzle-orm'
+import { and, count, eq } from 'drizzle-orm'
 import type { Database } from '../db/connect'
 import * as s from '../db/schema'
 import type { EntityType, Vocabulary } from '../editorial'
 import { normalizePair } from '../content/link-pairs'
+import { illustrationTitle } from '../illustrations'
 import {
   SEED_ARTICLES,
   SEED_BOOK,
+  SEED_CHAPTERS,
   SEED_CHARACTERS,
   SEED_DOCUMENTS,
   SEED_ERAS,
   SEED_EVENTS,
+  SEED_ILLUSTRATIONS,
   SEED_KINGDOMS,
   SEED_LOCATIONS,
   SEED_MYSTERIES,
@@ -266,7 +269,77 @@ export async function seedDatabase(db: Database, opts: { log?: (msg: string) => 
     }
   })
 
+  await ensureBookIllustrations(db, opts)
   log('Conteúdo inicial carregado.')
+  return true
+}
+
+/** Marca, em settings, que a carga das ilustrações do Livro I já foi feita. */
+export const ILLUSTRATIONS_SEED_KEY = 'seed_ilustracoes_livro_1'
+
+/**
+ * Acrescenta, uma única vez, os capítulos I–X do Livro I (como rascunho, só
+ * com o título) e os registros de ilustração de cada um. Funciona também em
+ * bancos que já têm conteúdo: não altera capítulos existentes e não recria
+ * nada depois de executada (o painel passa a ser a fonte da verdade).
+ */
+export async function ensureBookIllustrations(db: Database, opts: { log?: (msg: string) => void } = {}): Promise<boolean> {
+  const log = opts.log ?? (() => {})
+  const [done] = await db.select().from(s.settings).where(eq(s.settings.key, ILLUSTRATIONS_SEED_KEY))
+  if (done) return false
+  const [book] = await db.select().from(s.books).where(eq(s.books.slug, SEED_BOOK.slug))
+  if (!book) return false
+
+  const now = new Date().toISOString()
+  let created = 0
+  await db.transaction(async (tx) => {
+    const chapterIds = new Map<number, { id: number; title: string }>()
+    for (const ch of SEED_CHAPTERS) {
+      const [existing] = await tx.select().from(s.chapters).where(and(eq(s.chapters.bookId, book.id), eq(s.chapters.number, ch.number)))
+      if (existing) {
+        chapterIds.set(ch.number, { id: existing.id, title: existing.title })
+        continue
+      }
+      const [row] = await tx
+        .insert(s.chapters)
+        .values({
+          bookId: book.id,
+          number: ch.number,
+          slug: `capitulo-${ch.number}`,
+          title: ch.title,
+          canon: 'canonico',
+          status: 'rascunho',
+          notes: 'Registro criado para organizar as ilustrações. O texto do capítulo não é publicado automaticamente: cole aqui apenas trechos autorizados.',
+        })
+        .returning({ id: s.chapters.id })
+      chapterIds.set(ch.number, { id: row.id, title: ch.title })
+    }
+
+    for (const ill of SEED_ILLUSTRATIONS) {
+      const chapter = chapterIds.get(ill.chapter)
+      if (!chapter) continue
+      const [byChapter] = await tx.select({ id: s.illustrations.id }).from(s.illustrations).where(eq(s.illustrations.chapterId, chapter.id))
+      const [bySlug] = await tx.select({ id: s.illustrations.id }).from(s.illustrations).where(eq(s.illustrations.slug, ill.slug))
+      if (byChapter || bySlug) continue
+      await tx.insert(s.illustrations).values({
+        chapterId: chapter.id,
+        slug: ill.slug,
+        title: illustrationTitle(ill.chapter, chapter.title),
+        artState: ill.artState,
+        alt: ill.alt,
+        caption: ill.caption,
+        credit: '',
+        direction: ill.direction,
+        canon: 'canonico',
+        status: 'publicado',
+        publishedAt: now,
+        notes: ill.notes,
+      })
+      created++
+    }
+    await tx.insert(s.settings).values({ key: ILLUSTRATIONS_SEED_KEY, value: now }).onConflictDoNothing()
+  })
+  log(`Ilustrações do Livro I: ${created} registro(s) criado(s).`)
   return true
 }
 

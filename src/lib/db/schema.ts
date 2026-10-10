@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
-import { CANON_STATES, CERTAINTY_STATES, PUBLICATION_STATES, RELIABILITY_STATES } from '../editorial'
+import { ART_STATES, CANON_STATES, CERTAINTY_STATES, PUBLICATION_STATES, RELIABILITY_STATES } from '../editorial'
 
 /**
  * Colunas editoriais comuns a todo conteúdo do arquivo.
@@ -259,6 +259,33 @@ export const chapters = sqliteTable(
     ...editorial(),
   },
   (t) => [uniqueIndex('chapters_book_number_idx').on(t.bookId, t.number), uniqueIndex('chapters_book_slug_idx').on(t.bookId, t.slug)],
+)
+
+/**
+ * Ilustração de um capítulo (uma por capítulo). A imagem vem do painel
+ * (imageId) ou de um arquivo versionado em public/images/livro-N/ilustracoes/<slug>.*;
+ * `artState` diz se é a arte final, uma versão provisória ou se ainda falta a arte.
+ * `direction` (direção de arte) é anotação de trabalho e nunca é publicada.
+ */
+export const illustrations = sqliteTable(
+  'illustrations',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    chapterId: integer('chapter_id')
+      .notNull()
+      .references(() => chapters.id, { onDelete: 'cascade' }),
+    slug: text('slug').notNull().unique(),
+    /** Rótulo derivado do capítulo ("Capítulo I — …"), usado nas listagens do painel. */
+    title: text('title').notNull().default(''),
+    imageId: integer('image_id').references(() => media.id, { onDelete: 'set null' }),
+    artState: text('art_state', { enum: ART_STATES }).notNull().default('pendente'),
+    alt: text('alt').notNull().default(''),
+    caption: text('caption').notNull().default(''),
+    credit: text('credit').notNull().default(''),
+    direction: text('direction').notNull().default(''),
+    ...editorial(),
+  },
+  (t) => [uniqueIndex('illustrations_chapter_idx').on(t.chapterId)],
 )
 
 export const posts = sqliteTable('posts', {

@@ -5,6 +5,7 @@ import { db, schema as s } from '../db'
 import type { ArticleSection, EntityType, Vocabulary } from '../editorial'
 import { paths } from '../routes'
 import { getLinkedIds } from './links'
+import { listBookIllustrations } from './illustrations'
 import { getGallery, getImage, getImages, type ImageData } from './media'
 import type { Viewer } from './viewer'
 import { isVisible, listable, reachable } from './visibility'
@@ -559,6 +560,15 @@ export async function getBook(slug: string, viewer: Viewer) {
   return { book: pub(row), cover, gallery, tags, chapters, characters, locations }
 }
 
+/** Apenas o registro do livro (sem capítulos e relações). */
+export async function getBookSummary(slug: string, viewer: Viewer) {
+  const [row] = await db
+    .select()
+    .from(s.books)
+    .where(and(eq(s.books.slug, slug), reachable(s.books, viewer)))
+  return row ? pub(row) : null
+}
+
 export async function getChapter(bookSlug: string, number: number, viewer: Viewer) {
   const [book] = await db
     .select()
@@ -737,7 +747,14 @@ export async function getPublicPaths(): Promise<Array<{ path: string; updated: s
     db.select().from(s.posts).where(listable(s.posts, viewer)),
     db.select().from(s.maps).where(listable(s.maps, viewer)),
   ])
+  const illustrated: Array<{ path: string; updated: string }> = []
+  for (const b of bs) {
+    if (b.spoiler > viewer.spoiler) continue
+    const items = await listBookIllustrations(b, viewer)
+    if (items.length) illustrated.push({ path: paths.bookIllustrations(b.slug), updated: b.updatedAt })
+  }
   return [
+    ...illustrated,
     ...ks.map((r) => ({ path: paths.kingdom(r.slug), updated: r.updatedAt })),
     ...ls.map((r) => ({ path: paths.location(r.slug), updated: r.updatedAt })),
     ...cs.map((r) => ({ path: paths.character(r.slug), updated: r.updatedAt })),

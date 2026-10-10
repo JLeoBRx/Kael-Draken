@@ -6,7 +6,7 @@
  * Este arquivo é serializável (sem funções) para ser usado também no cliente.
  */
 
-import { CERTAINTY_INFO, CERTAINTY_STATES, RELIABILITY_INFO, RELIABILITY_STATES, type EntityType, type Vocabulary } from '../editorial'
+import { ART_INFO, ART_STATES, CERTAINTY_INFO, CERTAINTY_STATES, RELIABILITY_INFO, RELIABILITY_STATES, type EntityType, type Vocabulary } from '../editorial'
 
 export type FieldType = 'text' | 'textarea' | 'markdown' | 'number' | 'select' | 'boolean' | 'media' | 'gallery' | 'reference' | 'links' | 'tags' | 'color' | 'date'
 
@@ -43,6 +43,7 @@ export type CollectionKey =
   | 'mapas'
   | 'livros'
   | 'capitulos'
+  | 'ilustracoes'
   | 'publicacoes'
 
 export interface CollectionDef {
@@ -451,6 +452,46 @@ export const COLLECTIONS: Record<CollectionKey, CollectionDef> = {
         ],
       },
       { title: 'Relações', fields: [links('__characters', 'Personagens que aparecem', 'character'), links('__locations', 'Lugares', 'location')] },
+    ],
+  },
+  ilustracoes: {
+    key: 'ilustracoes',
+    entity: 'illustration',
+    label: 'Ilustrações',
+    singular: 'Ilustração',
+    description:
+      'Uma ilustração por capítulo, exibida em ordem na galeria do livro e na página do capítulo publicado. Formato: vertical, 15,5 × 23 cm (31:46), preto e branco; para impressão a 300 DPI, 1831 × 2717 px.',
+    titleField: 'title',
+    hasSlug: true,
+    hasCanon: false,
+    listFields: ['chapterId', 'artState'],
+    groups: [
+      {
+        title: 'Ilustração',
+        fields: [
+          { name: 'chapterId', label: 'Capítulo', type: 'reference', collection: 'capitulos', required: true, help: 'O capítulo pode continuar como rascunho: a galeria mostra apenas número e título.' },
+          {
+            name: 'artState',
+            label: 'Estado da arte',
+            type: 'select',
+            required: true,
+            options: ART_STATES.map((v) => ({ value: v, label: `${ART_INFO[v].label} — ${ART_INFO[v].description}` })),
+          },
+          {
+            name: 'imageId',
+            label: 'Imagem',
+            type: 'media',
+            help: 'Vertical, 31:46, preto e branco; 1831 × 2717 px para 300 DPI. Vazio: o site usa o arquivo public/images/livro-N/ilustracoes/<identificador>.webp, se existir.',
+          },
+          area('alt', 'Texto alternativo', { help: 'Descreva o que a imagem mostra, para leitores de tela — sem revelar o que a história ainda guarda.', rows: 4 }),
+          text('caption', 'Legenda'),
+          text('credit', 'Créditos', { help: 'Ilustrador ou origem da imagem.' }),
+        ],
+      },
+      {
+        title: 'Direção de arte (privada)',
+        fields: [area('direction', 'Orientação para o ilustrador', { help: 'Nunca aparece no site público.', rows: 8 })],
+      },
     ],
   },
   publicacoes: {

@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 
-const PAGES = ['/', '/atlas', '/reinos/safra', '/personagens', '/personagens/kael-draken', '/mitologia', '/mitologia/safra-e-a-noite-das-cinzas', '/cronologia', '/ressonancia', '/locais', '/manuscritos/quando-a-chama-despertar', '/misterios', '/livros/o-sussurro-da-chama-antiga', '/novidades', '/sobre']
+const PAGES = ['/', '/atlas', '/reinos/safra', '/personagens', '/personagens/kael-draken', '/mitologia', '/mitologia/safra-e-a-noite-das-cinzas', '/cronologia', '/ressonancia', '/locais', '/manuscritos/quando-a-chama-despertar', '/misterios', '/livros/o-sussurro-da-chama-antiga', '/livros/o-sussurro-da-chama-antiga/ilustracoes', '/novidades', '/sobre']
 
 test('página inicial apresenta o título completo e acessos principais', async ({ page }) => {
   await page.goto('/')
@@ -47,7 +47,7 @@ test('o seletor de spoilers controla o que o servidor envia', async ({ page }) =
 })
 
 test('acessibilidade: sem violações graves nas páginas principais', async ({ page }) => {
-  for (const path of ['/', '/atlas', '/personagens/kael-draken', '/misterios']) {
+  for (const path of ['/', '/atlas', '/personagens/kael-draken', '/misterios', '/livros/o-sussurro-da-chama-antiga', '/livros/o-sussurro-da-chama-antiga/ilustracoes']) {
     await page.goto(path)
     // @axe-core/playwright declara tipos de uma versão mais nova do Playwright; a API usada é compatível
     const results = await new AxeBuilder({ page: page as unknown as ConstructorParameters<typeof AxeBuilder>[0]['page'] }).withTags(['wcag2a', 'wcag2aa']).analyze()

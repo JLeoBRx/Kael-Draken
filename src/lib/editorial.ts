@@ -84,6 +84,16 @@ export const RELIABILITY_INFO: Record<ReliabilityState, { label: string; descrip
   desconhecido: { label: 'Não avaliado', description: 'Confiabilidade ainda desconhecida.' },
 }
 
+/** Estado da arte de uma ilustração de capítulo. */
+export const ART_STATES = ['pendente', 'estudo', 'final'] as const
+export type ArtState = (typeof ART_STATES)[number]
+
+export const ART_INFO: Record<ArtState, { label: string; description: string }> = {
+  pendente: { label: 'Arte em produção', description: 'A ilustração deste capítulo ainda precisa ser produzida.' },
+  estudo: { label: 'Versão provisória', description: 'Imagem provisória, ainda não pronta para a impressão; será substituída pela arte final.' },
+  final: { label: 'Arte final', description: 'Ilustração do livro no formato de impressão (15,5 × 23 cm, preto e branco).' },
+}
+
 /** Tipos de entidade que podem ser relacionados entre si. */
 export const ENTITY_TYPES = [
   'kingdom',
@@ -98,6 +108,7 @@ export const ENTITY_TYPES = [
   'book',
   'chapter',
   'post',
+  'illustration',
 ] as const
 export type EntityType = (typeof ENTITY_TYPES)[number]
 
@@ -114,6 +125,7 @@ export const ENTITY_LABELS: Record<EntityType, { singular: string; plural: strin
   book: { singular: 'Livro', plural: 'Livros' },
   chapter: { singular: 'Capítulo', plural: 'Capítulos' },
   post: { singular: 'Publicação', plural: 'Publicações' },
+  illustration: { singular: 'Ilustração', plural: 'Ilustrações' },
 }
 
 export const ARTICLE_SECTIONS = ['mitologia', 'ressonancia'] as const

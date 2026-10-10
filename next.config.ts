@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
   images: {
     // As imagens enviadas pelo painel são servidas pela rota /media/…
     localPatterns: [{ pathname: '/media/**' }, { pathname: '/capa/**' }, { pathname: '/images/**' }],
+    // 90: visualização ampliada das ilustrações em gravura (hachuras finas)
+    qualities: [75, 90],
   },
   async headers() {
     return [

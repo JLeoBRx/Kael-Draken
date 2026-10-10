@@ -29,8 +29,8 @@ export default defineConfig({
   use: { baseURL: BASE, trace: 'retain-on-failure', launchOptions: { args: webglArgs } },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } }, testIgnore: /fallback\.spec\.ts/ },
-    { name: 'tablet', use: { ...devices['Desktop Chrome'], viewport: { width: 820, height: 1180 }, hasTouch: true }, testMatch: /(public|atlas)\.spec\.ts/ },
-    { name: 'mobile', use: { ...devices['Pixel 5'] }, testMatch: /(public|atlas)\.spec\.ts/ },
+    { name: 'tablet', use: { ...devices['Desktop Chrome'], viewport: { width: 820, height: 1180 }, hasTouch: true }, testMatch: /(public|atlas|illustrations)\.spec\.ts/ },
+    { name: 'mobile', use: { ...devices['Pixel 5'] }, testMatch: /(public|atlas|illustrations)\.spec\.ts/ },
     {
       name: 'sem-webgl',
       use: { ...devices['Desktop Chrome'], launchOptions: { args: ['--disable-webgl', '--disable-3d-apis', '--disable-gpu'] } },

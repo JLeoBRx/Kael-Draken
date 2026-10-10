@@ -1,6 +1,6 @@
 import { connect } from '../src/lib/db/connect'
 import { runMigrations } from '../src/lib/db/migrate'
-import { ensureSettings, seedDatabase } from '../src/lib/seed'
+import { ensureBookIllustrations, ensureSettings, seedDatabase } from '../src/lib/seed'
 import { loadEnv } from './env'
 
 loadEnv()
@@ -10,6 +10,7 @@ async function main() {
   await runMigrations(db, client)
   await seedDatabase(db, { log: console.log })
   await ensureSettings(db)
+  await ensureBookIllustrations(db, { log: console.log })
   client.close()
 }
 
