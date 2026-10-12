@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SEED_ARTICLES, SEED_BOOK, SEED_CHARACTERS, SEED_DOCUMENTS, SEED_ERAS, SEED_EVENTS, SEED_MYSTERIES } from '@/lib/seed/content'
+import { OFFICIAL_BOOK_SYNOPSIS, SEED_ARTICLES, SEED_BOOK, SEED_CHARACTERS, SEED_DOCUMENTS, SEED_ERAS, SEED_EVENTS, SEED_MYSTERIES, SEED_SETTINGS } from '@/lib/seed/content'
 import { renderMarkdown, toPlainText } from '@/lib/markdown/render'
 
 const PROPHECY = 'Quando a Chama despertar, não o fará sozinha. Skrugheim abrirá suas portas, e a morte caminhará entre os vivos.'
@@ -45,5 +45,22 @@ describe('fidelidade do conteúdo inicial', () => {
     const all = JSON.stringify([SEED_ARTICLES, SEED_DOCUMENTS, SEED_MYSTERIES])
     expect(all).toMatch(/Skrugheim/)
     expect(all).not.toMatch(/Skrugheim (é|era) (um|uma|o|a) /)
+  })
+
+  it('o pergaminho de anúncio guarda a origem de Kael atrás de revelações avançadas', () => {
+    const body = SEED_SETTINGS.announcement_body
+    expect(SEED_SETTINGS.announcement_title).toBe('O livro voltou')
+    for (const level of [0, 1] as const) {
+      const html = renderMarkdown(body, { spoiler: level }).html
+      expect(html).not.toMatch(/herdeiro real|portal/)
+      expect(html).toMatch(/Século Perdido/)
+    }
+    expect(renderMarkdown(body, { spoiler: 2 }).html).toMatch(/herdeiro real de Safra/)
+  })
+
+  it('usa a sinopse oficial da contracapa, sem ISBN', () => {
+    expect(SEED_BOOK.synopsis).toBe(OFFICIAL_BOOK_SYNOPSIS)
+    expect(OFFICIAL_BOOK_SYNOPSIS).toMatch(/Quando a Chama desperta, o mundo nunca mais será o mesmo/)
+    expect(OFFICIAL_BOOK_SYNOPSIS).not.toMatch(/ISBN/i)
   })
 })

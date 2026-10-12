@@ -276,6 +276,15 @@
   pointer-events: none;
 }
 
+/* Carta ilustrada: o título desenhado ocupa o canto superior esquerdo; a faixa vai ao centro, sobre as montanhas */
+.world-atlas[data-drawn='true'][data-mode='2d'] .world-atlas__ribbon {
+  left: 50%;
+  width: max-content;
+  max-width: min(36rem, calc(100% - 2 * var(--space-3)));
+  transform: translateX(-50%);
+  text-align: center;
+}
+
 .world-atlas__hint {
   position: absolute;
   left: var(--space-3);

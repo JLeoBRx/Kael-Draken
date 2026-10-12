@@ -850,17 +850,31 @@ e a morte caminhará entre os vivos.`,
   },
 ]
 
+/** Apresentação provisória usada antes da sinopse oficial (para atualizar bancos antigos sem tocar em textos editados). */
+export const LEGACY_BOOK_SYNOPSIS = `Kael tem dezesseis anos e cresceu em um vilarejo distante, criado por uma família adotiva, humilde e amorosa. É inteligente, gentil e alegre — mas também reservado e impulsivo, e aprendeu a usar máscaras sociais para esconder a dificuldade de lidar com a própria raiva.
+
+Quando seus sonhos começam a se intensificar, eles trazem lugares impossíveis, imagens do passado e acontecimentos que desafiam tudo o que ele entende sobre o mundo.`
+
+/** Sinopse oficial: texto da contracapa do Livro I. */
+export const OFFICIAL_BOOK_SYNOPSIS = `**Quando a Chama desperta, o mundo nunca mais será o mesmo.**
+
+Em um mundo marcado por guerras, segredos e reinos em ruínas, Kael Draken, um jovem de 16 anos, leva uma vida tranquila em um vilarejo distante, sem saber que carrega um destino capaz de mudar o rumo da história.
+
+Quando uma antiga chama desperta, forças adormecidas voltam a se mover nas sombras, revelando verdades esquecidas, símbolos antigos e um passado que muitos preferem manter oculto.
+
+Entre alianças inesperadas, perigos mortais e escolhas que podem consumir sua alma, Kael precisará descobrir quem realmente é, antes que o mundo seja tomado novamente pelo Caos.
+
+> *“O fogo não escolhe, ele consome. Mas também revela aquilo que estava oculto.”*`
+
 export const SEED_BOOK = {
   slug: 'o-sussurro-da-chama-antiga',
   volume: 1,
   title: 'O Sussurro da Chama Antiga',
   subtitle: 'Kael Draken — Livro I',
-  synopsis: `Kael tem dezesseis anos e cresceu em um vilarejo distante, criado por uma família adotiva, humilde e amorosa. É inteligente, gentil e alegre — mas também reservado e impulsivo, e aprendeu a usar máscaras sociais para esconder a dificuldade de lidar com a própria raiva.
-
-Quando seus sonhos começam a se intensificar, eles trazem lugares impossíveis, imagens do passado e acontecimentos que desafiam tudo o que ele entende sobre o mundo.`,
+  synopsis: OFFICIAL_BOOK_SYNOPSIS,
   editorialInfo: `- **Saga:** Kael Draken
 - **Volume:** I
-- **Situação:** em desenvolvimento`,
+- **Gêneros:** fantasia, aventura, mistério e destino`,
 }
 
 export const SEED_POST = {
@@ -891,6 +905,24 @@ export const SEED_SETTINGS: Record<string, string> = {
   site_description: 'Enciclopédia oficial e arquivo de desenvolvimento do universo de Kael Draken — O Sussurro da Chama Antiga.',
   author_name: '',
   cover_media_id: '',
+  announcement_enabled: '1',
+  announcement_kicker: 'Kael Draken · O Sussurro da Chama Antiga',
+  announcement_title: 'O livro voltou',
+  announcement_body: `O Sussurro da Chama Antiga está de volta — e o Arquivo da Chama Antiga abre suas portas para quem quiser atravessá-las.
+
+Antes que o céu e a terra existissem, havia a Chama do Dragão. Dela nasceu tudo: os céus, as terras, a vida e os seis reinos.
+
+Cada reino recebeu um fragmento da Chama, mas Safra conseguiu dominá-la como nenhum outro. Com ela, seu povo alcançou força, conhecimento e habilidades extraordinárias.
+
+Movidas pela inveja, as outras cinco grandes nações se uniram para destruir Safra e exterminar seu povo. Durante a catástrofe, a Chama desapareceu; os registros sobre o sexto reino foram apagados, e um Século Perdido de cerca de seiscentos anos esconde a verdade da história. Sem a Chama, o Caos voltou a ameaçar o mundo.
+
+:::spoiler 2
+Apenas Kael, o herdeiro real de Safra, sobreviveu, graças a um sacrifício que abriu um portal e o enviou para outro lugar. Cresceu em um vilarejo distante, sob um novo nome — Kael Draken —, sem saber sobre sua verdadeira origem, seu reino ou sua ligação com a Chama.
+:::
+
+A história acompanha Kael, um jovem de dezesseis anos, inteligente e gentil, mas marcado por uma raiva que tenta controlar, enquanto sonhos misteriosos começam a se intensificar — sonhos com lugares, tempos e acontecimentos que não existem no mundo conhecido.
+
+Entre ruínas do passado, o renascimento do Caos e segredos antigos, Kael embarca em uma jornada que poderá revelar a verdade sobre suas origens e definir o destino de todos os reinos.`,
 }
 
 /**

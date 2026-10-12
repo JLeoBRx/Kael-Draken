@@ -1,0 +1,941 @@
+/* Layout: abertura em pergaminho sobre a mesa escura → livro (capa + contracapa) → pranchas dos capítulos em 5 × 2 → carta do Atlas → profecia */
+:root {
+  --ink: #0d0b09;
+  --ink-2: #15110d;
+  --ink-3: #1d1813;
+  --line: #3a3026;
+  --ivory: #ede4d0;
+  --muted: #b5a891;
+  --gold: #c9a35f;
+  --gold-soft: #ddc9a2;
+  --ember: #8e2417;
+  --ember-hi: #b5321f;
+  --sepia: #2c1d10;
+  --sepia-soft: #5a4128;
+  --paper: #f1e3c1;
+  --paper-2: #e6d2a3;
+  --paper-edge: #c6a46a;
+  --display: 'Cormorant Garamond', 'Garamond', Georgia, serif;
+  --body: 'Literata', Georgia, 'Times New Roman', serif;
+  --gutter: clamp(16px, 4vw, 48px);
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--ivory);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 600;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--gold-soft);
+}
+
+:focus-visible {
+  outline: 2px solid #e8c987;
+  outline-offset: 3px;
+}
+
+.wrap {
+  width: min(100%, 76rem);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.eyebrow {
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0.6rem 1.3rem;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font: 500 0.95rem/1.2 var(--body);
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.btn--ember {
+  background: var(--ember);
+  border-color: var(--ember-hi);
+  color: #fbf3e2;
+}
+
+.btn--ember:hover {
+  background: var(--ember-hi);
+}
+
+.btn--ink {
+  border-color: rgba(44, 29, 16, 0.55);
+  background: rgba(255, 248, 228, 0.4);
+  color: var(--sepia);
+}
+
+.btn--ink:hover {
+  border-color: var(--ember);
+}
+
+.btn--line {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--ivory);
+}
+
+.btn--line:hover {
+  border-color: var(--gold);
+}
+
+/* Cabeçalho */
+
+.mast {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  padding: 1rem var(--gutter);
+  border-bottom: 1px solid var(--line);
+}
+
+.mast__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.mast__mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--gold);
+  transform: rotate(45deg);
+  color: var(--gold);
+}
+
+.mast__mark svg {
+  transform: rotate(-45deg);
+}
+
+.mast__sub {
+  font-size: 0.85rem;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.mast__nav {
+  display: flex;
+  gap: 1.25rem;
+  font-size: 0.95rem;
+}
+
+.mast__nav a {
+  color: var(--ivory);
+  text-decoration: none;
+}
+
+.mast__nav a:hover {
+  color: var(--gold-soft);
+}
+
+/* Abertura: o pergaminho */
+
+.opening {
+  overflow-x: clip;
+  padding: clamp(2.5rem, 7vw, 5rem) var(--gutter) clamp(3.5rem, 8vw, 6rem);
+  background:
+    radial-gradient(ellipse 55% 50% at 50% 42%, rgba(214, 150, 70, 0.16), transparent 70%),
+    radial-gradient(ellipse 25% 30% at 90% 12%, rgba(255, 190, 110, 0.08), transparent 70%),
+    var(--ink);
+}
+
+.scroll {
+  /* espaço para as ponteiras dos rolos, que avançam além da folha */
+  width: min(calc(100% - 4rem), 50rem);
+  margin-inline: auto;
+  filter: drop-shadow(0 26px 40px rgba(0, 0, 0, 0.6)) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+}
+
+.scroll__rod {
+  position: relative;
+  z-index: 2;
+  height: 2.6rem;
+  margin-inline: -1.2rem;
+  border-radius: 1.3rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 35%, rgba(0, 0, 0, 0.25) 75%),
+    linear-gradient(180deg, #c9ab78 0%, #f3e3bd 30%, #e2c993 55%, #b8955c 80%, #8a6a3c 100%);
+  box-shadow: inset 0 -3px 6px rgba(60, 35, 10, 0.45), 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.scroll__rod::before,
+.scroll__rod::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 2.3rem;
+  height: 3.1rem;
+  transform: translateY(-50%);
+  border-radius: 0.9rem;
+  background:
+    radial-gradient(ellipse 40% 30% at 35% 30%, rgba(255, 240, 200, 0.75), transparent 70%),
+    linear-gradient(180deg, #3a220e 0%, #7a4a21 22%, #b4783a 45%, #6a3f1b 70%, #2a170a 100%);
+  box-shadow: inset 0 0 0 2px rgba(214, 172, 96, 0.55), 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.scroll__rod::before {
+  left: -1.4rem;
+}
+
+.scroll__rod::after {
+  right: -1.4rem;
+}
+
+.scroll__rod:first-child {
+  margin-bottom: -0.9rem;
+}
+
+.scroll__rod:last-child {
+  margin-top: -0.9rem;
+}
+
+.scroll__sheet {
+  position: relative;
+  color: var(--sepia);
+  clip-path: polygon(0.6% 0%, 99.2% 0%, 100% 6%, 99.1% 13%, 99.8% 21%, 99% 30%, 99.9% 39%, 99.2% 48%, 99.8% 57%, 99% 66%, 99.7% 75%, 99.1% 84%, 99.9% 92%, 99.3% 100%, 0.7% 100%, 0% 93%, 0.9% 85%, 0.2% 76%, 0.8% 67%, 0% 58%, 0.9% 49%, 0.1% 40%, 0.8% 31%, 0% 22%, 0.9% 13%, 0.2% 6%);
+  background:
+    radial-gradient(ellipse 45% 30% at 18% 12%, rgba(255, 252, 236, 0.75), transparent 70%),
+    radial-gradient(ellipse 30% 22% at 82% 78%, rgba(150, 96, 40, 0.2), transparent 70%),
+    radial-gradient(ellipse 18% 12% at 70% 22%, rgba(140, 90, 40, 0.14), transparent 70%),
+    radial-gradient(ellipse 22% 16% at 28% 88%, rgba(120, 70, 30, 0.16), transparent 70%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35  0 0 0 0 0.22  0 0 0 0 0.08  0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.55'/></svg>"),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='m'><feTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.3  0 0 0 0 0.12  0 0 0 0.9 -0.32'/></filter><rect width='100%' height='100%' filter='url(%23m)'/></svg>"),
+    linear-gradient(90deg, var(--paper-edge) 0%, var(--paper-2) 5%, var(--paper) 30%, #f6ebcf 55%, var(--paper-2) 92%, var(--paper-edge) 100%);
+  box-shadow: inset 0 0 70px rgba(110, 66, 22, 0.32), inset 0 0 14px rgba(80, 45, 12, 0.45);
+}
+
+.scroll__inner {
+  display: grid;
+  justify-items: center;
+  gap: 0.8rem;
+  padding: clamp(2.6rem, 6vw, 4.2rem) clamp(1.4rem, 6vw, 4.4rem) clamp(3rem, 6vw, 4.4rem);
+  text-align: center;
+}
+
+.scroll__emblem {
+  color: var(--ember);
+}
+
+.scroll__kicker {
+  font-family: var(--display);
+  font-size: clamp(0.95rem, 0.85rem + 0.4vw, 1.15rem);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--sepia-soft);
+}
+
+.scroll__title {
+  font-size: clamp(2.6rem, 1.6rem + 4.2vw, 4.6rem);
+  line-height: 1;
+  color: var(--sepia);
+  text-shadow: 0 1px 0 rgba(255, 248, 225, 0.6);
+}
+
+.scroll__divider {
+  width: min(15rem, 70%);
+  color: var(--ember);
+}
+
+.scroll__divider svg {
+  width: 100%;
+  height: auto;
+}
+
+.scroll__body {
+  display: grid;
+  gap: 0.9em;
+  max-width: 38rem;
+  text-align: left;
+  font-family: var(--display);
+  font-size: clamp(1.15rem, 1.03rem + 0.4vw, 1.35rem);
+  line-height: 1.55;
+}
+
+.scroll__body > p:first-child {
+  font-style: italic;
+}
+
+.scroll__body > p:first-child::first-letter {
+  float: left;
+  margin: 0.06em 0.12em 0 0;
+  font-size: 3.4em;
+  line-height: 0.82;
+  font-weight: 600;
+  color: var(--ember);
+}
+
+.scroll__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.scroll__seal {
+  position: absolute;
+  right: clamp(0.6rem, 4vw, 2.4rem);
+  bottom: clamp(0.4rem, 2vw, 1.2rem);
+  width: clamp(3.6rem, 9vw, 5.2rem);
+  filter: drop-shadow(0 3px 4px rgba(40, 10, 5, 0.45));
+}
+
+.scroll__seal svg {
+  width: 100%;
+  height: auto;
+}
+
+/* O livro */
+
+.book {
+  padding-block: clamp(3.5rem, 8vw, 6rem);
+  border-top: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+}
+
+.book__grid {
+  display: grid;
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: start;
+}
+
+@media (min-width: 860px) {
+  .book__grid {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  }
+}
+
+.book__cover {
+  margin: 0;
+  justify-self: center;
+  width: min(100%, 26rem);
+}
+
+.book__cover img {
+  width: 100%;
+  border: 1px solid rgba(201, 163, 95, 0.35);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 0 6px rgba(0, 0, 0, 0.35), 0 0 80px rgba(214, 120, 50, 0.12);
+}
+
+.book__text {
+  display: grid;
+  gap: 1.1rem;
+  min-width: 0;
+}
+
+.book__title {
+  font-size: clamp(2.3rem, 1.5rem + 3vw, 3.6rem);
+}
+
+.book__synopsis {
+  display: grid;
+  gap: 0.9rem;
+  max-width: 38rem;
+  color: #ddd2bb;
+}
+
+.book__synopsis strong {
+  font-family: var(--display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--gold-soft);
+}
+
+.book__synopsis blockquote {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  border-left: 2px solid var(--ember);
+  font-family: var(--display);
+  font-size: 1.3rem;
+  color: var(--ivory);
+}
+
+.book__synopsis blockquote p {
+  margin: 0;
+}
+
+.genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--display);
+  font-size: 1.05rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold-soft);
+}
+
+.genres li + li::before {
+  content: '|';
+  margin-right: 0.9rem;
+  color: var(--line);
+}
+
+.book__meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* Cabeçalhos de seção */
+
+.head {
+  display: grid;
+  gap: 0.7rem;
+  max-width: 46rem;
+  margin-bottom: clamp(2rem, 4vw, 3rem);
+}
+
+.head h2 {
+  font-size: clamp(2.1rem, 1.4rem + 2.6vw, 3.2rem);
+}
+
+.head__lede {
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+
+/* Pranchas dos capítulos */
+
+.plates {
+  padding-block: clamp(3.5rem, 8vw, 6rem);
+  border-top: 1px solid var(--line);
+}
+
+.plates__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 900px) {
+  .plates__grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 2.75rem 1.4rem;
+  }
+}
+
+.plate {
+  display: grid;
+  gap: 0.3rem;
+  align-content: start;
+  scroll-margin-top: 2rem;
+}
+
+.plate__frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0;
+  aspect-ratio: 31 / 46;
+  border: 1px solid #4a3d30;
+  background: #070605;
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.plate__frame::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(201, 163, 95, 0.22);
+  pointer-events: none;
+}
+
+.plate__frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 0.7s cubic-bezier(0.2, 0.6, 0.2, 1);
+}
+
+.plate__frame:hover {
+  border-color: var(--gold);
+}
+
+.plate__frame:hover img {
+  transform: scale(1.03);
+}
+
+.plate__num {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.plate__title {
+  font-family: var(--display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.plate__state {
+  justify-self: start;
+  margin-top: 0.2rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px dashed var(--line);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Atlas */
+
+.atlas {
+  padding-block: clamp(3.5rem, 8vw, 6rem);
+  border-top: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink), var(--ink-2));
+}
+
+.atlas__switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  border: 1px solid var(--line);
+}
+
+.atlas__opt {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.55rem 1rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: 1.05rem/1.2 var(--display);
+  text-align: left;
+  cursor: pointer;
+}
+
+.atlas__opt span {
+  font: 0.68rem/1.2 var(--body);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.atlas__opt[aria-pressed='true'] {
+  background: var(--ink-3);
+  color: var(--ivory);
+  box-shadow: inset 0 -2px 0 var(--gold);
+}
+
+.atlas__map {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid #4a3d30;
+  background: #070605;
+  cursor: zoom-in;
+}
+
+.atlas__map img {
+  width: 100%;
+}
+
+.atlas__note {
+  margin-top: 0.7rem;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.realms {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  margin: 2.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  background: var(--line);
+}
+
+@media (min-width: 560px) {
+  .realms {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .realms {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.realm {
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+  padding: 1.3rem 1.3rem 1.4rem;
+  background: var(--ink-2);
+}
+
+.realm--lost {
+  background: linear-gradient(180deg, rgba(142, 36, 23, 0.16), var(--ink-2));
+}
+
+.realm__num {
+  font-family: var(--display);
+  font-size: 0.95rem;
+  color: var(--gold);
+}
+
+.realm__name {
+  font-size: 1.7rem;
+}
+
+.realm__epithet {
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-soft);
+}
+
+.realm__summary {
+  font-size: 0.95rem;
+  color: #d4c8b0;
+}
+
+.realm__capital {
+  font-size: 0.9rem;
+  color: var(--ivory);
+}
+
+.realm__capital span {
+  margin-right: 0.3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.realm__state {
+  justify-self: start;
+  margin-top: 0.3rem;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid var(--line);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.realm--lost .realm__state {
+  border-color: rgba(201, 163, 95, 0.6);
+  color: var(--gold-soft);
+}
+
+/* Profecia */
+
+.prophecy {
+  padding-block: clamp(4rem, 9vw, 7rem);
+  border-top: 1px solid var(--line);
+  background: radial-gradient(ellipse 50% 70% at 50% 50%, rgba(142, 36, 23, 0.14), transparent 70%), var(--ink);
+  text-align: center;
+}
+
+.prophecy figure {
+  margin: 0 auto;
+}
+
+.prophecy blockquote {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(1.6rem, 1.1rem + 2.2vw, 2.7rem);
+  font-style: italic;
+  line-height: 1.25;
+}
+
+.prophecy figcaption {
+  margin-top: 1.4rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+/* Rodapé */
+
+.foot {
+  padding-block: 2.5rem 3rem;
+  border-top: 1px solid var(--line);
+  background: #080706;
+}
+
+.foot__grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
+}
+
+.foot__brand {
+  font-family: var(--display);
+  font-size: 1.35rem;
+}
+
+.foot__brand em {
+  margin-left: 0.5rem;
+  font-size: 1rem;
+  color: var(--gold-soft);
+}
+
+.foot__copy {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+/* Visualização ampliada */
+
+html:has(.viewer[open]) {
+  overflow: hidden;
+}
+
+.viewer {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(7, 6, 5, 0.97);
+  color: var(--ivory);
+}
+
+.viewer::backdrop {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.viewer__inner {
+  position: relative;
+  display: grid;
+  min-height: 100%;
+}
+
+.viewer__stage {
+  display: grid;
+  place-items: center;
+  padding: 4.5rem 1rem 1rem;
+}
+
+.viewer__stage img {
+  width: auto;
+  max-height: 66svh;
+  border: 1px solid #4a3d30;
+}
+
+.viewer__info {
+  display: grid;
+  gap: 0.8rem;
+  align-content: start;
+  padding: 1.4rem var(--gutter) 2.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.viewer__title {
+  font-size: 2rem;
+}
+
+.viewer__state {
+  justify-self: start;
+  padding: 0.1rem 0.45rem;
+  border: 1px dashed var(--line);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.viewer__caption {
+  font-family: var(--display);
+  font-size: 1.3rem;
+  font-style: italic;
+  color: var(--paper-2);
+}
+
+.viewer__alt summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--gold-soft);
+}
+
+.viewer__alt p {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #d4c8b0;
+}
+
+.viewer__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--line);
+}
+
+.viewer__close {
+  position: absolute;
+  z-index: 2;
+  top: 0.9rem;
+  right: 0.9rem;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--ink-2);
+  color: var(--ivory);
+  cursor: pointer;
+}
+
+.viewer__close:hover {
+  border-color: var(--gold);
+}
+
+@media (min-width: 960px) {
+  .viewer__inner {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+    height: 100%;
+  }
+
+  .viewer__stage {
+    padding: 2rem;
+  }
+
+  .viewer__stage img {
+    max-height: calc(100svh - 4rem);
+  }
+
+  .viewer__info {
+    overflow-y: auto;
+    padding: 5rem 2rem 2rem;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 16px;
+  }
+
+  .scroll {
+    width: min(calc(100% - 1.4rem), 50rem);
+  }
+
+  .scroll__rod {
+    height: 2rem;
+    margin-inline: -0.2rem;
+  }
+
+  .scroll__rod::before,
+  .scroll__rod::after {
+    width: 1.3rem;
+    height: 2.4rem;
+  }
+
+  .scroll__rod::before {
+    left: -0.55rem;
+  }
+
+  .scroll__rod::after {
+    right: -0.55rem;
+  }
+
+  .scroll__actions .btn {
+    width: 100%;
+  }
+
+  .mast__sub {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plate__frame img {
+    transition: none;
+  }
+}

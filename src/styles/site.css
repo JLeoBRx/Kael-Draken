@@ -4142,3 +4142,11 @@ html:has(.illus-dialog[open]) {
     transform: none;
   }
 }
+
+.book-layout__full-cover {
+  display: grid;
+  gap: 0.1rem;
+  margin-top: var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--gold-300);
+}

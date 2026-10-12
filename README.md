@@ -24,7 +24,9 @@ arquivar todo esse conteúdo.
 - [Atlas interativo 2D → 3D](#atlas-interativo-2d--3d)
 - [Imagens do Atlas](#imagens-do-atlas)
 - [Capa oficial do Livro I](#capa-oficial-do-livro-i)
+- [Pergaminho de anúncio](#pergaminho-de-anúncio)
 - [Ilustrações dos capítulos](#ilustrações-dos-capítulos)
+- [Versão em HTML](#versão-em-html)
 - [Testes](#testes)
 - [Publicação](#publicação)
 - [Estrutura do projeto](#estrutura-do-projeto)
@@ -165,7 +167,8 @@ nenhuma página: aparecem como mistérios em aberto ou atrás de spoilers.
 
 Página: `/atlas`.
 
-1. **2D (padrão):** mapa ilustrado com as seis zonas conceituais clicáveis e
+1. **2D (padrão):** a carta ilustrada do manuscrito, com as seis regiões clicáveis
+   traçadas sobre as fronteiras desenhadas, e
    alternância entre a **versão original** (seis reinos) e a **versão conhecida**
    (Safra apagada, cinco reinos). A seleção abre um painel com o resumo do reino
    e o link para a página completa; o estado fica na URL (`?regiao=&versao=`).
@@ -186,18 +189,19 @@ Adaptações: sem WebGL o botão 3D não aparece e o mapa 2D segue completo; com
 celulares usam menos resolução de textura, sem antialiasing e com densidade de
 pixels limitada; perda de contexto WebGL volta ao 2D com aviso.
 
-**Editar as regiões:** os polígonos ficam em `src/data/atlas/world.json`
-(coordenadas de 0 a 1 sobre o mapa). Edite à mão e rode `npm run art:mapas` para
-redesenhar os mapas com as novas fronteiras. `npm run art:regioes` recalcula as
-regiões a partir do zero (sobrescreve as edições).
+**Carta e regiões:** `npm run art:mapas` (`scripts/art/manuscript_map.py`) parte
+de `scripts/art/fontes/mapa-manuscrito-cor.webp` e gera a carta original, a versão
+conhecida (Safra em branco, como no encarte da própria carta), a máscara de terra,
+o relevo 3D e `src/data/atlas/world.json`. As fronteiras clicáveis, os pontos dos
+rótulos e as zonas montanhosas ficam no topo do script, em pixels da carta: para
+uma carta nova, troque o arquivo da fonte, ajuste esses valores e rode o comando.
 
 ## Imagens do Atlas
 
-Todas as imagens em `public/images/atlas/` foram **produzidas por código**
-(scripts em `scripts/art/`), não por uma ferramenta de geração de imagens por IA.
-São artes conceituais provisórias: relevo, céu, névoa, silhuetas e luz montados
-por ruído procedural. Nenhuma tem texto embutido — títulos e legendas são texto
-real da página.
+As cartas do mundo vêm do mapa ilustrado do manuscrito. As demais imagens em
+`public/images/atlas/` (panoramas dos reinos, brasões, cenas da mitologia) foram
+**produzidas por código** (scripts em `scripts/art/`), não por uma ferramenta de
+geração de imagens por IA. São artes conceituais provisórias, sem texto embutido.
 
 Para regenerar: `npm run art` (requer `python3` com `numpy` e `Pillow`; os brasões
 usam o Chromium do Playwright). Para trocar uma arte por uma ilustração definitiva,
@@ -207,13 +211,23 @@ créditos, está em `src/lib/atlas/art.ts`.
 
 ## Capa oficial do Livro I
 
-O arquivo da capa aprovada **não está neste repositório**. Há duas formas de
-ativá-la (a página do livro mostra um espaço reservado até lá):
+A capa está em `public/capa/capa-oficial.webp` (recortada da arte completa, que
+fica em `public/capa/capa-completa.webp` e tem link na página do livro). Uma imagem
+escolhida no painel → **Configurações** → *Capa oficial* tem prioridade.
 
-1. Painel → **Configurações** → *Capa oficial*: escolha ou envie a imagem; ou
-2. coloque o arquivo em `public/capa/capa-oficial.jpg` (ou `.png`/`.webp`).
+A sinopse do Livro I é o texto da contracapa. Em bancos criados antes, ela
+substitui a apresentação provisória uma única vez, e só se o texto antigo não
+tiver sido editado no painel. O site não inventa ISBN nem data de lançamento.
 
-O site não inventa ISBN, data de lançamento nem sinopse oficial.
+## Pergaminho de anúncio
+
+Na primeira visita, a página inicial abre um pergaminho com o anúncio
+“O livro voltou”. Ele fecha com Esc, com o X, com “Entrar no Arquivo” ou com um
+clique fora, e não volta a abrir para o mesmo visitante até o texto mudar. O
+mesmo pergaminho fica como seção logo abaixo do topo. Título, linha superior e
+texto são editados no painel → **Configurações** → *Pergaminho de anúncio*, que
+também permite desligá-lo. O trecho sobre a origem de Kael está entre
+`:::spoiler 2` e `:::`, então só aparece para quem escolhe revelações avançadas.
 
 ## Ilustrações dos capítulos
 
@@ -253,6 +267,14 @@ Os capítulos I–X existem no painel como **rascunho, só com o título**: nenh
 trecho do manuscrito é publicado, e um capítulo não pode ser publicado com o
 trecho vazio. Em bancos que já tinham conteúdo, esses registros são criados
 uma única vez na inicialização.
+
+## Versão em HTML
+
+`npm run html` gera `html/index.html` e `html/assets/`: uma página única com o
+pergaminho, a capa e a sinopse, as ilustrações com visualização ampliada e o
+Atlas nas duas versões. Ela abre com dois cliques, sem servidor, e pode ser
+hospedada de graça (GitHub Pages, Netlify). Usa os mesmos textos e imagens do
+site; trechos marcados como spoiler não entram nela.
 
 ## Testes
 
@@ -316,21 +338,23 @@ src/
   lib/atlas/         registro das artes e geometria das regiões
   data/atlas/        world.json (regiões editáveis do mapa)
   styles/            tokens, base, site, atlas, painel
-public/images/atlas/ artes procedurais, mapas, relevo e brasões
-scripts/             migrações, seed, hash de senha e geradores de arte
+public/images/atlas/ carta do manuscrito, relevo, panoramas e brasões
+public/images/livro-1/ilustracoes/  ilustrações dos capítulos (resolução de impressão)
+public/capa/         capa oficial e capa completa
+scripts/             migrações, seed, hash de senha, geradores de arte e da versão HTML
+html/                versão em HTML puro (gerada por npm run html)
 tests/               unidade, ponta a ponta e ferramentas de verificação
 drizzle/             migrações SQL versionadas
 ```
 
 ## O que ainda é provisório
 
-- **Geografia:** posições, fronteiras, costas e rios do mapa são uma composição
-  conceitual; nenhum traçado foi aprovado.
 - **Brasões, cores e panoramas dos reinos:** propostas visuais.
-- **Artes:** conceituais e procedurais; substituíveis por ilustrações definitivas.
+- **Artes procedurais** (panoramas, brasões, cenas da mitologia): conceituais, substituíveis por ilustrações definitivas.
 - **As seis faces da Ressonância** (Forja, Vigília, Elo, Eco, Limiar, Ímpeto):
   nomes provisórios, sem vínculo com reinos.
 - **Brumafunda e Ruínas de Safra:** propostas de local.
-- **Capa oficial:** espaço pronto, arquivo não fornecido.
+- **Carta do Atlas:** nomes, capitais e fronteiras são os do mapa do manuscrito,
+  ainda conceituais; o relevo 3D é uma interpretação da carta.
 - **Ilustração do capítulo II:** versão provisória em baixa resolução; precisa
   de um arquivo em 1831 × 2717 px. Créditos das ilustrações não informados.

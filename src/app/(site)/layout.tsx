@@ -8,6 +8,7 @@ import { getViewer } from '@/lib/content/viewer'
 import { paths } from '@/lib/routes'
 import '@/styles/site.css'
 import '@/styles/atlas.css'
+import '@/styles/announcement.css'
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const [viewer, settings] = await Promise.all([getViewer(), getSettings()])

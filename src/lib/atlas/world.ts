@@ -3,9 +3,9 @@ import worldData from '@/data/atlas/world.json'
 /**
  * Dados cartográficos do Atlas, separados da renderização (2D e 3D).
  *
- * TODA a geografia aqui é conceitual: posições, fronteiras, costas e rios
- * ainda não foram aprovados. As regiões ficam em src/data/atlas/world.json e
- * podem ser editadas; `npm run art:mapas` refaz as cartas a partir delas.
+ * A carta é o mapa ilustrado do manuscrito; nomes, capitais e fronteiras são
+ * conceituais. As regiões clicáveis ficam em src/data/atlas/world.json,
+ * geradas por `npm run art:mapas` (scripts/art/manuscript_map.py).
  */
 
 export type Point = [number, number]
@@ -23,6 +23,8 @@ export interface WorldRegion {
 export interface WorldData {
   estado: 'conceitual'
   nota: string
+  /** A carta vem ilustrada (nomes desenhados no próprio mapa). */
+  cartaIlustrada?: boolean
   largura: number
   altura: number
   relevo: { arquivo: string; codificacao: 'rg16'; largura: number; altura: number; nivelDoMar: number }
@@ -30,7 +32,7 @@ export interface WorldData {
   regioes: WorldRegion[]
 }
 
-export const WORLD = worldData as WorldData
+export const WORLD = worldData as unknown as WorldData
 export const WORLD_ASPECT = WORLD.largura / WORLD.altura
 
 export type MapVersionId = 'original' | 'conhecido'

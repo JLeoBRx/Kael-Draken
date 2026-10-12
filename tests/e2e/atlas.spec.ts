@@ -4,7 +4,9 @@ test('mapa 2D: seleção de região e versões original/conhecida', async ({ pag
   await page.goto('/atlas')
   const atlas = page.locator('.world-atlas')
   await expect(atlas).toHaveAttribute('data-mode', '2d')
-  await expect(page.locator('.atlas-label', { hasText: 'Safra' })).toBeVisible()
+  // a carta do manuscrito traz os nomes desenhados; as regiões continuam acessíveis por nome
+  await expect(page.locator('path.atlas-region[aria-label^="Safra"]')).toBeAttached()
+  await expect(page.locator('.atlas-label', { hasText: 'Safra' })).toHaveCount(0)
 
   await page.locator('.region-list').getByRole('button', { name: /Nácaris/ }).click()
   await expect(page.locator('.atlas-panel h3')).toHaveText('Nácaris')
@@ -23,8 +25,8 @@ test('mapa 2D: clique direto na carta seleciona a região sob o cursor', async (
   await page.goto('/atlas')
   const map = page.locator('.world-atlas__map2d')
   const box = (await map.boundingBox())!
-  // rótulo de Rhovaryn (u≈0.443, v≈0.76) — ponto garantidamente sobre a terra da região
-  await map.click({ position: { x: box.width * 0.443, y: box.height * 0.76 } })
+  // perto de Avarra, capital de Rhovaryn (u≈0.72, v≈0.42) — ponto sobre a terra da região
+  await map.click({ position: { x: box.width * 0.72, y: box.height * 0.42 } })
   await expect(page.locator('.atlas-panel h3')).toHaveText('Rhovaryn')
 })
 

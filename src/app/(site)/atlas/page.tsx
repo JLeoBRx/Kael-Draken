@@ -8,7 +8,7 @@ import { Breadcrumbs } from '@/components/ui/PageHero'
 import { MediaImage } from '@/components/ui/media'
 import { ART, emblemArt } from '@/lib/atlas/art'
 import { getAtlasRegions } from '@/lib/atlas/regions'
-import { WORLD, type MapVersionId } from '@/lib/atlas/world'
+import { WORLD, WORLD_ASPECT, type MapVersionId } from '@/lib/atlas/world'
 import { listKingdoms, listMaps } from '@/lib/content/queries'
 import { getViewer } from '@/lib/content/viewer'
 import { toRoman } from '@/lib/format'
@@ -78,13 +78,15 @@ export default async function AtlasPage({ searchParams }: { searchParams: Promis
             images={{ original: ART.mapaOriginal, conhecido: ART.mapaConhecido }}
             heightmap={{ src: WORLD.relevo.arquivo, width: WORLD.relevo.largura, height: WORLD.relevo.altura, seaLevel: WORLD.relevo.nivelDoMar }}
             maskSrc={WORLD.mascaraTerra}
+            aspect={WORLD_ASPECT}
+            drawnLabels={!!WORLD.cartaIlustrada}
             initialVersion={version}
             initialRegion={regiao ?? null}
           />
           <p className="notice" role="note" style={{ marginTop: 'var(--space-5)' }}>
             <span>
-              <strong>Geografia conceitual.</strong> {WORLD.nota} As zonas dos reinos, o relevo do modo 3D e as costas servem apenas à visualização e podem ser editados quando a
-              cartografia for aprovada.
+              <strong>Geografia conceitual.</strong> {WORLD.nota} As zonas clicáveis acompanham as fronteiras desenhadas na carta e podem ser ajustadas quando a cartografia
+              for aprovada.
             </span>
           </p>
 

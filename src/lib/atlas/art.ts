@@ -3,10 +3,11 @@ import type { ImageData } from '../content/media'
 /**
  * Registro das artes do Atlas (public/images/atlas).
  *
- * As imagens foram produzidas proceduralmente pelos scripts em scripts/art
- * (ruído, geometria e vetores) — não por um modelo de geração de imagens.
- * Representam conceitos artísticos, não confirmação de fatos: a geografia,
- * a arquitetura e os brasões dos cinco reinos conhecidos são propostas.
+ * As cartas do mundo vêm do mapa ilustrado do manuscrito (Edição Profissional
+ * Ilustrada). As demais imagens foram produzidas proceduralmente pelos
+ * scripts em scripts/art (ruído, geometria e vetores). Todas representam
+ * conceitos artísticos, não confirmação de fatos: nomes, fronteiras,
+ * arquitetura e brasões dos cinco reinos conhecidos são propostas.
  *
  * Uma imagem enviada pelo painel para a entidade sempre tem prioridade sobre
  * a arte deste registro.
@@ -19,25 +20,31 @@ export interface ArtEntry extends ImageData {
 
 const BASE = '/images/atlas'
 
-function art(file: string, width: number, height: number, alt: string, caption: string, concept = true): ArtEntry {
-  return { src: `${BASE}/${file}`, width, height, alt, caption, credit: 'Arte procedural do Arquivo', concept }
+function art(file: string, width: number, height: number, alt: string, caption: string, concept = true, credit = 'Arte procedural do Arquivo'): ArtEntry {
+  return { src: `${BASE}/${file}`, width, height, alt, caption, credit, concept }
 }
+
+const MANUSCRIPT_MAP = 'Mapa do manuscrito — Edição Profissional Ilustrada'
 
 export const ART = {
   capa: art('capa-atlas.webp', 1200, 1800, 'Um dragão ancestral envolve uma chama misteriosa sobre uma cidade monumental mergulhada na névoa.', 'Capa do Atlas — conceito artístico.'),
   mapaOriginal: art(
     'mapa-mundo-original.webp',
-    2400,
-    1500,
-    'Carta conceitual do mundo original, com relevo, rios e as zonas provisórias dos seis reinos.',
-    'Mapa do mundo original — composição conceitual; fronteiras e posições não aprovadas.',
+    1536,
+    1024,
+    'Carta ilustrada do Atlas dos Seis Reinos: Aurelion, Nácaris, Elyndor, Rhovaryn, Kharveth e, ao centro-sul, Safra, com o Templo da Chama em ruínas; ao norte, as Terras do Norte e as Montanhas Eternas; ao redor, o Mar Velado, o Mar Interior e o Mar da Aurora.',
+    'Atlas dos Seis Reinos — carta do manuscrito; nomes, capitais e fronteiras sujeitos a revisão.',
+    true,
+    MANUSCRIPT_MAP,
   ),
   mapaConhecido: art(
     'mapa-mundo-conhecido.webp',
-    2400,
-    1500,
-    'Carta conceitual do mundo conhecido, na versão oficial em que a região de Safra aparece apagada e apenas cinco reinos são reconhecidos.',
-    'Mapa do mundo conhecido — versão oficial da história; composição conceitual.',
+    1536,
+    1024,
+    'A mesma carta na versão oficial: o território de Safra aparece em branco, como terra sem registro, e apenas cinco reinos são reconhecidos.',
+    'Mundo conhecido — versão oficial da história, com Safra apagada; a partir da carta do manuscrito.',
+    true,
+    MANUSCRIPT_MAP,
   ),
   origemChama: art('origem-chama.webp', 2000, 1250, 'A Chama do Dragão surge no vazio e ilumina um mundo que começa a nascer.', 'A Chama do Dragão e o nascimento do mundo — conceito artístico.'),
   caos: art('caos.webp', 2000, 1250, 'Sombras, distorções e espaços impossíveis sugerem a presença do Caos, sem revelar sua forma.', 'O Caos — representação atmosférica; sua natureza permanece desconhecida.'),

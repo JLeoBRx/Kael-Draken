@@ -28,6 +28,8 @@ export interface World3DOptions {
   heightmapUrl: string
   heightmapSize: [number, number]
   seaLevel: number
+  /** Proporção largura/altura da carta (e do relevo). */
+  aspect: number
   textureUrl: string
   maskUrl: string
   regions: Region3D[]
@@ -52,9 +54,8 @@ export interface World3D {
   dispose(): void
 }
 
-const WX = 16
 const WZ = 10
-const HSCALE = 1.7
+const HSCALE = 1.3
 const BASE_Y = -0.75
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -80,6 +81,7 @@ const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 
 
 export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
   const { container, labelLayer } = opts
+  const WX = WZ * opts.aspect
   let regions = opts.regions
   let selectedId = opts.selectedId
   let hoveredId: string | null = null
@@ -92,7 +94,7 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
   const heights = new Float32Array(HW * HH)
   for (let i = 0; i < HW * HH; i++) heights[i] = (hmPx[i * 4] * 256 + hmPx[i * 4 + 1]) / 65535
   const MW = 600
-  const MH = 375
+  const MH = Math.round(600 / opts.aspect)
   const maskPx = readPixels(maskImg, MW, MH)
 
   const sampleHeight = (u: number, v: number) => {
@@ -346,8 +348,16 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
     }
   })
 
-  const animate = (duration: number, frame: (t: number) => void) =>
+  // Movimento de câmera em curso: um novo comando substitui o anterior (o último pedido vence)
+  let cameraAnim: { step: (now: number) => boolean; resolve: () => void } | null = null
+
+  const animate = (duration: number, frame: (t: number) => void, exclusive = false) =>
     new Promise<void>((resolve) => {
+      if (exclusive && cameraAnim) {
+        animations.delete(cameraAnim.step)
+        cameraAnim.resolve()
+        cameraAnim = null
+      }
       if (opts.reducedMotion || duration <= 0) {
         frame(1)
         requestRender()
@@ -355,25 +365,43 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
         return
       }
       const start = performance.now()
-      animations.add((now) => {
+      const step = (now: number) => {
         const t = Math.min(1, (now - start) / duration)
         frame(ease(t))
         if (t >= 1) {
+          if (cameraAnim?.step === step) cameraAnim = null
           resolve()
           return false
         }
         return true
-      })
+      }
+      animations.add(step)
+      if (exclusive) cameraAnim = { step, resolve }
     })
 
   const flyTo = (pos: THREE.Vector3, target: THREE.Vector3, duration = 900) => {
     const p0 = camera.position.clone()
     const t0 = controls.target.clone()
-    return animate(duration, (t) => {
-      camera.position.lerpVectors(p0, pos, t)
-      controls.target.lerpVectors(t0, target, t)
-      camera.lookAt(controls.target)
-    })
+    return animate(
+      duration,
+      (t) => {
+        camera.position.lerpVectors(p0, pos, t)
+        controls.target.lerpVectors(t0, target, t)
+        camera.lookAt(controls.target)
+      },
+      true,
+    )
+  }
+
+  // Comandos dados durante a entrada esperam o relevo se erguer; e, se houve
+  // algum, a câmera não voa sozinha até a região selecionada ao final.
+  let entering: Promise<void> | null = null
+  let interacted = false
+  const whenReady = (fn: () => void) => {
+    if (entering) {
+      interacted = true
+      void entering.then(fn)
+    } else fn()
   }
 
   // ── Seleção por toque/clique ──────────────────────────────────────────
@@ -503,7 +531,8 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
     async enter() {
       const home = homePose()
       canvas.classList.add('is-visible')
-      await animate(1700, (t) => {
+      interacted = false
+      entering = animate(1700, (t) => {
         group.scale.y = Math.max(0.001, t)
         waterMaterial.opacity = t * 0.42
         labelOpacity = t
@@ -511,8 +540,10 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
         controls.target.lerpVectors(start.target, home.target, t)
         camera.lookAt(controls.target)
       })
+      await entering
+      entering = null
       controls.enabled = true
-      if (selectedId) {
+      if (selectedId && !interacted) {
         const f = regionFocus(selectedId)
         if (f) await flyTo(f.pos, f.target, 700)
       }
@@ -537,9 +568,11 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
       selectedId = id
       drawTexture()
       requestRender()
-      if (id && focus && controls.enabled) {
-        const f = regionFocus(id)
-        if (f) void flyTo(f.pos, f.target, 800)
+      if (id && focus && (controls.enabled || entering)) {
+        whenReady(() => {
+          const f = regionFocus(id)
+          if (f) void flyTo(f.pos, f.target, 800)
+        })
       }
     },
     async setVersion(textureUrl, nextRegions) {
@@ -550,26 +583,34 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
       requestRender()
     },
     zoom(factor) {
-      const offset = camera.position.clone().sub(controls.target)
-      const len = THREE.MathUtils.clamp(offset.length() * factor, controls.minDistance, controls.maxDistance)
-      offset.setLength(len)
-      void flyTo(controls.target.clone().add(offset), controls.target.clone(), 350)
+      whenReady(() => {
+        const offset = camera.position.clone().sub(controls.target)
+        const len = THREE.MathUtils.clamp(offset.length() * factor, controls.minDistance, controls.maxDistance)
+        offset.setLength(len)
+        void flyTo(controls.target.clone().add(offset), controls.target.clone(), 350)
+      })
     },
     rotate(radians) {
-      const offset = camera.position.clone().sub(controls.target)
-      offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), radians)
-      void flyTo(controls.target.clone().add(offset), controls.target.clone(), 400)
+      whenReady(() => {
+        const offset = camera.position.clone().sub(controls.target)
+        offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), radians)
+        void flyTo(controls.target.clone().add(offset), controls.target.clone(), 400)
+      })
     },
     tilt(radians) {
-      const offset = camera.position.clone().sub(controls.target)
-      const sph = new THREE.Spherical().setFromVector3(offset)
-      sph.phi = THREE.MathUtils.clamp(sph.phi + radians, controls.minPolarAngle, controls.maxPolarAngle)
-      offset.setFromSpherical(sph)
-      void flyTo(controls.target.clone().add(offset), controls.target.clone(), 350)
+      whenReady(() => {
+        const offset = camera.position.clone().sub(controls.target)
+        const sph = new THREE.Spherical().setFromVector3(offset)
+        sph.phi = THREE.MathUtils.clamp(sph.phi + radians, controls.minPolarAngle, controls.maxPolarAngle)
+        offset.setFromSpherical(sph)
+        void flyTo(controls.target.clone().add(offset), controls.target.clone(), 350)
+      })
     },
     resetView() {
-      const home = homePose()
-      void flyTo(home.pos, home.target, 800)
+      whenReady(() => {
+        const home = homePose()
+        void flyTo(home.pos, home.target, 800)
+      })
     },
     dispose() {
       if (disposed) return

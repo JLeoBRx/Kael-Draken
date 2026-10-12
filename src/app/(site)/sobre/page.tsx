@@ -68,12 +68,12 @@ export default function AboutPage() {
           <h2 id="ilustracoes-titulo">Sobre as ilustrações e os mapas</h2>
           <div className="prose">
             <p>
-              As ilustrações do Atlas foram produzidas por código, a partir de ruído procedural, geometria e desenho vetorial. São <strong>conceitos artísticos</strong>: a arquitetura,
-              as paisagens e os brasões dos cinco reinos conhecidos são propostas visuais, não fatos confirmados.
+              A capa oficial, as ilustrações dos capítulos e a carta do Atlas dos Seis Reinos vêm da <strong>edição ilustrada do manuscrito</strong>. Na carta, nomes, capitais e
+              fronteiras continuam sendo propostas: podem mudar à medida que a saga é escrita. O relevo do modo 3D é uma interpretação dessa carta.
             </p>
             <p>
-              Os mapas e o terreno tridimensional são <strong>composições conceituais</strong>. Fronteiras, posições, distâncias e cidades ainda não foram aprovadas e estão marcadas como
-              provisórias. A capa oficial do Livro I é tratada como identidade aprovada e nunca é substituída por estas ilustrações.
+              Os panoramas dos reinos, os brasões e as cenas da mitologia foram produzidos por código, a partir de ruído procedural, geometria e desenho vetorial. São{' '}
+              <strong>conceitos artísticos</strong>: a arquitetura, as paisagens e os brasões dos cinco reinos conhecidos são propostas visuais, não fatos confirmados.
             </p>
           </div>
         </section>

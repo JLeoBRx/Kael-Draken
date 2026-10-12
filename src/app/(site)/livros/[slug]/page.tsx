@@ -7,7 +7,7 @@ import { EntrySection, Gallery, RelatedList, SpoilerGate, TagList } from '@/comp
 import { BookCover } from '@/components/ui/media'
 import { PageHero } from '@/components/ui/PageHero'
 import { listBookIllustrations, toIllustrationItems } from '@/lib/content/illustrations'
-import { getOfficialCover } from '@/lib/content/media'
+import { getFullCover, getOfficialCover } from '@/lib/content/media'
 import { getBook } from '@/lib/content/queries'
 import { prepareRichText } from '@/lib/content/rich'
 import { getSettings } from '@/lib/content/settings'
@@ -42,6 +42,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const editorial = render(b.editorialInfo, { headingOffset: 1 })
   const materials = render(b.materials, { headingOffset: 1 })
   const illustrations = toIllustrationItems(await listBookIllustrations(b, viewer))
+  const fullCover = b.volume === 1 ? getFullCover(`Capa completa de ${b.title}`) : null
 
   return (
     <article>
@@ -51,6 +52,11 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       <div className="container book-layout">
         <div className="book-layout__cover">
           <BookCover cover={cover} title={b.title} priority note="A capa aprovada será exibida aqui assim que o arquivo for adicionado." />
+          {fullCover ? (
+            <a className="book-layout__full-cover" href={fullCover.src} target="_blank" rel="noopener">
+              Ver a capa completa <span className="related-list__meta">contracapa, lombada e capa</span>
+            </a>
+          ) : null}
         </div>
         <div className="entry-main">
           <EntrySection

@@ -1,0 +1,1274 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="O Sussurro da Chama Antiga está de volta. Capa, sinopse oficial, as ilustrações dos dez primeiros capítulos e o Atlas dos Seis Reinos.">
+<meta property="og:title" content="Kael Draken — O Sussurro da Chama Antiga">
+<meta property="og:description" content="O livro voltou.">
+<meta property="og:image" content="assets/capa.webp">
+<title>O Sussurro da Chama Antiga</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;1,7..72,400&display=swap">
+<style>/* Layout: abertura em pergaminho sobre a mesa escura → livro (capa + contracapa) → pranchas dos capítulos em 5 × 2 → carta do Atlas → profecia */
+:root {
+  --ink: #0d0b09;
+  --ink-2: #15110d;
+  --ink-3: #1d1813;
+  --line: #3a3026;
+  --ivory: #ede4d0;
+  --muted: #b5a891;
+  --gold: #c9a35f;
+  --gold-soft: #ddc9a2;
+  --ember: #8e2417;
+  --ember-hi: #b5321f;
+  --sepia: #2c1d10;
+  --sepia-soft: #5a4128;
+  --paper: #f1e3c1;
+  --paper-2: #e6d2a3;
+  --paper-edge: #c6a46a;
+  --display: 'Cormorant Garamond', 'Garamond', Georgia, serif;
+  --body: 'Literata', Georgia, 'Times New Roman', serif;
+  --gutter: clamp(16px, 4vw, 48px);
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--ivory);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 600;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--gold-soft);
+}
+
+:focus-visible {
+  outline: 2px solid #e8c987;
+  outline-offset: 3px;
+}
+
+.wrap {
+  width: min(100%, 76rem);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.eyebrow {
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0.6rem 1.3rem;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font: 500 0.95rem/1.2 var(--body);
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.btn--ember {
+  background: var(--ember);
+  border-color: var(--ember-hi);
+  color: #fbf3e2;
+}
+
+.btn--ember:hover {
+  background: var(--ember-hi);
+}
+
+.btn--ink {
+  border-color: rgba(44, 29, 16, 0.55);
+  background: rgba(255, 248, 228, 0.4);
+  color: var(--sepia);
+}
+
+.btn--ink:hover {
+  border-color: var(--ember);
+}
+
+.btn--line {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--ivory);
+}
+
+.btn--line:hover {
+  border-color: var(--gold);
+}
+
+/* Cabeçalho */
+
+.mast {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  padding: 1rem var(--gutter);
+  border-bottom: 1px solid var(--line);
+}
+
+.mast__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.mast__mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--gold);
+  transform: rotate(45deg);
+  color: var(--gold);
+}
+
+.mast__mark svg {
+  transform: rotate(-45deg);
+}
+
+.mast__sub {
+  font-size: 0.85rem;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.mast__nav {
+  display: flex;
+  gap: 1.25rem;
+  font-size: 0.95rem;
+}
+
+.mast__nav a {
+  color: var(--ivory);
+  text-decoration: none;
+}
+
+.mast__nav a:hover {
+  color: var(--gold-soft);
+}
+
+/* Abertura: o pergaminho */
+
+.opening {
+  overflow-x: clip;
+  padding: clamp(2.5rem, 7vw, 5rem) var(--gutter) clamp(3.5rem, 8vw, 6rem);
+  background:
+    radial-gradient(ellipse 55% 50% at 50% 42%, rgba(214, 150, 70, 0.16), transparent 70%),
+    radial-gradient(ellipse 25% 30% at 90% 12%, rgba(255, 190, 110, 0.08), transparent 70%),
+    var(--ink);
+}
+
+.scroll {
+  /* espaço para as ponteiras dos rolos, que avançam além da folha */
+  width: min(calc(100% - 4rem), 50rem);
+  margin-inline: auto;
+  filter: drop-shadow(0 26px 40px rgba(0, 0, 0, 0.6)) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+}
+
+.scroll__rod {
+  position: relative;
+  z-index: 2;
+  height: 2.6rem;
+  margin-inline: -1.2rem;
+  border-radius: 1.3rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 35%, rgba(0, 0, 0, 0.25) 75%),
+    linear-gradient(180deg, #c9ab78 0%, #f3e3bd 30%, #e2c993 55%, #b8955c 80%, #8a6a3c 100%);
+  box-shadow: inset 0 -3px 6px rgba(60, 35, 10, 0.45), 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.scroll__rod::before,
+.scroll__rod::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 2.3rem;
+  height: 3.1rem;
+  transform: translateY(-50%);
+  border-radius: 0.9rem;
+  background:
+    radial-gradient(ellipse 40% 30% at 35% 30%, rgba(255, 240, 200, 0.75), transparent 70%),
+    linear-gradient(180deg, #3a220e 0%, #7a4a21 22%, #b4783a 45%, #6a3f1b 70%, #2a170a 100%);
+  box-shadow: inset 0 0 0 2px rgba(214, 172, 96, 0.55), 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.scroll__rod::before {
+  left: -1.4rem;
+}
+
+.scroll__rod::after {
+  right: -1.4rem;
+}
+
+.scroll__rod:first-child {
+  margin-bottom: -0.9rem;
+}
+
+.scroll__rod:last-child {
+  margin-top: -0.9rem;
+}
+
+.scroll__sheet {
+  position: relative;
+  color: var(--sepia);
+  clip-path: polygon(0.6% 0%, 99.2% 0%, 100% 6%, 99.1% 13%, 99.8% 21%, 99% 30%, 99.9% 39%, 99.2% 48%, 99.8% 57%, 99% 66%, 99.7% 75%, 99.1% 84%, 99.9% 92%, 99.3% 100%, 0.7% 100%, 0% 93%, 0.9% 85%, 0.2% 76%, 0.8% 67%, 0% 58%, 0.9% 49%, 0.1% 40%, 0.8% 31%, 0% 22%, 0.9% 13%, 0.2% 6%);
+  background:
+    radial-gradient(ellipse 45% 30% at 18% 12%, rgba(255, 252, 236, 0.75), transparent 70%),
+    radial-gradient(ellipse 30% 22% at 82% 78%, rgba(150, 96, 40, 0.2), transparent 70%),
+    radial-gradient(ellipse 18% 12% at 70% 22%, rgba(140, 90, 40, 0.14), transparent 70%),
+    radial-gradient(ellipse 22% 16% at 28% 88%, rgba(120, 70, 30, 0.16), transparent 70%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35  0 0 0 0 0.22  0 0 0 0 0.08  0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.55'/></svg>"),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='m'><feTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.3  0 0 0 0 0.12  0 0 0 0.9 -0.32'/></filter><rect width='100%' height='100%' filter='url(%23m)'/></svg>"),
+    linear-gradient(90deg, var(--paper-edge) 0%, var(--paper-2) 5%, var(--paper) 30%, #f6ebcf 55%, var(--paper-2) 92%, var(--paper-edge) 100%);
+  box-shadow: inset 0 0 70px rgba(110, 66, 22, 0.32), inset 0 0 14px rgba(80, 45, 12, 0.45);
+}
+
+.scroll__inner {
+  display: grid;
+  justify-items: center;
+  gap: 0.8rem;
+  padding: clamp(2.6rem, 6vw, 4.2rem) clamp(1.4rem, 6vw, 4.4rem) clamp(3rem, 6vw, 4.4rem);
+  text-align: center;
+}
+
+.scroll__emblem {
+  color: var(--ember);
+}
+
+.scroll__kicker {
+  font-family: var(--display);
+  font-size: clamp(0.95rem, 0.85rem + 0.4vw, 1.15rem);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--sepia-soft);
+}
+
+.scroll__title {
+  font-size: clamp(2.6rem, 1.6rem + 4.2vw, 4.6rem);
+  line-height: 1;
+  color: var(--sepia);
+  text-shadow: 0 1px 0 rgba(255, 248, 225, 0.6);
+}
+
+.scroll__divider {
+  width: min(15rem, 70%);
+  color: var(--ember);
+}
+
+.scroll__divider svg {
+  width: 100%;
+  height: auto;
+}
+
+.scroll__body {
+  display: grid;
+  gap: 0.9em;
+  max-width: 38rem;
+  text-align: left;
+  font-family: var(--display);
+  font-size: clamp(1.15rem, 1.03rem + 0.4vw, 1.35rem);
+  line-height: 1.55;
+}
+
+.scroll__body > p:first-child {
+  font-style: italic;
+}
+
+.scroll__body > p:first-child::first-letter {
+  float: left;
+  margin: 0.06em 0.12em 0 0;
+  font-size: 3.4em;
+  line-height: 0.82;
+  font-weight: 600;
+  color: var(--ember);
+}
+
+.scroll__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.scroll__seal {
+  position: absolute;
+  right: clamp(0.6rem, 4vw, 2.4rem);
+  bottom: clamp(0.4rem, 2vw, 1.2rem);
+  width: clamp(3.6rem, 9vw, 5.2rem);
+  filter: drop-shadow(0 3px 4px rgba(40, 10, 5, 0.45));
+}
+
+.scroll__seal svg {
+  width: 100%;
+  height: auto;
+}
+
+/* O livro */
+
+.book {
+  padding-block: clamp(3.5rem, 8vw, 6rem);
+  border-top: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+}
+
+.book__grid {
+  display: grid;
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: start;
+}
+
+@media (min-width: 860px) {
+  .book__grid {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  }
+}
+
+.book__cover {
+  margin: 0;
+  justify-self: center;
+  width: min(100%, 26rem);
+}
+
+.book__cover img {
+  width: 100%;
+  border: 1px solid rgba(201, 163, 95, 0.35);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 0 6px rgba(0, 0, 0, 0.35), 0 0 80px rgba(214, 120, 50, 0.12);
+}
+
+.book__text {
+  display: grid;
+  gap: 1.1rem;
+  min-width: 0;
+}
+
+.book__title {
+  font-size: clamp(2.3rem, 1.5rem + 3vw, 3.6rem);
+}
+
+.book__synopsis {
+  display: grid;
+  gap: 0.9rem;
+  max-width: 38rem;
+  color: #ddd2bb;
+}
+
+.book__synopsis strong {
+  font-family: var(--display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--gold-soft);
+}
+
+.book__synopsis blockquote {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  border-left: 2px solid var(--ember);
+  font-family: var(--display);
+  font-size: 1.3rem;
+  color: var(--ivory);
+}
+
+.book__synopsis blockquote p {
+  margin: 0;
+}
+
+.genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--display);
+  font-size: 1.05rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold-soft);
+}
+
+.genres li + li::before {
+  content: '|';
+  margin-right: 0.9rem;
+  color: var(--line);
+}
+
+.book__meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* Cabeçalhos de seção */
+
+.head {
+  display: grid;
+  gap: 0.7rem;
+  max-width: 46rem;
+  margin-bottom: clamp(2rem, 4vw, 3rem);
+}
+
+.head h2 {
+  font-size: clamp(2.1rem, 1.4rem + 2.6vw, 3.2rem);
+}
+
+.head__lede {
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+
+/* Pranchas dos capítulos */
+
+.plates {
+  padding-block: clamp(3.5rem, 8vw, 6rem);
+  border-top: 1px solid var(--line);
+}
+
+.plates__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 900px) {
+  .plates__grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 2.75rem 1.4rem;
+  }
+}
+
+.plate {
+  display: grid;
+  gap: 0.3rem;
+  align-content: start;
+  scroll-margin-top: 2rem;
+}
+
+.plate__frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0;
+  aspect-ratio: 31 / 46;
+  border: 1px solid #4a3d30;
+  background: #070605;
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.plate__frame::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(201, 163, 95, 0.22);
+  pointer-events: none;
+}
+
+.plate__frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 0.7s cubic-bezier(0.2, 0.6, 0.2, 1);
+}
+
+.plate__frame:hover {
+  border-color: var(--gold);
+}
+
+.plate__frame:hover img {
+  transform: scale(1.03);
+}
+
+.plate__num {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.plate__title {
+  font-family: var(--display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.plate__state {
+  justify-self: start;
+  margin-top: 0.2rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px dashed var(--line);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Atlas */
+
+.atlas {
+  padding-block: clamp(3.5rem, 8vw, 6rem);
+  border-top: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink), var(--ink-2));
+}
+
+.atlas__switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  border: 1px solid var(--line);
+}
+
+.atlas__opt {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.55rem 1rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: 1.05rem/1.2 var(--display);
+  text-align: left;
+  cursor: pointer;
+}
+
+.atlas__opt span {
+  font: 0.68rem/1.2 var(--body);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.atlas__opt[aria-pressed='true'] {
+  background: var(--ink-3);
+  color: var(--ivory);
+  box-shadow: inset 0 -2px 0 var(--gold);
+}
+
+.atlas__map {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid #4a3d30;
+  background: #070605;
+  cursor: zoom-in;
+}
+
+.atlas__map img {
+  width: 100%;
+}
+
+.atlas__note {
+  margin-top: 0.7rem;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.realms {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  margin: 2.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  background: var(--line);
+}
+
+@media (min-width: 560px) {
+  .realms {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .realms {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.realm {
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+  padding: 1.3rem 1.3rem 1.4rem;
+  background: var(--ink-2);
+}
+
+.realm--lost {
+  background: linear-gradient(180deg, rgba(142, 36, 23, 0.16), var(--ink-2));
+}
+
+.realm__num {
+  font-family: var(--display);
+  font-size: 0.95rem;
+  color: var(--gold);
+}
+
+.realm__name {
+  font-size: 1.7rem;
+}
+
+.realm__epithet {
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-soft);
+}
+
+.realm__summary {
+  font-size: 0.95rem;
+  color: #d4c8b0;
+}
+
+.realm__capital {
+  font-size: 0.9rem;
+  color: var(--ivory);
+}
+
+.realm__capital span {
+  margin-right: 0.3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.realm__state {
+  justify-self: start;
+  margin-top: 0.3rem;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid var(--line);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.realm--lost .realm__state {
+  border-color: rgba(201, 163, 95, 0.6);
+  color: var(--gold-soft);
+}
+
+/* Profecia */
+
+.prophecy {
+  padding-block: clamp(4rem, 9vw, 7rem);
+  border-top: 1px solid var(--line);
+  background: radial-gradient(ellipse 50% 70% at 50% 50%, rgba(142, 36, 23, 0.14), transparent 70%), var(--ink);
+  text-align: center;
+}
+
+.prophecy figure {
+  margin: 0 auto;
+}
+
+.prophecy blockquote {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(1.6rem, 1.1rem + 2.2vw, 2.7rem);
+  font-style: italic;
+  line-height: 1.25;
+}
+
+.prophecy figcaption {
+  margin-top: 1.4rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+/* Rodapé */
+
+.foot {
+  padding-block: 2.5rem 3rem;
+  border-top: 1px solid var(--line);
+  background: #080706;
+}
+
+.foot__grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
+}
+
+.foot__brand {
+  font-family: var(--display);
+  font-size: 1.35rem;
+}
+
+.foot__brand em {
+  margin-left: 0.5rem;
+  font-size: 1rem;
+  color: var(--gold-soft);
+}
+
+.foot__copy {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+/* Visualização ampliada */
+
+html:has(.viewer[open]) {
+  overflow: hidden;
+}
+
+.viewer {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(7, 6, 5, 0.97);
+  color: var(--ivory);
+}
+
+.viewer::backdrop {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.viewer__inner {
+  position: relative;
+  display: grid;
+  min-height: 100%;
+}
+
+.viewer__stage {
+  display: grid;
+  place-items: center;
+  padding: 4.5rem 1rem 1rem;
+}
+
+.viewer__stage img {
+  width: auto;
+  max-height: 66svh;
+  border: 1px solid #4a3d30;
+}
+
+.viewer__info {
+  display: grid;
+  gap: 0.8rem;
+  align-content: start;
+  padding: 1.4rem var(--gutter) 2.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.viewer__title {
+  font-size: 2rem;
+}
+
+.viewer__state {
+  justify-self: start;
+  padding: 0.1rem 0.45rem;
+  border: 1px dashed var(--line);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.viewer__caption {
+  font-family: var(--display);
+  font-size: 1.3rem;
+  font-style: italic;
+  color: var(--paper-2);
+}
+
+.viewer__alt summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--gold-soft);
+}
+
+.viewer__alt p {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #d4c8b0;
+}
+
+.viewer__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--line);
+}
+
+.viewer__close {
+  position: absolute;
+  z-index: 2;
+  top: 0.9rem;
+  right: 0.9rem;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--ink-2);
+  color: var(--ivory);
+  cursor: pointer;
+}
+
+.viewer__close:hover {
+  border-color: var(--gold);
+}
+
+@media (min-width: 960px) {
+  .viewer__inner {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+    height: 100%;
+  }
+
+  .viewer__stage {
+    padding: 2rem;
+  }
+
+  .viewer__stage img {
+    max-height: calc(100svh - 4rem);
+  }
+
+  .viewer__info {
+    overflow-y: auto;
+    padding: 5rem 2rem 2rem;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 16px;
+  }
+
+  .scroll {
+    width: min(calc(100% - 1.4rem), 50rem);
+  }
+
+  .scroll__rod {
+    height: 2rem;
+    margin-inline: -0.2rem;
+  }
+
+  .scroll__rod::before,
+  .scroll__rod::after {
+    width: 1.3rem;
+    height: 2.4rem;
+  }
+
+  .scroll__rod::before {
+    left: -0.55rem;
+  }
+
+  .scroll__rod::after {
+    right: -0.55rem;
+  }
+
+  .scroll__actions .btn {
+    width: 100%;
+  }
+
+  .mast__sub {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plate__frame img {
+    transition: none;
+  }
+}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <p class="mast__brand"><span class="mast__mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2c1.2 3 4.5 5 4.5 9.5a4.5 4.5 0 0 1-9 0c0-2 1-3.5 2-4.5.2 1.5.8 2.5 1.8 2.9-.6-2.7.1-5.5.7-7.9z" fill="currentColor"/></svg></span>Kael Draken <span class="mast__sub">Arquivo da Chama Antiga</span></p>
+  <nav class="mast__nav" aria-label="Seções">
+    <a href="#livro">O livro</a><a href="#ilustracoes">Ilustrações</a><a href="#atlas">Atlas</a>
+  </nav>
+</header>
+
+<main>
+  <section class="opening" aria-labelledby="anuncio">
+    <div class="scroll">
+      <div class="scroll__rod" aria-hidden="true"></div>
+      <article class="scroll__sheet">
+        <div class="scroll__inner">
+          <span class="scroll__emblem" aria-hidden="true"><svg viewBox="0 0 64 64" width="56" height="56"><circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="32" cy="32" r="24" fill="none" stroke="currentColor" stroke-width=".6" stroke-dasharray="1.5 2.5"/><path d="M32 10c3 7 11 12 11 23a11 11 0 0 1-22 0c0-5 2.5-8.5 5-11 .4 3.6 2 6 4.5 7-1.5-6.5.2-13.4 1.5-19z" fill="currentColor" opacity=".9"/><path d="M32 30c1.8 3 4.5 4.8 4.5 8.5a4.5 4.5 0 0 1-9 0c0-2.4 1.2-3.9 2.3-5 .3 1.4 1 2.3 2 2.8-.3-2.3-.3-4.4.2-6.3z" fill="#f3e5c4"/></svg></span>
+          <p class="scroll__kicker">Kael Draken · O Sussurro da Chama Antiga</p>
+          <h1 class="scroll__title" id="anuncio">O livro voltou</h1>
+          <span class="scroll__divider" aria-hidden="true"><svg viewBox="0 0 240 16" width="240" height="16"><path d="M0 8h96M144 8h96" stroke="currentColor" stroke-width=".8"/><path d="M100 8l4-4 4 4-4 4zM132 8l4-4 4 4-4 4z" fill="currentColor"/><path d="M120 0l3 8-3 8-3-8z" fill="currentColor"/><circle cx="120" cy="8" r="1.4" fill="#f3e5c4"/></svg></span>
+          <div class="scroll__body"><p>O Sussurro da Chama Antiga está de volta — e o Arquivo da Chama Antiga abre suas portas para quem quiser atravessá-las.</p>
+<p>Antes que o céu e a terra existissem, havia a Chama do Dragão. Dela nasceu tudo: os céus, as terras, a vida e os seis reinos.</p>
+<p>Cada reino recebeu um fragmento da Chama, mas Safra conseguiu dominá-la como nenhum outro. Com ela, seu povo alcançou força, conhecimento e habilidades extraordinárias.</p>
+<p>Movidas pela inveja, as outras cinco grandes nações se uniram para destruir Safra e exterminar seu povo. Durante a catástrofe, a Chama desapareceu; os registros sobre o sexto reino foram apagados, e um Século Perdido de cerca de seiscentos anos esconde a verdade da história. Sem a Chama, o Caos voltou a ameaçar o mundo.</p>
+<p>A história acompanha Kael, um jovem de dezesseis anos, inteligente e gentil, mas marcado por uma raiva que tenta controlar, enquanto sonhos misteriosos começam a se intensificar — sonhos com lugares, tempos e acontecimentos que não existem no mundo conhecido.</p>
+<p>Entre ruínas do passado, o renascimento do Caos e segredos antigos, Kael embarca em uma jornada que poderá revelar a verdade sobre suas origens e definir o destino de todos os reinos.</p>
+</div>
+          <p class="scroll__actions"><a class="btn btn--ember" href="#livro">Conhecer o Livro I</a><a class="btn btn--ink" href="#ilustracoes">Ver as ilustrações</a></p>
+        </div>
+        <span class="scroll__seal" aria-hidden="true"><svg viewBox="0 0 80 96" width="80" height="96"><defs><radialGradient id="cera" cx="38%" cy="32%" r="70%"><stop offset="0" stop-color="#c0392b"/><stop offset=".55" stop-color="#8e1b12"/><stop offset="1" stop-color="#4d0b07"/></radialGradient></defs><path d="M30 62l-8 32 10-7 6 9 4-34zM50 62l8 32-10-7-6 9-4-34z" fill="#6e1410"/><polygon points="71.2,40.0 70.6,45.4 65.9,49.4 66.7,55.4 62.1,58.5 61.0,65.0 54.6,65.3 49.9,67.2 45.2,69.6 40.0,69.4 34.3,72.3 30.4,66.3 24.8,66.2 21.6,61.9 16.1,60.0 12.7,55.8 13.4,49.7 10.0,45.3 12.0,40.0 7.9,34.3 12.0,29.8 14.4,25.2 17.5,21.1 21.4,17.9 23.6,11.6 30.2,13.0 34.7,9.7 40.0,12.1 45.3,9.8 50.8,10.3 54.6,14.7 59.7,16.6 60.9,22.4 67.9,23.9 68.2,29.7 70.0,34.7" fill="url(#cera)"/><circle cx="40" cy="40" r="21" fill="none" stroke="#e8a28f" stroke-opacity=".35" stroke-width="1.2"/><path d="M40 24c2 5 8 8.5 8 16a8 8 0 0 1-16 0c0-3.6 1.8-6 3.6-7.8.3 2.6 1.4 4.2 3.2 5-1-4.6.2-9.4 1.2-13.2z" fill="#f2b8a6" fill-opacity=".55"/></svg></span>
+      </article>
+      <div class="scroll__rod" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <section class="book" id="livro" aria-labelledby="livro-titulo">
+    <div class="wrap book__grid">
+      <figure class="book__cover">
+        <img src="assets/capa.webp" width="720" height="1058" alt="Capa de Kael Draken — Livro I: O Sussurro da Chama Antiga. Um jovem de capa vermelha, de costas, olha para uma cidade de torres ao entardecer, sob a sombra de um dragão.">
+      </figure>
+      <div class="book__text">
+        <p class="eyebrow">Kael Draken — Livro I</p>
+        <h2 class="book__title" id="livro-titulo">O Sussurro da Chama Antiga</h2>
+        <div class="book__synopsis"><p><strong>Quando a Chama desperta, o mundo nunca mais será o mesmo.</strong></p>
+<p>Em um mundo marcado por guerras, segredos e reinos em ruínas, Kael Draken, um jovem de 16 anos, leva uma vida tranquila em um vilarejo distante, sem saber que carrega um destino capaz de mudar o rumo da história.</p>
+<p>Quando uma antiga chama desperta, forças adormecidas voltam a se mover nas sombras, revelando verdades esquecidas, símbolos antigos e um passado que muitos preferem manter oculto.</p>
+<p>Entre alianças inesperadas, perigos mortais e escolhas que podem consumir sua alma, Kael precisará descobrir quem realmente é, antes que o mundo seja tomado novamente pelo Caos.</p>
+<blockquote>
+<p><em>“O fogo não escolhe, ele consome. Mas também revela aquilo que estava oculto.”</em></p>
+</blockquote>
+</div>
+        <ul class="genres" aria-label="Gêneros"><li>Fantasia</li><li>Aventura</li><li>Mistério</li><li>Destino</li></ul>
+        <p class="book__meta">Edição independente · 2026</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="plates" id="ilustracoes" aria-labelledby="ilustracoes-titulo">
+    <div class="wrap">
+      <header class="head">
+        <p class="eyebrow">Livro I · gravuras dos capítulos</p>
+        <h2 id="ilustracoes-titulo">Ilustrações do Livro I</h2>
+        <p class="head__lede">Imagens que acompanham os primeiros passos de Kael Draken e os vestígios de uma história que o mundo tentou esquecer. Uma por capítulo, no formato do livro impresso: 15,5 × 23 cm, em preto e branco.</p>
+      </header>
+      <ol class="plates__grid">
+      <li class="plate" id="capitulo-01-lugar-que-nao-existia">
+        <button type="button" class="plate__frame" data-index="0" aria-label="Ampliar a ilustração do capítulo i: O lugar que não existia">
+          <img src="assets/ilustracoes/capitulo-01-lugar-que-nao-existia-p.webp" width="560" height="831" alt="" loading="lazy" decoding="async">
+        </button>
+        <p class="plate__num">Capítulo I</p>
+        <p class="plate__title">O lugar que não existia</p>
+        
+      </li>
+      <li class="plate" id="capitulo-02-peso-do-despertar">
+        <button type="button" class="plate__frame" data-index="1" aria-label="Ampliar a ilustração do capítulo ii: O peso do despertar">
+          <img src="assets/ilustracoes/capitulo-02-peso-do-despertar-p.webp" width="560" height="822" alt="" loading="lazy" decoding="async">
+        </button>
+        <p class="plate__num">Capítulo II</p>
+        <p class="plate__title">O peso do despertar</p>
+        <p class="plate__state">Versão provisória</p>
+      </li>
+      <li class="plate" id="capitulo-03-casa-fim-da-estrada">
+        <button type="button" class="plate__frame" data-index="2" aria-label="Ampliar a ilustração do capítulo iii: A casa no fim da estrada">
+          <img src="assets/ilustracoes/capitulo-03-casa-fim-da-estrada-p.webp" width="560" height="831" alt="" loading="lazy" decoding="async">
+        </button>
+        <p class="plate__num">Capítulo III</p>
+        <p class="plate__title">A casa no fim da estrada</p>
+        
+      </li>
+      <li class="plate" id="capitulo-04-caminho-do-bosque">
+        <button type="button" class="plate__frame" data-index="3" aria-label="Ampliar a ilustração do capítulo iv: O caminho do bosque">
+          <img src="assets/ilustracoes/capitulo-04-caminho-do-bosque-p.webp" width="560" height="831" alt="" loading="lazy" decoding="async">
+        </button>
+        <p class="plate__num">Capítulo IV</p>
+        <p class="plate__title">O caminho do bosque</p>
+        
+      </li>
+      <li class="plate" id="capitulo-05-aquilo-ficou-porta">
+        <button type="button" class="plate__frame" data-index="4" aria-label="Ampliar a ilustração do capítulo v: Aquilo que ficou à porta">
+          <img src="assets/ilustracoes/capitulo-05-aquilo-ficou-porta-p.webp" width="560" height="831" alt="" loading="lazy" decoding="async">
+        </button>
+        <p class="plate__num">Capítulo V</p>
+        <p class="plate__title">Aquilo que ficou à porta</p>
+        
+      </li>
+      <li class="plate" id="capitulo-06-o-que-pode-ser-provado">
+        <button type="button" class="plate__frame" data-index="5" aria-label="Ampliar a ilustração do capítulo vi: O que pode ser provado">
+          <img src="assets/ilustracoes/capitulo-06-o-que-pode-ser-provado-p.webp" width="560" height="831" alt="" loading="lazy" decoding="async">
+        </button>
+        <p class="plate__num">Capítulo VI</p>
+        <p class="plate__title">O que pode ser provado</p>
+        
+      </li>
+      <li class="plate" id="capitulo-07-arquivo-sob-poeira">
+        <button type="button" class="plate__frame" data-index="6" aria-label="Ampliar a ilustração do capítulo vii: O arquivo sob a poeira">
+          <img src="assets/ilustracoes/capitulo-07-arquivo-sob-poeira-p.webp" width="560" height="831" alt="" loading="lazy" decoding="async">
+        </button>
+        <p class="plate__num">Capítulo VII</p>
+        <p class="plate__title">O arquivo sob a poeira</p>
+        
+      </li>
+      <li class="plate" id="capitulo-08-versao-oficial">
+        <button type="button" class="plate__frame" data-index="7" aria-label="Ampliar a ilustração do capítulo viii: A versão oficial">
+          <img src="assets/ilustracoes/capitulo-08-versao-oficial-p.webp" width="560" height="831" alt="" loading="lazy" decoding="async">
+        </button>
+        <p class="plate__num">Capítulo VIII</p>
+        <p class="plate__title">A versão oficial</p>
+        
+      </li>
+      <li class="plate" id="capitulo-09-homem-dos-estabulos">
+        <button type="button" class="plate__frame" data-index="8" aria-label="Ampliar a ilustração do capítulo ix: O homem dos estábulos">
+          <img src="assets/ilustracoes/capitulo-09-homem-dos-estabulos-p.webp" width="560" height="831" alt="" loading="lazy" decoding="async">
+        </button>
+        <p class="plate__num">Capítulo IX</p>
+        <p class="plate__title">O homem dos estábulos</p>
+        
+      </li>
+      <li class="plate" id="capitulo-10-chave-de-ferro">
+        <button type="button" class="plate__frame" data-index="9" aria-label="Ampliar a ilustração do capítulo x: A chave de ferro">
+          <img src="assets/ilustracoes/capitulo-10-chave-de-ferro-p.webp" width="560" height="831" alt="" loading="lazy" decoding="async">
+        </button>
+        <p class="plate__num">Capítulo X</p>
+        <p class="plate__title">A chave de ferro</p>
+        
+      </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="atlas" id="atlas" aria-labelledby="atlas-titulo">
+    <div class="wrap">
+      <header class="head">
+        <p class="eyebrow">Atlas dos Seis Reinos</p>
+        <h2 id="atlas-titulo">O mundo, em duas versões</h2>
+        <p class="head__lede">Antes da Noite das Cinzas, seis reinos. Depois dela, a história oficial reconhece apenas cinco — e o território de Safra ficou sem registro.</p>
+      </header>
+      <div class="atlas__switch" role="group" aria-label="Versão do mapa">
+        <button type="button" class="atlas__opt" aria-pressed="true" data-map="original">Mundo original <span>seis reinos</span></button>
+        <button type="button" class="atlas__opt" aria-pressed="false" data-map="conhecido">Mundo conhecido <span>versão oficial · cinco reinos</span></button>
+      </div>
+      <button type="button" class="atlas__map" aria-label="Ampliar o mapa">
+        <img id="mapa" src="assets/mapa-original.webp" data-original="assets/mapa-original.webp" data-conhecido="assets/mapa-conhecido.webp" width="1536" height="1024" loading="lazy" decoding="async"
+          alt="Carta ilustrada do Atlas dos Seis Reinos: Aurelion, Nácaris, Elyndor, Rhovaryn, Kharveth e, ao centro-sul, Safra, com o Templo da Chama em ruínas.">
+      </button>
+      <p class="atlas__note">Carta do manuscrito. Nomes, capitais, fronteiras e brasões são conceituais e podem mudar.</p>
+      <ol class="realms">
+        <li class="realm realm--lost">
+          <p class="realm__num">I</p>
+          <h3 class="realm__name">Safra</h3>
+          <p class="realm__epithet">O reino desaparecido</p>
+          <p class="realm__summary">O reino que possuía uma ligação excepcional com as chamas — e que desapareceu.</p>
+          <p class="realm__capital"><span>Na carta</span> Templo da Chama (ruínas)</p>
+          <p class="realm__state">Estabelecido</p>
+        </li>
+        <li class="realm">
+          <p class="realm__num">II</p>
+          <h3 class="realm__name">Aurelion</h3>
+          <p class="realm__epithet">Monarquia consultiva</p>
+          <p class="realm__summary">Um dos cinco reinos conhecidos, organizado como monarquia consultiva.</p>
+          <p class="realm__capital"><span>Na carta</span> Auréstria</p>
+          <p class="realm__state">Proposta</p>
+        </li>
+        <li class="realm">
+          <p class="realm__num">III</p>
+          <h3 class="realm__name">Nácaris</h3>
+          <p class="realm__epithet">Confederação de cidades</p>
+          <p class="realm__summary">Um dos cinco reinos conhecidos, organizado como confederação de cidades.</p>
+          <p class="realm__capital"><span>Na carta</span> Velária, sede da confederação</p>
+          <p class="realm__state">Proposta</p>
+        </li>
+        <li class="realm">
+          <p class="realm__num">IV</p>
+          <h3 class="realm__name">Kharveth</h3>
+          <p class="realm__epithet">Pacto entre cinco ordens</p>
+          <p class="realm__summary">Um dos cinco reinos conhecidos, sustentado por um pacto entre cinco ordens.</p>
+          <p class="realm__capital"><span>Na carta</span> Vhaldris</p>
+          <p class="realm__state">Proposta</p>
+        </li>
+        <li class="realm">
+          <p class="realm__num">V</p>
+          <h3 class="realm__name">Elyndor</h3>
+          <p class="realm__epithet">Conselho religioso e civil</p>
+          <p class="realm__summary">Um dos cinco reinos conhecidos, governado por um conselho religioso e civil.</p>
+          <p class="realm__capital"><span>Na carta</span> Ithária</p>
+          <p class="realm__state">Proposta</p>
+        </li>
+        <li class="realm">
+          <p class="realm__num">VI</p>
+          <h3 class="realm__name">Rhovaryn</h3>
+          <p class="realm__epithet">Liga de territórios autônomos</p>
+          <p class="realm__summary">Um dos cinco reinos conhecidos, formado por uma liga de territórios autônomos.</p>
+          <p class="realm__capital"><span>Na carta</span> Avarra</p>
+          <p class="realm__state">Proposta</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="prophecy" aria-label="Profecia">
+    <figure class="wrap">
+      <blockquote><span>Quando a Chama despertar,</span><span>não o fará sozinha.</span><span>Skrugheim abrirá suas portas,</span><span>e a morte caminhará entre os vivos.</span></blockquote>
+      <figcaption>Profecia · O Sussurro da Chama Antiga</figcaption>
+    </figure>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot__grid">
+    <p class="foot__brand">Kael Draken <em>O Sussurro da Chama Antiga</em></p>
+    
+    <p class="foot__copy">© 2026 Kael Draken. Todos os direitos reservados.</p>
+  </div>
+</footer>
+
+<dialog class="viewer" id="viewer" aria-labelledby="viewer-title">
+  <div class="viewer__inner">
+    <button type="button" class="viewer__close" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div class="viewer__stage"><img id="viewer-img" alt=""></div>
+    <div class="viewer__info">
+      <p class="eyebrow" id="viewer-label"></p>
+      <h2 class="viewer__title" id="viewer-title"></h2>
+      <p class="viewer__state" id="viewer-state" hidden></p>
+      <p class="viewer__caption" id="viewer-caption"></p>
+      <details class="viewer__alt"><summary>Descrição da imagem</summary><p id="viewer-alt"></p></details>
+      <p class="viewer__nav" id="viewer-nav"><button type="button" class="btn btn--line" data-step="-1">← Anterior</button><button type="button" class="btn btn--line" data-step="1">Próxima →</button></p>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  const items = [{"src":"assets/ilustracoes/capitulo-01-lugar-que-nao-existia.webp","w":1400,"h":2077,"label":"Capítulo I","title":"O lugar que não existia","caption":"Um céu sem estrelas e uma cidade que Kael não reconhece.","alt":"Gravura em preto e branco. De costas, um rapaz está num terraço de pedra entre dois braseiros acesos e contempla uma cidade imensa de torres e pináculos góticos, pontes em arcos e cascatas. No alto, um templo monumental se ergue sob um halo de luz circular, contra um céu escuro e revolto.","state":""},{"src":"assets/ilustracoes/capitulo-02-peso-do-despertar.webp","w":1240,"h":1820,"label":"Capítulo II","title":"O peso do despertar","caption":"O vale visto do alto, na manhã depois do sonho.","alt":"Imagem em preto e branco, em baixa resolução. Uma figura de manto e capuz, apoiada num cajado, observa do alto de uma rocha um vale coberto de mata, com montanhas ao longe sob um céu nublado.","state":"Versão provisória"},{"src":"assets/ilustracoes/capitulo-03-casa-fim-da-estrada.webp","w":1400,"h":2077,"label":"Capítulo III","title":"A casa no fim da estrada","caption":"A casa de pedra, junto ao muro e à grande árvore.","alt":"Gravura em preto e branco. Uma casa de pedra com telhado de colmo, chaminé, janelas iluminadas e um alpendre, ao lado de uma grande árvore. Um caminho de terra passa junto a um muro de pedras soltas; ao fundo, montanhas.","state":""},{"src":"assets/ilustracoes/capitulo-04-caminho-do-bosque.webp","w":1400,"h":2077,"label":"Capítulo IV","title":"O caminho do bosque","caption":"Um arco de pedra esquecido no bosque.","alt":"Gravura em preto e branco. Num bosque denso, um rapaz de manto com capuz, visto de costas, observa um antigo arco de pedra coberto de entalhes; através do arco, a trilha segue para uma claridade enevoada.","state":""},{"src":"assets/ilustracoes/capitulo-05-aquilo-ficou-porta.webp","w":1400,"h":2077,"label":"Capítulo V","title":"Aquilo que ficou à porta","caption":"Um disco de metal escuro, à luz da lamparina.","alt":"Gravura em preto e branco. Sobre uma mesa de madeira, um disco de metal escuro com um emblema ramificado em relevo, semelhante a uma chama, e uma borda de marcas gravadas; um cordão está preso a ele. Ao fundo, livros antigos e uma lamparina acesa.","state":""},{"src":"assets/ilustracoes/capitulo-06-o-que-pode-ser-provado.webp","w":1400,"h":2077,"label":"Capítulo VI","title":"O que pode ser provado","caption":"Um caderno antigo, entre desenhos e anotações.","alt":"Gravura em preto e branco. Um caderno antigo aberto sobre a mesa, à luz de uma lamparina: numa página, o esboço de uma cidade de torres e alguns diagramas; na outra, um emblema ramificado dentro de um círculo, cercado de anotações manuscritas ilegíveis.","state":""},{"src":"assets/ilustracoes/capitulo-07-arquivo-sob-poeira.webp","w":1400,"h":2077,"label":"Capítulo VII","title":"O arquivo sob a poeira","caption":"O arquivo e os registros esquecidos.","alt":"Gravura em preto e branco. Uma sala de arquivo com estantes altas de livros e um janelão por onde entram feixes de luz. Sobre as mesas, livros de registro empilhados, pergaminhos enrolados, documentos espalhados e uma esfera armilar.","state":""},{"src":"assets/ilustracoes/capitulo-08-versao-oficial.webp","w":1400,"h":2077,"label":"Capítulo VIII","title":"A versão oficial","caption":"O responsável pelos registros da aldeia.","alt":"Gravura em preto e branco. Um homem de cabelos grisalhos e barba, de casaco escuro e medalhão ao peito, lê um documento sentado à mesa de registros, entre papéis, livros e um tinteiro. Atrás dele, na parede de madeira, pende um estandarte com brasão.","state":""},{"src":"assets/ilustracoes/capitulo-09-homem-dos-estabulos.webp","w":1400,"h":2077,"label":"Capítulo IX","title":"O homem dos estábulos","caption":"Os antigos estábulos de Darel.","alt":"Gravura em preto e branco. No estábulo, um homem mais velho, de cabelos grisalhos e barba, de camisa com as mangas arregaçadas e avental de couro, está sentado com as mãos marcadas pelo trabalho apoiadas nos joelhos e a expressão cansada. Atrás dele, um cavalo de cabresto; ao lado, uma lanterna e arreios pendurados.","state":""},{"src":"assets/ilustracoes/capitulo-10-chave-de-ferro.webp","w":1400,"h":2077,"label":"Capítulo X","title":"A chave de ferro","caption":"Uma porta de ferro sob a pedra.","alt":"Gravura em preto e branco. Num salão subterrâneo de pedra, uma porta de ferro em arco, de dois batentes, com ferragens e um grande emblema ramificado, em forma de chama, no centro. Velas ardem dos dois lados, e o chão de lajes molhadas reflete a luz.","state":""}];
+  const dialog = document.getElementById('viewer');
+  const img = document.getElementById('viewer-img');
+  const nav = document.getElementById('viewer-nav');
+  let current = -1;
+  let opener = null;
+  const set = (id, text) => { const el = document.getElementById(id); el.textContent = text; el.hidden = !text; };
+  function show(i) {
+    current = (i + items.length) % items.length;
+    const it = items[current];
+    img.src = it.src; img.width = it.w; img.height = it.h; img.alt = it.alt;
+    set('viewer-label', it.label + ' · ' + (current + 1) + ' de ' + items.length);
+    set('viewer-title', it.title);
+    set('viewer-state', it.state);
+    set('viewer-caption', it.caption);
+    document.getElementById('viewer-alt').textContent = it.alt;
+    nav.hidden = false;
+    dialog.querySelector('.viewer__alt').hidden = false;
+  }
+  function open(fn, from) {
+    opener = from || document.activeElement;
+    fn();
+    if (!dialog.open) dialog.showModal();
+  }
+  document.querySelectorAll('.plate__frame').forEach((b) => b.addEventListener('click', () => open(() => show(Number(b.dataset.index)), b)));
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog || e.target.closest('[data-close]')) dialog.close();
+    const step = e.target.closest('[data-step]');
+    if (step && current >= 0) show(current + Number(step.dataset.step));
+  });
+  dialog.addEventListener('keydown', (e) => {
+    if (current < 0) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); show(current + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); show(current - 1); }
+  });
+  let touch = null;
+  dialog.addEventListener('touchstart', (e) => { touch = e.touches[0]; }, { passive: true });
+  dialog.addEventListener('touchend', (e) => {
+    if (!touch || current < 0) return;
+    const dx = e.changedTouches[0].clientX - touch.clientX;
+    const dy = e.changedTouches[0].clientY - touch.clientY;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) show(current + (dx < 0 ? 1 : -1));
+    touch = null;
+  });
+  dialog.addEventListener('close', () => { current = -1; img.removeAttribute('src'); if (opener) opener.focus({ preventScroll: true }); });
+
+  // Mapa: alternância entre as versões e visualização ampliada
+  const map = document.getElementById('mapa');
+  let version = 'original';
+  document.querySelectorAll('.atlas__opt').forEach((b) => b.addEventListener('click', () => {
+    version = b.dataset.map;
+    document.querySelectorAll('.atlas__opt').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+    map.src = map.dataset[version];
+  }));
+  document.querySelector('.atlas__map').addEventListener('click', (e) => open(() => {
+    current = -1;
+    img.src = map.src; img.width = map.width; img.height = map.height; img.alt = map.alt;
+    set('viewer-label', 'Atlas dos Seis Reinos');
+    set('viewer-title', version === 'original' ? 'Mundo original' : 'Mundo conhecido');
+    set('viewer-state', '');
+    set('viewer-caption', version === 'original' ? 'Os seis reinos, antes da Noite das Cinzas.' : 'A versão oficial: Safra apagada, cinco reinos.');
+    nav.hidden = true;
+    dialog.querySelector('.viewer__alt').hidden = true;
+  }, e.currentTarget));
+})();
+</script>
+</body>
+</html>

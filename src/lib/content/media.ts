@@ -79,3 +79,21 @@ export async function getOfficialCover(settingValue: string | undefined, alt: st
   }
   return null
 }
+
+const FULL_COVER_CANDIDATES = ['capa-completa.webp', 'capa-completa.jpg', 'capa-completa.jpeg', 'capa-completa.png']
+
+/** Capa completa (contracapa, lombada e capa), se houver um arquivo em public/capa/. */
+export function getFullCover(alt: string): ImageData | null {
+  for (const name of FULL_COVER_CANDIDATES) {
+    const file = path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'capa', name)
+    if (existsSync(file)) {
+      try {
+        const size = imageSize(readFileSync(file))
+        return { src: `/capa/${name}`, width: size.width ?? 2000, height: size.height ?? 1333, alt }
+      } catch {
+        return { src: `/capa/${name}`, width: 2000, height: 1333, alt }
+      }
+    }
+  }
+  return null
+}

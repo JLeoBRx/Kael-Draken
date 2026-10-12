@@ -15,21 +15,25 @@ interface Props {
   images: Record<MapVersionId, ImageData>
   heightmap: { src: string; width: number; height: number; seaLevel: number }
   maskSrc: string
+  /** Proporção largura/altura da carta. */
+  aspect: number
+  /** A carta já traz os nomes desenhados: os rótulos em texto ficam só para leitores de tela. */
+  drawnLabels?: boolean
   initialVersion?: MapVersionId
   initialRegion?: string | null
 }
 
 type Mode = '2d' | 'loading' | '3d' | 'leaving'
 
-const VB_W = 1600
-const VB_H = 1000
+const VB_W = 1500
 const ERASED_LABEL = 'Terras sem registro'
 
 function optimized(src: string, width: number) {
   return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=75`
 }
 
-export function WorldAtlas({ regions, images, heightmap, maskSrc, initialVersion = 'original', initialRegion = null }: Props) {
+export function WorldAtlas({ regions, images, heightmap, maskSrc, aspect, drawnLabels = false, initialVersion = 'original', initialRegion = null }: Props) {
+  const VB_H = Math.round(VB_W / aspect)
   const [version, setVersion] = useState<MapVersionId>(initialVersion)
   const [selected, setSelected] = useState<string | null>(initialRegion && regions.some((r) => r.id === initialRegion) ? initialRegion : null)
   const [hovered, setHovered] = useState<string | null>(null)
@@ -56,7 +60,7 @@ export function WorldAtlas({ regions, images, heightmap, maskSrc, initialVersion
     const img = new window.Image()
     img.onload = () => {
       const w = 600
-      const h = 375
+      const h = Math.round(600 / aspect)
       const c = document.createElement('canvas')
       c.width = w
       c.height = h
@@ -66,7 +70,7 @@ export function WorldAtlas({ regions, images, heightmap, maskSrc, initialVersion
       maskRef.current = { data: ctx.getImageData(0, 0, w, h).data, w, h }
     }
     img.src = maskSrc
-  }, [maskSrc])
+  }, [maskSrc, aspect])
 
   // Mantém a seleção e a versão no endereço (links compartilháveis)
   useEffect(() => {
@@ -136,6 +140,7 @@ export function WorldAtlas({ regions, images, heightmap, maskSrc, initialVersion
         heightmapUrl: heightmap.src,
         heightmapSize: [heightmap.width, heightmap.height],
         seaLevel: heightmap.seaLevel,
+        aspect,
         textureUrl: optimized(images[version].src, lowPower ? 1200 : 2048),
         maskUrl: maskSrc,
         regions: regions3d,
@@ -187,7 +192,7 @@ export function WorldAtlas({ regions, images, heightmap, maskSrc, initialVersion
   const panelVisible = !!active
 
   return (
-    <section className="world-atlas" data-mode={mode} aria-label="Mapa interativo do mundo">
+    <section className="world-atlas" data-mode={mode} data-drawn={drawnLabels ? 'true' : undefined} aria-label="Mapa interativo do mundo">
       <div className="world-atlas__bar">
         <div className="segmented" role="group" aria-label="Versão do mapa">
           {(Object.keys(MAP_VERSIONS) as MapVersionId[]).map((id) => (
@@ -261,6 +266,7 @@ export function WorldAtlas({ regions, images, heightmap, maskSrc, initialVersion
             <div className="world-atlas__labels" aria-hidden="true">
               {regions.map((r) => {
                 const erasedHere = isErased(r.id)
+                if (drawnLabels && !erasedHere) return null
                 return (
                   <span
                     key={r.id}
@@ -277,7 +283,7 @@ export function WorldAtlas({ regions, images, heightmap, maskSrc, initialVersion
           <div className="world-atlas__gl" ref={glHostRef} />
           <div className="world-atlas__labels3d" ref={labelHostRef} />
 
-          <p className="world-atlas__ribbon">{in3d ? 'Modo 3D · relevo conceitual' : 'Composição conceitual · geografia não aprovada'}</p>
+          <p className="world-atlas__ribbon">{in3d ? 'Modo 3D · relevo interpretado da carta' : 'Carta do manuscrito · nomes e fronteiras sujeitos a revisão'}</p>
           {mode === 'loading' ? (
             <p className="world-atlas__loading" role="status">
               Preparando o relevo…

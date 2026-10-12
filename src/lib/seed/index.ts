@@ -6,6 +6,8 @@ import { normalizePair } from '../content/link-pairs'
 import { illustrationTitle } from '../illustrations'
 import {
   SEED_ARTICLES,
+  LEGACY_BOOK_SYNOPSIS,
+  OFFICIAL_BOOK_SYNOPSIS,
   SEED_BOOK,
   SEED_CHAPTERS,
   SEED_CHARACTERS,
@@ -244,10 +246,10 @@ export async function seedDatabase(db: Database, opts: { log?: (msg: string) => 
       title: SEED_BOOK.title,
       subtitle: SEED_BOOK.subtitle,
       synopsis: SEED_BOOK.synopsis,
-      synopsisOfficial: false,
+      synopsisOfficial: true,
       editorialInfo: SEED_BOOK.editorialInfo,
       canon: 'canonico',
-      notes: 'A sinopse acima é uma apresentação provisória escrita a partir da bíblia narrativa. Substituir pela sinopse oficial e marcar "Sinopse oficial".',
+      notes: 'Sinopse oficial transcrita da contracapa do Livro I.',
       ...published,
     })
 
@@ -349,4 +351,35 @@ export async function ensureSettings(db: Database) {
     const existing = await db.select().from(s.settings).where(eq(s.settings.key, key))
     if (!existing.length) await db.insert(s.settings).values({ key, value })
   }
+}
+
+/** Marca, em settings, que a sinopse oficial já foi aplicada ao Livro I. */
+export const SYNOPSIS_UPDATE_KEY = 'seed_sinopse_oficial_livro_1'
+
+/**
+ * Troca, uma única vez, a apresentação provisória do Livro I pela sinopse
+ * oficial da contracapa — apenas se o texto provisório continuar intacto
+ * (nada editado no painel é sobrescrito).
+ */
+export async function ensureOfficialSynopsis(db: Database, opts: { log?: (msg: string) => void } = {}): Promise<boolean> {
+  const log = opts.log ?? (() => {})
+  const [done] = await db.select().from(s.settings).where(eq(s.settings.key, SYNOPSIS_UPDATE_KEY))
+  if (done) return false
+  const [book] = await db.select().from(s.books).where(eq(s.books.slug, SEED_BOOK.slug))
+  if (!book) return false
+  const now = new Date().toISOString()
+  let changed = false
+  if (!book.synopsisOfficial && book.synopsis.trim() === LEGACY_BOOK_SYNOPSIS.trim()) {
+    await db.update(s.books).set({ synopsis: OFFICIAL_BOOK_SYNOPSIS, synopsisOfficial: true, updatedAt: now }).where(eq(s.books.id, book.id))
+    changed = true
+  }
+  await db.insert(s.settings).values({ key: SYNOPSIS_UPDATE_KEY, value: now }).onConflictDoNothing()
+  if (changed) log('Livro I: sinopse oficial da contracapa aplicada.')
+  return changed
+}
+
+/** Atualizações de conteúdo aplicadas uma única vez na inicialização. */
+export async function ensureContentUpdates(db: Database, opts: { log?: (msg: string) => void } = {}) {
+  await ensureBookIllustrations(db, opts)
+  await ensureOfficialSynopsis(db, opts)
 }

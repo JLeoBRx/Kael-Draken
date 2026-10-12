@@ -1,0 +1,389 @@
+/* ── Pergaminho de anúncio ─────────────────────────────────── */
+
+.announce-section {
+  position: relative;
+  overflow-x: clip;
+  padding-block: var(--space-8) var(--space-9);
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(ellipse 60% 55% at 50% 45%, rgba(214, 150, 70, 0.13), transparent 70%),
+    radial-gradient(ellipse 30% 40% at 88% 20%, rgba(255, 190, 110, 0.06), transparent 70%),
+    var(--ink-1000);
+}
+
+.parchment-scroll {
+  --ink-sepia: #2c1d10;
+  --ink-sepia-soft: #5a4128;
+  --ink-red: #7a1f14;
+  --paper-1: #f3e6c5;
+  --paper-2: #e9d6a8;
+  --paper-edge: #c9a970;
+  position: relative;
+  /* espaço para as ponteiras dos rolos, que avançam além da folha */
+  width: min(calc(100% - 4.4rem), 50rem);
+  margin-inline: auto;
+  filter: drop-shadow(0 26px 40px rgba(0, 0, 0, 0.55)) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+}
+
+/* Rolos de madeira com o papel enrolado e ponteiras de latão */
+
+.parchment-scroll__rod {
+  position: relative;
+  z-index: 2;
+  height: 2.6rem;
+  margin-inline: -1.4rem;
+  border-radius: 1.3rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 35%, rgba(0, 0, 0, 0.25) 75%),
+    linear-gradient(180deg, #c9ab78 0%, #f3e3bd 30%, #e2c993 55%, #b8955c 80%, #8a6a3c 100%);
+  box-shadow:
+    inset 0 -3px 6px rgba(60, 35, 10, 0.45),
+    0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.parchment-scroll__rod::before,
+.parchment-scroll__rod::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 2.4rem;
+  height: 3.1rem;
+  transform: translateY(-50%);
+  border-radius: 0.9rem;
+  background:
+    radial-gradient(ellipse 40% 30% at 35% 30%, rgba(255, 240, 200, 0.75), transparent 70%),
+    linear-gradient(180deg, #3a220e 0%, #7a4a21 22%, #b4783a 45%, #6a3f1b 70%, #2a170a 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(214, 172, 96, 0.55),
+    inset 0 0 0 5px rgba(60, 30, 10, 0.35),
+    0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.parchment-scroll__rod::before {
+  left: -1.7rem;
+}
+
+.parchment-scroll__rod::after {
+  right: -1.7rem;
+}
+
+.parchment-scroll__rod--top {
+  margin-bottom: -0.9rem;
+}
+
+.parchment-scroll__rod--bottom {
+  margin-top: -0.9rem;
+}
+
+/* Folha */
+
+.parchment-scroll__sheet-wrap {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+.parchment-scroll__sheet {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  clip-path: var(--torn);
+  color: var(--ink-sepia);
+  background:
+    radial-gradient(ellipse 45% 30% at 18% 12%, rgba(255, 252, 236, 0.75), transparent 70%),
+    radial-gradient(ellipse 30% 22% at 82% 78%, rgba(150, 96, 40, 0.2), transparent 70%),
+    radial-gradient(ellipse 18% 12% at 70% 22%, rgba(140, 90, 40, 0.14), transparent 70%),
+    radial-gradient(ellipse 22% 16% at 28% 88%, rgba(120, 70, 30, 0.16), transparent 70%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35  0 0 0 0 0.22  0 0 0 0 0.08  0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.55'/></svg>"),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='m'><feTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.3  0 0 0 0 0.12  0 0 0 0.9 -0.32'/></filter><rect width='100%' height='100%' filter='url(%23m)'/></svg>"),
+    linear-gradient(90deg, var(--paper-edge) 0%, var(--paper-2) 5%, var(--paper-1) 30%, #f6ebcf 55%, var(--paper-2) 92%, var(--paper-edge) 100%);
+  box-shadow:
+    inset 0 0 70px rgba(110, 66, 22, 0.32),
+    inset 0 0 14px rgba(80, 45, 12, 0.45);
+}
+
+/* bordas tostadas */
+.parchment-scroll__sheet::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(92, 52, 18, 0.35), transparent 3.5%, transparent 96.5%, rgba(92, 52, 18, 0.35)),
+    linear-gradient(180deg, rgba(92, 52, 18, 0.25), transparent 4%, transparent 96%, rgba(92, 52, 18, 0.3));
+}
+
+.parchment-scroll__inner {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: clamp(2.6rem, 6vw, 4.2rem) clamp(1.4rem, 6vw, 4.4rem) clamp(3rem, 6vw, 4.4rem);
+  text-align: center;
+}
+
+.parchment-scroll__emblem {
+  width: 3.4rem;
+  height: 3.4rem;
+  color: var(--ink-red);
+}
+
+.parchment-scroll__kicker {
+  font-family: var(--font-display);
+  font-size: clamp(0.95rem, 0.85rem + 0.4vw, 1.15rem);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-sepia-soft);
+}
+
+.parchment-scroll__title {
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 1.6rem + 4.2vw, 4.4rem);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink-sepia);
+  text-shadow: 0 1px 0 rgba(255, 248, 225, 0.6);
+}
+
+.parchment-scroll__divider {
+  width: min(15rem, 70%);
+  height: 1rem;
+  color: var(--ink-red);
+  margin-block: var(--space-1) var(--space-2);
+}
+
+.parchment-scroll__body {
+  display: grid;
+  gap: 0.9em;
+  max-width: 38rem;
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: clamp(1.12rem, 1.02rem + 0.35vw, 1.32rem);
+  line-height: 1.55;
+  color: var(--ink-sepia);
+}
+
+.parchment-scroll__body p {
+  margin: 0;
+}
+
+/* capitular em vermelho na abertura */
+.parchment-scroll__body > p:first-child::first-letter {
+  float: left;
+  margin: 0.06em 0.12em 0 0;
+  font-size: 3.4em;
+  line-height: 0.82;
+  font-weight: 600;
+  color: var(--ink-red);
+}
+
+.parchment-scroll__body > p:first-child {
+  font-style: italic;
+}
+
+.parchment-scroll__body strong {
+  color: var(--ink-red);
+  font-weight: 700;
+}
+
+.parchment-scroll__body a {
+  color: var(--ink-red);
+}
+
+.parchment-scroll__body .spoiler-block {
+  display: grid;
+  gap: 0.4em;
+  padding: 0.7em 1em;
+  border-left: 2px solid var(--ink-red);
+  background: rgba(122, 31, 20, 0.07);
+}
+
+.parchment-scroll__body .spoiler-block__label {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-red);
+}
+
+.parchment-scroll__body .spoiler-hidden {
+  display: block;
+  padding: 0.7em 1em;
+  border: 1px dashed rgba(92, 52, 18, 0.55);
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--ink-sepia-soft);
+  background: rgba(255, 248, 228, 0.35);
+}
+
+.parchment-scroll__body .spoiler-hidden__label {
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-red);
+  margin-right: 0.4em;
+}
+
+.parchment-scroll__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.btn--ink {
+  border-color: rgba(44, 29, 16, 0.55);
+  color: var(--ink-sepia, #2c1d10);
+  background: rgba(255, 248, 228, 0.35);
+}
+
+.btn--ink:hover {
+  border-color: #7a1f14;
+  background: rgba(255, 248, 228, 0.6);
+}
+
+.parchment-scroll .btn:focus-visible {
+  outline-color: #7a1f14;
+}
+
+.parchment-scroll__seal {
+  position: absolute;
+  right: clamp(0.6rem, 4vw, 2.4rem);
+  bottom: clamp(0.4rem, 2vw, 1.2rem);
+  width: clamp(3.6rem, 9vw, 5.2rem);
+  height: auto;
+  filter: drop-shadow(0 3px 4px rgba(40, 10, 5, 0.45));
+}
+
+@media (max-width: 640px) {
+  .parchment-scroll {
+    width: min(calc(100% - 1.4rem), 50rem);
+  }
+
+  .parchment-scroll__rod {
+    height: 2rem;
+    margin-inline: -0.2rem;
+  }
+
+  .parchment-scroll__rod::before,
+  .parchment-scroll__rod::after {
+    width: 1.3rem;
+    height: 2.4rem;
+  }
+
+  .parchment-scroll__rod::before {
+    left: -0.55rem;
+  }
+
+  .parchment-scroll__rod::after {
+    right: -0.55rem;
+  }
+
+  .parchment-scroll__seal {
+    opacity: 0.9;
+  }
+
+  .parchment-scroll__actions .btn {
+    width: 100%;
+  }
+}
+
+/* Desenrolar (apenas no pergaminho de entrada) */
+
+.parchment-scroll--unroll .parchment-scroll__sheet-wrap {
+  animation: parchment-unroll 1.7s cubic-bezier(0.22, 0.7, 0.18, 1) 0.15s both;
+}
+
+.parchment-scroll--unroll .parchment-scroll__inner {
+  animation: parchment-ink 1.1s ease 1s both;
+}
+
+@keyframes parchment-unroll {
+  from {
+    grid-template-rows: 0fr;
+  }
+  to {
+    grid-template-rows: 1fr;
+  }
+}
+
+@keyframes parchment-ink {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Diálogo de entrada */
+
+html:has(.announce-dialog[open]) {
+  overflow: hidden;
+}
+
+.announce-dialog {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 40%, rgba(214, 150, 70, 0.18), transparent 70%),
+    rgba(6, 5, 4, 0.9);
+  color: var(--text);
+}
+
+.announce-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.announce-dialog[open] {
+  animation: illus-fade 320ms var(--ease);
+}
+
+.announce-dialog__frame {
+  position: relative;
+  display: grid;
+  align-content: center;
+  min-height: 100%;
+  padding: clamp(3.5rem, 8vh, 5rem) clamp(1.4rem, 5vw, 3rem);
+}
+
+.announce-dialog__close {
+  position: fixed;
+  z-index: 3;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--ink-900);
+  color: var(--ivory-50);
+  cursor: pointer;
+}
+
+.announce-dialog__close:hover {
+  border-color: var(--gold-500);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .parchment-scroll--unroll .parchment-scroll__sheet-wrap,
+  .parchment-scroll--unroll .parchment-scroll__inner,
+  .announce-dialog[open] {
+    animation: none;
+  }
+}

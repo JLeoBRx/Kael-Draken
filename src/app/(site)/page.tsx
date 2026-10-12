@@ -1,4 +1,7 @@
+import { createHash } from 'node:crypto'
 import Link from 'next/link'
+import { AnnouncementOverlay, EnterArchiveButton } from '@/components/announcement/AnnouncementOverlay'
+import { Parchment } from '@/components/announcement/Parchment'
 import { PortolanTexture } from '@/components/atlas/Cartography'
 import { WorldPreview } from '@/components/atlas/WorldPreview'
 import Image from 'next/image'
@@ -9,6 +12,7 @@ import { ArrowRight } from '@/components/ui/icons'
 import { BookCover, MediaImage } from '@/components/ui/media'
 import { getOfficialCover } from '@/lib/content/media'
 import { getRecentEntries, getSectionCounts, getTermLabels, listArticles, listBooks, listDocuments, listKingdoms, listPosts } from '@/lib/content/queries'
+import { prepareRichText } from '@/lib/content/rich'
 import { getSettings } from '@/lib/content/settings'
 import { getViewer } from '@/lib/content/viewer'
 import { ENTITY_LABELS } from '@/lib/editorial'
@@ -35,6 +39,15 @@ export default async function HomePage() {
   ])
   const book = books[0]
   const bookHref = book ? paths.book(book.slug) : paths.books
+  const galleryHref = book ? paths.bookIllustrations(book.slug) : paths.books
+
+  // Pergaminho de anúncio (texto do painel, filtrado pelo nível de spoiler)
+  const announcementOn = settings.announcement_enabled !== '0' && !!settings.announcement_title?.trim()
+  const announcement = announcementOn ? (await prepareRichText(viewer, [settings.announcement_body]))(settings.announcement_body ?? '') : null
+  const announcementVersion = createHash('sha1')
+    .update(`${settings.announcement_kicker}|${settings.announcement_title}|${settings.announcement_body}`)
+    .digest('hex')
+    .slice(0, 12)
 
   return (
     <>
@@ -67,6 +80,48 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {announcement ? (
+        <>
+          <section className="announce-section" id="o-livro-voltou" aria-labelledby="anuncio-secao-titulo">
+            <div className="container">
+              <Parchment
+                kicker={settings.announcement_kicker}
+                title={settings.announcement_title}
+                html={announcement.html}
+                titleId="anuncio-secao-titulo"
+                actions={
+                  <>
+                    <Link className="btn btn--primary" href={bookHref}>
+                      Conhecer o Livro I <ArrowRight className="btn__arrow" />
+                    </Link>
+                    <Link className="btn btn--ink" href={galleryHref}>
+                      Ver as ilustrações
+                    </Link>
+                  </>
+                }
+              />
+            </div>
+          </section>
+          <AnnouncementOverlay version={announcementVersion}>
+            <Parchment
+              unroll
+              kicker={settings.announcement_kicker}
+              title={settings.announcement_title}
+              html={announcement.html}
+              titleId="anuncio-titulo"
+              actions={
+                <>
+                  <EnterArchiveButton />
+                  <Link className="btn btn--ink" href={bookHref}>
+                    Conhecer o Livro I
+                  </Link>
+                </>
+              }
+            />
+          </AnnouncementOverlay>
+        </>
+      ) : null}
 
       {settings.home_quote ? (
         <section className="quote-band" aria-label="Fragmento">

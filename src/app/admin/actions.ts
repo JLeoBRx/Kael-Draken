@@ -171,16 +171,29 @@ export async function deleteMediaAction(id: number): Promise<{ error?: string }>
 
 // ── Configurações ─────────────────────────────────────────────────────
 
-const SETTING_KEYS = ['home_intro', 'home_quote', 'home_quote_source', 'home_quote_href', 'site_description', 'author_name', 'cover_media_id'] as const
+const SETTING_KEYS = [
+  'home_intro',
+  'home_quote',
+  'home_quote_source',
+  'home_quote_href',
+  'site_description',
+  'author_name',
+  'cover_media_id',
+  'announcement_kicker',
+  'announcement_title',
+  'announcement_body',
+] as const
 
 export async function saveSettingsAction(_prev: FormState, form: FormData): Promise<FormState> {
   await requireAdmin()
   const href = String(form.get('home_quote_href') ?? '').trim()
   if (href && !href.startsWith('/')) return { error: 'O link da citação precisa ser um endereço interno começando com /.' }
   for (const key of SETTING_KEYS) {
-    const value = String(form.get(key) ?? '').trim()
+    const value = String(form.get(key) ?? '').replace(/\r\n/g, '\n').trim()
     await db.insert(s.settings).values({ key, value }).onConflictDoUpdate({ target: s.settings.key, set: { value } })
   }
+  const enabled = form.get('announcement_enabled') === 'on' ? '1' : '0'
+  await db.insert(s.settings).values({ key: 'announcement_enabled', value: enabled }).onConflictDoUpdate({ target: s.settings.key, set: { value: enabled } })
   refresh()
   return { message: 'Configurações salvas.' }
 }

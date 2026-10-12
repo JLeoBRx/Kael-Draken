@@ -66,6 +66,39 @@ export function SettingsForm({ values, media, coverFileFound }: { values: Record
             <input id="home_quote_href" name="home_quote_href" defaultValue={values.home_quote_href} placeholder="/manuscritos/…" />
           </div>
         </fieldset>
+        <fieldset className="adm-group">
+          <legend>Pergaminho de anúncio</legend>
+          <p className="adm-help">
+            Aparece uma vez para cada visitante ao entrar na página inicial e fica como seção logo abaixo do topo. Ao mudar o texto, ele volta a aparecer para quem já o
+            tinha fechado.
+          </p>
+          <div className="adm-field adm-field--check">
+            <input id="announcement_enabled" name="announcement_enabled" type="checkbox" defaultChecked={values.announcement_enabled !== '0'} />
+            <label htmlFor="announcement_enabled">Exibir o pergaminho</label>
+          </div>
+          <div className="adm-field">
+            <label className="adm-label" htmlFor="announcement_kicker">
+              Linha superior
+            </label>
+            <input id="announcement_kicker" name="announcement_kicker" defaultValue={values.announcement_kicker} />
+          </div>
+          <div className="adm-field">
+            <label className="adm-label" htmlFor="announcement_title">
+              Título
+            </label>
+            <input id="announcement_title" name="announcement_title" defaultValue={values.announcement_title} />
+          </div>
+          <div className="adm-field">
+            <label className="adm-label" htmlFor="announcement_body">
+              Texto (Markdown)
+            </label>
+            <textarea id="announcement_body" name="announcement_body" rows={14} defaultValue={values.announcement_body} aria-describedby="announcement_body_help" />
+            <p className="adm-help" id="announcement_body_help">
+              Revelações vão entre <code>:::spoiler 1</code> (ou <code>2</code>) e <code>:::</code>: só aparecem para quem escolheu esse nível. Notas entre{' '}
+              <code>%% %%</code> nunca são publicadas.
+            </p>
+          </div>
+        </fieldset>
         <button type="submit" className="adm-btn adm-btn--primary" disabled={pending}>
           {pending ? 'Salvando…' : 'Salvar configurações'}
         </button>
