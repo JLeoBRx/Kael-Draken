@@ -6,7 +6,8 @@ import { WorldAtlas } from '@/components/atlas/WorldAtlas'
 import { CanonBadge } from '@/components/ui/editorial'
 import { Breadcrumbs } from '@/components/ui/PageHero'
 import { MediaImage } from '@/components/ui/media'
-import { ART, emblemArt } from '@/lib/atlas/art'
+import { ART, ILLUSTRATION, emblemArt, type ArtSource } from '@/lib/atlas/art'
+import { resolveArt } from '@/lib/atlas/resolve'
 import { getAtlasRegions } from '@/lib/atlas/regions'
 import { WORLD, WORLD_ASPECT, type MapVersionId } from '@/lib/atlas/world'
 import { listKingdoms, listMaps } from '@/lib/content/queries'
@@ -18,30 +19,36 @@ export const metadata: Metadata = {
   title: 'Atlas dos Seis Reinos',
   description: 'Mapa interativo 2D e 3D do mundo de Kael Draken, os seis reinos e os capítulos da história antiga — uma composição conceitual em desenvolvimento.',
   alternates: { canonical: '/atlas' },
-  openGraph: { images: [{ url: ART.capa.src, width: ART.capa.width, height: ART.capa.height, alt: ART.capa.alt }] },
+  openGraph: { images: [{ url: ART.mapaOriginal.src, width: ART.mapaOriginal.width, height: ART.mapaOriginal.height, alt: ART.mapaOriginal.alt }] },
 }
 
-const CHAPTERS = [
-  { title: 'A Chama do Dragão e o Caos', href: '/mitologia/a-chama-do-dragao', image: ART.origemChama, text: 'A força que criou o mundo e aquilo que nasceu com ele.' },
-  { title: 'Safra e a Noite das Cinzas', href: '/mitologia/safra-e-a-noite-das-cinzas', image: ART.quedaSafra, text: 'Uma civilização ligada às chamas, sua destruição e seu apagamento.' },
-  { title: 'O Templo da Chama', href: '/mitologia/o-templo-da-chama', image: ART.templo, text: 'O lugar central ligado à proteção da Chama.' },
-  { title: 'A Ressonância', href: '/ressonancia', image: ART.ressonancia, text: 'O sistema de poder: o que está estabelecido e o que é proposta.' },
-  { title: 'Kael Draken', href: '/personagens/kael-draken', image: ART.sonhosKael, text: 'Dezesseis anos, uma família adotiva e sonhos impossíveis.' },
-  { title: 'O Século Perdido', href: '/mitologia/o-seculo-perdido', image: ART.seculoPerdido, text: 'Cerca de seiscentos anos de história perdida.' },
-  { title: 'Mistérios', href: '/misterios', image: ART.skrugheim, text: 'As perguntas em aberto — e a profecia de Skrugheim.' },
+const CHAPTERS: Array<{ title: string; href: string; image: ArtSource; text: string }> = [
+  { title: 'A Chama do Dragão e o Caos', href: '/mitologia/a-chama-do-dragao', image: ART.selo.chama, text: 'A força que criou o mundo e aquilo que nasceu com ele.' },
+  { title: 'Safra e a Noite das Cinzas', href: '/mitologia/safra-e-a-noite-das-cinzas', image: ART.reino.safra, text: 'Uma civilização ligada às chamas, sua destruição e seu apagamento.' },
+  { title: 'O Templo da Chama', href: '/mitologia/o-templo-da-chama', image: ART.selo.templo, text: 'O lugar central ligado à proteção da Chama.' },
+  { title: 'A Ressonância', href: '/ressonancia', image: ART.selo.ressonancia, text: 'O sistema de poder: o que está estabelecido e o que é proposta.' },
+  { title: 'Kael Draken', href: '/personagens/kael-draken', image: ILLUSTRATION.capitulo1, text: 'Dezesseis anos, uma família adotiva e sonhos impossíveis.' },
+  { title: 'O Século Perdido', href: '/mitologia/o-seculo-perdido', image: ART.selo.seculoPerdido, text: 'Cerca de seiscentos anos de história perdida.' },
+  { title: 'Mistérios', href: '/misterios', image: ART.selo.skrugheim, text: 'As perguntas em aberto — e a profecia de Skrugheim.' },
 ]
 
 export default async function AtlasPage({ searchParams }: { searchParams: Promise<{ regiao?: string; versao?: string }> }) {
   const viewer = await getViewer()
   const { regiao, versao } = await searchParams
-  const [regions, kingdoms, maps] = await Promise.all([getAtlasRegions(viewer), listKingdoms(viewer), listMaps(viewer)])
+  const [regions, kingdoms, maps, chapters] = await Promise.all([
+    getAtlasRegions(viewer),
+    listKingdoms(viewer),
+    listMaps(viewer),
+    // ilustração de capítulo despublicada: o cartão usa o frontispício
+    Promise.all(CHAPTERS.map(async (c) => ({ ...c, image: (await resolveArt(c.image, viewer)) ?? ART.frontispicio }))),
+  ])
   const version: MapVersionId = versao === 'conhecido' ? 'conhecido' : 'original'
 
   return (
     <>
       <header className="atlas-opening">
         <div className="atlas-opening__art">
-          <Image src={ART.capa.src} alt={ART.capa.alt} width={ART.capa.width} height={ART.capa.height} priority sizes="(min-width: 960px) 45vw, 100vw" />
+          <MediaImage image={ART.frontispicio} priority sizes="(min-width: 960px) 46vw, 100vw" />
         </div>
         <div className="container atlas-opening__inner">
           <Breadcrumbs items={[{ label: 'Atlas' }]} />
@@ -59,7 +66,7 @@ export default async function AtlasPage({ searchParams }: { searchParams: Promis
             <a href="#capitulos">Capítulos</a>
             <Link href="/misterios">Mistérios</Link>
           </nav>
-          <p className="art-note">Capa do Atlas: conceito artístico procedural. A capa oficial do Livro I é exibida na página do livro.</p>
+          <p className="art-note">Ao fundo: frontispício do Livro I, da Edição Profissional Ilustrada. A capa oficial é exibida na página do livro.</p>
         </div>
       </header>
 
@@ -122,8 +129,8 @@ export default async function AtlasPage({ searchParams }: { searchParams: Promis
             <p className="eyebrow">Os reinos</p>
             <h2 id="reinos-titulo">Os seis reinos</h2>
             <p className="section-head__lede">
-              Safra é o reino desaparecido. Os outros cinco são os reinos conhecidos — seus nomes, capitais e características ainda podem mudar. Brasões e paisagens são propostas
-              visuais.
+              Safra é o reino desaparecido. Os outros cinco são os reinos conhecidos — seus nomes, capitais e características ainda podem mudar. Cada reino aparece recortado da carta
+              do manuscrito; os brasões são propostas visuais.
             </p>
           </header>
           <figure className="heraldry-panel">
@@ -173,7 +180,7 @@ export default async function AtlasPage({ searchParams }: { searchParams: Promis
             <h2 id="capitulos-titulo">A história do mundo</h2>
           </header>
           <ul className="chapter-grid">
-            {CHAPTERS.map((c) => (
+            {chapters.map((c) => (
               <li key={c.href}>
                 <Link className="chapter-card" href={c.href}>
                   <MediaImage image={c.image} sizes="(min-width: 1000px) 400px, 100vw" alt="" />

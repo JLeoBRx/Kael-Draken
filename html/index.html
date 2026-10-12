@@ -213,9 +213,11 @@ a {
 .opening {
   overflow-x: clip;
   padding: clamp(2.5rem, 7vw, 5rem) var(--gutter) clamp(3.5rem, 8vw, 6rem);
+  /* cena da capa ao fundo, escurecida para o pergaminho se destacar */
   background:
     radial-gradient(ellipse 55% 50% at 50% 42%, rgba(214, 150, 70, 0.16), transparent 70%),
-    radial-gradient(ellipse 25% 30% at 90% 12%, rgba(255, 190, 110, 0.08), transparent 70%),
+    linear-gradient(180deg, rgba(14, 12, 10, 0.72), rgba(14, 12, 10, 0.86) 70%, var(--ink)),
+    var(--scene, none) center 40% / cover no-repeat,
     var(--ink);
 }
 
@@ -406,6 +408,26 @@ a {
 
 .book__title {
   font-size: clamp(2.3rem, 1.5rem + 3vw, 3.6rem);
+}
+
+.book__author {
+  margin-top: -0.4rem;
+  font-family: var(--display);
+  font-size: 1.25rem;
+  letter-spacing: 0.04em;
+  color: var(--gold-soft);
+}
+
+.book__epigraph {
+  max-width: 32rem;
+  margin: 0.4rem 0 0.6rem;
+  padding-left: 1.1rem;
+  border-left: 2px solid rgba(201, 163, 95, 0.55);
+  font-family: var(--display);
+  font-size: 1.35rem;
+  font-style: italic;
+  line-height: 1.35;
+  color: #e8d9b8;
 }
 
 .book__synopsis {
@@ -659,6 +681,17 @@ a {
   align-content: start;
   padding: 1.3rem 1.3rem 1.4rem;
   background: var(--ink-2);
+}
+
+.realm__map {
+  display: block;
+  width: calc(100% + 2.6rem);
+  max-width: none;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  margin: -1.3rem -1.3rem 0.8rem;
+  border-bottom: 1px solid var(--line);
 }
 
 .realm--lost {
@@ -964,7 +997,7 @@ html:has(.viewer[open]) {
 </header>
 
 <main>
-  <section class="opening" aria-labelledby="anuncio">
+  <section class="opening" aria-labelledby="anuncio" style="--scene: url('assets/cena.webp')">
     <div class="scroll">
       <div class="scroll__rod" aria-hidden="true"></div>
       <article class="scroll__sheet">
@@ -996,6 +1029,8 @@ html:has(.viewer[open]) {
       <div class="book__text">
         <p class="eyebrow">Kael Draken — Livro I</p>
         <h2 class="book__title" id="livro-titulo">O Sussurro da Chama Antiga</h2>
+        <p class="book__author">Pedro Henrique Martins Silva</p>
+        <blockquote class="book__epigraph">“Há chamas que destroem mundos, e outras que revelam quem realmente somos.”</blockquote>
         <div class="book__synopsis"><p><strong>Quando a Chama desperta, o mundo nunca mais será o mesmo.</strong></p>
 <p>Em um mundo marcado por guerras, segredos e reinos em ruínas, Kael Draken, um jovem de 16 anos, leva uma vida tranquila em um vilarejo distante, sem saber que carrega um destino capaz de mudar o rumo da história.</p>
 <p>Quando uma antiga chama desperta, forças adormecidas voltam a se mover nas sombras, revelando verdades esquecidas, símbolos antigos e um passado que muitos preferem manter oculto.</p>
@@ -1120,6 +1155,7 @@ html:has(.viewer[open]) {
       <p class="atlas__note">Carta do manuscrito. Nomes, capitais, fronteiras e brasões são conceituais e podem mudar.</p>
       <ol class="realms">
         <li class="realm realm--lost">
+          <img class="realm__map" src="assets/carta/safra.webp" width="640" height="427" alt="Safra na carta do manuscrito" loading="lazy" decoding="async">
           <p class="realm__num">I</p>
           <h3 class="realm__name">Safra</h3>
           <p class="realm__epithet">O reino desaparecido</p>
@@ -1128,6 +1164,7 @@ html:has(.viewer[open]) {
           <p class="realm__state">Estabelecido</p>
         </li>
         <li class="realm">
+          <img class="realm__map" src="assets/carta/aurelion.webp" width="640" height="427" alt="Aurelion na carta do manuscrito" loading="lazy" decoding="async">
           <p class="realm__num">II</p>
           <h3 class="realm__name">Aurelion</h3>
           <p class="realm__epithet">Monarquia consultiva</p>
@@ -1136,6 +1173,7 @@ html:has(.viewer[open]) {
           <p class="realm__state">Proposta</p>
         </li>
         <li class="realm">
+          <img class="realm__map" src="assets/carta/nacaris.webp" width="640" height="427" alt="Nácaris na carta do manuscrito" loading="lazy" decoding="async">
           <p class="realm__num">III</p>
           <h3 class="realm__name">Nácaris</h3>
           <p class="realm__epithet">Confederação de cidades</p>
@@ -1144,6 +1182,7 @@ html:has(.viewer[open]) {
           <p class="realm__state">Proposta</p>
         </li>
         <li class="realm">
+          <img class="realm__map" src="assets/carta/kharveth.webp" width="640" height="427" alt="Kharveth na carta do manuscrito" loading="lazy" decoding="async">
           <p class="realm__num">IV</p>
           <h3 class="realm__name">Kharveth</h3>
           <p class="realm__epithet">Pacto entre cinco ordens</p>
@@ -1152,6 +1191,7 @@ html:has(.viewer[open]) {
           <p class="realm__state">Proposta</p>
         </li>
         <li class="realm">
+          <img class="realm__map" src="assets/carta/elyndor.webp" width="640" height="427" alt="Elyndor na carta do manuscrito" loading="lazy" decoding="async">
           <p class="realm__num">V</p>
           <h3 class="realm__name">Elyndor</h3>
           <p class="realm__epithet">Conselho religioso e civil</p>
@@ -1160,6 +1200,7 @@ html:has(.viewer[open]) {
           <p class="realm__state">Proposta</p>
         </li>
         <li class="realm">
+          <img class="realm__map" src="assets/carta/rhovaryn.webp" width="640" height="426" alt="Rhovaryn na carta do manuscrito" loading="lazy" decoding="async">
           <p class="realm__num">VI</p>
           <h3 class="realm__name">Rhovaryn</h3>
           <p class="realm__epithet">Liga de territórios autônomos</p>
@@ -1183,7 +1224,7 @@ html:has(.viewer[open]) {
   <div class="wrap foot__grid">
     <p class="foot__brand">Kael Draken <em>O Sussurro da Chama Antiga</em></p>
     
-    <p class="foot__copy">© 2026 Kael Draken. Todos os direitos reservados.</p>
+    <p class="foot__copy">© 2026 Pedro Henrique Martins Silva · Kael Draken. Todos os direitos reservados.</p>
   </div>
 </footer>
 

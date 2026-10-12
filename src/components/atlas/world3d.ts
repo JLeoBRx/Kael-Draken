@@ -37,6 +37,8 @@ export interface World3DOptions {
   reducedMotion: boolean
   lowPower: boolean
   labelText: { erased: string }
+  /** A carta já traz os nomes desenhados: rótulos viram marcadores discretos, com o nome no foco ou na seleção. */
+  compactLabels?: boolean
   onSelect: (id: string | null) => void
   onHover?: (id: string | null) => void
   onContextLost: () => void
@@ -290,9 +292,20 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
     for (const r of regions) {
       const el = document.createElement('button')
       el.type = 'button'
-      el.className = `world3d__label${r.erased ? ' is-erased' : ''}`
+      const pin = !!opts.compactLabels && !r.erased
+      el.className = `world3d__label${r.erased ? ' is-erased' : ''}${pin ? ' world3d__label--pin' : ''}`
       el.dataset.region = r.id
-      el.textContent = r.erased ? opts.labelText.erased : r.name
+      if (pin) {
+        const mark = document.createElement('span')
+        mark.className = 'world3d__pin'
+        mark.setAttribute('aria-hidden', 'true')
+        const name = document.createElement('span')
+        name.className = 'world3d__name'
+        name.textContent = r.name
+        el.append(mark, name)
+      } else {
+        el.textContent = r.erased ? opts.labelText.erased : r.name
+      }
       el.setAttribute('aria-label', r.erased ? `${opts.labelText.erased} — região apagada da história oficial` : `${r.name} — ver detalhes`)
       el.addEventListener('click', () => opts.onSelect(r.id))
       labelLayer.appendChild(el)

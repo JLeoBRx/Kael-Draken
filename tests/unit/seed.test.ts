@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OFFICIAL_BOOK_SYNOPSIS, SEED_ARTICLES, SEED_BOOK, SEED_CHARACTERS, SEED_DOCUMENTS, SEED_ERAS, SEED_EVENTS, SEED_MYSTERIES, SEED_SETTINGS } from '@/lib/seed/content'
+import { LEGACY_SAFRA_BODY, MANUSCRIPT_AUTHOR, OFFICIAL_BOOK_SYNOPSIS, SAFRA_BODY, SEED_ARTICLES, SEED_BOOK, SEED_CHARACTERS, SEED_DOCUMENTS, SEED_ERAS, SEED_EVENTS, SEED_MYSTERIES, SEED_SETTINGS } from '@/lib/seed/content'
 import { renderMarkdown, toPlainText } from '@/lib/markdown/render'
 
 const PROPHECY = 'Quando a Chama despertar, não o fará sozinha. Skrugheim abrirá suas portas, e a morte caminhará entre os vivos.'
@@ -62,5 +62,21 @@ describe('fidelidade do conteúdo inicial', () => {
     expect(SEED_BOOK.synopsis).toBe(OFFICIAL_BOOK_SYNOPSIS)
     expect(OFFICIAL_BOOK_SYNOPSIS).toMatch(/Quando a Chama desperta, o mundo nunca mais será o mesmo/)
     expect(OFFICIAL_BOOK_SYNOPSIS).not.toMatch(/ISBN/i)
+  })
+
+  it('o verbete de Safra usa a carta do mundo conhecido, sem as cenas procedurais', () => {
+    const safra = SEED_ARTICLES.find((a) => a.slug === 'safra-e-a-noite-das-cinzas')!
+    expect(safra.body).toBe(SAFRA_BODY)
+    expect(SAFRA_BODY).toContain('/images/atlas/mapa-mundo-conhecido.webp')
+    expect(SAFRA_BODY).not.toMatch(/safra-antes|queda-safra|ruinas-safra/)
+    // o texto antigo só difere pelas imagens (é ele que a atualização única reconhece)
+    const strip = (t: string) => t.replace(/!\[[^\]]*\]\([^)]*\)\n\n/g, '')
+    expect(strip(LEGACY_SAFRA_BODY)).toBe(strip(SAFRA_BODY))
+    expect(LEGACY_SAFRA_BODY.match(/!\[/g)).toHaveLength(3)
+  })
+
+  it('credita o autor e a epígrafe como no manuscrito', () => {
+    expect(SEED_SETTINGS.author_name).toBe(MANUSCRIPT_AUTHOR)
+    expect(SEED_SETTINGS.book_epigraph).toBe('Há chamas que destroem mundos, e outras que revelam quem realmente somos.')
   })
 })

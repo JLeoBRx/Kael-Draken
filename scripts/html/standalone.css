@@ -200,9 +200,11 @@ a {
 .opening {
   overflow-x: clip;
   padding: clamp(2.5rem, 7vw, 5rem) var(--gutter) clamp(3.5rem, 8vw, 6rem);
+  /* cena da capa ao fundo, escurecida para o pergaminho se destacar */
   background:
     radial-gradient(ellipse 55% 50% at 50% 42%, rgba(214, 150, 70, 0.16), transparent 70%),
-    radial-gradient(ellipse 25% 30% at 90% 12%, rgba(255, 190, 110, 0.08), transparent 70%),
+    linear-gradient(180deg, rgba(14, 12, 10, 0.72), rgba(14, 12, 10, 0.86) 70%, var(--ink)),
+    var(--scene, none) center 40% / cover no-repeat,
     var(--ink);
 }
 
@@ -393,6 +395,26 @@ a {
 
 .book__title {
   font-size: clamp(2.3rem, 1.5rem + 3vw, 3.6rem);
+}
+
+.book__author {
+  margin-top: -0.4rem;
+  font-family: var(--display);
+  font-size: 1.25rem;
+  letter-spacing: 0.04em;
+  color: var(--gold-soft);
+}
+
+.book__epigraph {
+  max-width: 32rem;
+  margin: 0.4rem 0 0.6rem;
+  padding-left: 1.1rem;
+  border-left: 2px solid rgba(201, 163, 95, 0.55);
+  font-family: var(--display);
+  font-size: 1.35rem;
+  font-style: italic;
+  line-height: 1.35;
+  color: #e8d9b8;
 }
 
 .book__synopsis {
@@ -646,6 +668,17 @@ a {
   align-content: start;
   padding: 1.3rem 1.3rem 1.4rem;
   background: var(--ink-2);
+}
+
+.realm__map {
+  display: block;
+  width: calc(100% + 2.6rem);
+  max-width: none;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  margin: -1.3rem -1.3rem 0.8rem;
+  border-bottom: 1px solid var(--line);
 }
 
 .realm--lost {

@@ -5,6 +5,7 @@ import { Figure } from '@/components/ui/media'
 import { PageHero } from '@/components/ui/PageHero'
 import { Prose } from '@/components/ui/Prose'
 import { artImage } from '@/lib/atlas/art'
+import { resolveArt } from '@/lib/atlas/resolve'
 import type { getArticle } from '@/lib/content/queries'
 import { prepareRichText } from '@/lib/content/rich'
 import type { Viewer } from '@/lib/content/viewer'
@@ -20,7 +21,7 @@ export async function ArticleView({ data, viewer }: { data: ArticleData; viewer:
   const a = data.article
   const render = await prepareRichText(viewer, [a.body])
   const body = render(a.body)
-  const image = data.image ?? artImage('article', `${a.section}/${a.slug}`)
+  const image = data.image ?? (await resolveArt(artImage('article', `${a.section}/${a.slug}`), viewer))
   const sectionHref = a.section === 'mitologia' ? paths.mythology : paths.resonance
   const hasBody = !!body.html.trim()
 

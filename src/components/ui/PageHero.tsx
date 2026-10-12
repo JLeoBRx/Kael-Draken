@@ -29,6 +29,7 @@ export function PageHero({
   crumbs,
   children,
   accent,
+  media,
   className = '',
 }: {
   eyebrow?: string
@@ -38,18 +39,32 @@ export function PageHero({
   crumbs?: Crumb[]
   children?: ReactNode
   accent?: string
+  /** Imagem ao lado do título (abaixo dele, em telas estreitas). */
+  media?: ReactNode
   className?: string
 }) {
   const style = accent ? ({ '--page-accent': accent } as CSSProperties) : undefined
+  const text = (
+    <>
+      {crumbs ? <Breadcrumbs items={crumbs} /> : null}
+      {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
+      <h1>{title}</h1>
+      {subtitle ? <p className="page-hero__subtitle">{subtitle}</p> : null}
+      {lede ? <div className="page-hero__lede">{lede}</div> : null}
+      {children}
+    </>
+  )
   return (
-    <header className={`page-hero ${className}`.trim()} style={style}>
+    <header className={`page-hero ${media ? 'page-hero--media' : ''} ${className}`.replace(/\s+/g, ' ').trim()} style={style}>
       <div className="container page-hero__inner">
-        {crumbs ? <Breadcrumbs items={crumbs} /> : null}
-        {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-        <h1>{title}</h1>
-        {subtitle ? <p className="page-hero__subtitle">{subtitle}</p> : null}
-        {lede ? <div className="page-hero__lede">{lede}</div> : null}
-        {children}
+        {media ? (
+          <>
+            <div className="page-hero__text">{text}</div>
+            <div className="page-hero__media">{media}</div>
+          </>
+        ) : (
+          text
+        )}
       </div>
     </header>
   )

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { CSSProperties } from 'react'
+import { MapDetail } from '@/components/atlas/MapDetail'
 import { CertaintyBadge, EditorialBadges } from '@/components/ui/editorial'
 import { EntrySection, Facts, Gallery, HiddenNotice, PendingSections, RelatedList, SpoilerGate, TagList, Toc } from '@/components/ui/entry'
 import { Emblem, MediaImage } from '@/components/ui/media'
@@ -20,7 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const data = await getKingdom(slug, viewer)
   if (!data) return {}
   if (isLocked(data.kingdom, viewer)) return lockedMetadata
-  return entryMetadata({ title: data.kingdom.name, description: data.kingdom.summary, path: paths.kingdom(slug), image: data.emblem ?? data.image })
+  return entryMetadata({ title: data.kingdom.name, description: data.kingdom.summary, path: paths.kingdom(slug), image: data.image ?? ART.reino[slug] ?? data.emblem })
 }
 
 export default async function KingdomPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -53,7 +54,10 @@ export default async function KingdomPage({ params }: { params: Promise<{ slug: 
   const hidden = sections.reduce((n, s) => n + s.result.hiddenCount, 0)
   const capital = data.locations.find((l) => l.isCapital)
   const emblem = data.emblem ?? emblemArt(k.slug)
-  const panorama = data.image ?? ART.reino[k.slug] ?? null
+  // Imagem enviada pelo painel: faixa larga sob o título. Sem ela, o detalhe da carta ao lado do título.
+  const panorama = data.image
+  const mapDetail = panorama ? null : (ART.reino[k.slug] ?? null)
+  const atlasHref = `${paths.atlas}?regiao=${k.slug}#mapas`
 
   const tocItems = [
     ...filled.map((s) => ({ id: s.id, title: s.title })),
@@ -69,6 +73,7 @@ export default async function KingdomPage({ params }: { params: Promise<{ slug: 
         subtitle={k.epithet || k.government || undefined}
         crumbs={[{ label: 'Atlas', href: paths.atlas }, { label: k.name }]}
         accent={k.accent}
+        media={mapDetail ? <MapDetail image={mapDetail} href={atlasHref} priority /> : undefined}
       >
         <EditorialBadges canon={k.canon} spoiler={k.spoiler} status={k.status} preview={viewer.preview} />
       </PageHero>
@@ -94,7 +99,7 @@ export default async function KingdomPage({ params }: { params: Promise<{ slug: 
                   { label: 'Personagens associados', value: String(data.characters.length) },
                   {
                     label: 'No atlas',
-                    value: <Link href={`${paths.atlas}?regiao=${k.slug}#mapas`}>Ver a zona conceitual no mapa</Link>,
+                    value: <Link href={atlasHref}>Ver a zona conceitual no mapa</Link>,
                   },
                   { label: 'Brasão', value: data.emblem ? null : <span className="muted">Proposta heráldica (não aprovada)</span> },
                 ]}

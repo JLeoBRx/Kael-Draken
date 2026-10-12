@@ -11,6 +11,7 @@ Produz:
   - public/images/atlas/mascara-terra.png          (terra = branco)
   - public/images/atlas/relevo-mundo.png           (altura 16 bits em R+G, para o 3D)
   - src/data/atlas/world.json                       (regiões dos seis reinos, traçadas sobre a carta)
+  - public/images/atlas/carta/<reino>.webp          (detalhe de cada reino na carta, com a região em destaque)
 
 As cartelas do original (título, quadro "O mundo conhecido", legenda,
 encartes e escala) são mantidas; no relevo 3D elas ficam planas, sobre o mar,
@@ -261,6 +262,72 @@ def known_version(clean: np.ndarray, land: np.ndarray, noise: Noise) -> np.ndarr
     return np.clip(out, 0, 1).astype(F)
 
 
+# ── Detalhes dos reinos ───────────────────────────────────────────────────
+
+
+def detail_box(points, margin=0.16, aspect=1.5, min_w=600, step=4):
+    """
+    Janela 3:2 que contém a região com folga. Entre as posições possíveis,
+    escolhe a que menos invade as cartelas (título, legenda, encartes…) e,
+    no empate, a mais centrada na região.
+    """
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    w = max((x1 - x0) * (1 + 2 * margin), (y1 - y0) * (1 + 2 * margin) * aspect, min_w)
+    w = min(w, W)
+    h = min(w / aspect, H)
+    w = h * aspect
+    boxes = boxes_mask()
+    integral = boxes.cumsum(0).cumsum(1)
+
+    def overlap(ax, ay):
+        bx, by = int(ax + w) - 1, int(ay + h) - 1
+        ax, ay = int(ax), int(ay)
+        total = integral[by, bx]
+        if ax > 0:
+            total -= integral[by, ax - 1]
+        if ay > 0:
+            total -= integral[ay - 1, bx]
+        if ax > 0 and ay > 0:
+            total += integral[ay - 1, ax - 1]
+        return float(total)
+
+    pad = 10  # a região inteira, com uma pequena folga, precisa caber
+    best = None
+    for ax in np.arange(max(0, x1 + pad - w), min(x0 - pad, W - w) + 1, step):
+        for ay in np.arange(max(0, y1 + pad - h), min(y0 - pad, H - h) + 1, step):
+            score = (overlap(ax, ay), abs(ax + w / 2 - cx) + abs(ay + h / 2 - cy))
+            if best is None or score < best[0]:
+                best = (score, ax, ay)
+    if best is None:  # região maior que a janela: centraliza
+        ax = min(max(cx - w / 2, 0), W - w)
+        ay = min(max(cy - h / 2, 0), H - h)
+    else:
+        _, ax, ay = best
+    return int(round(ax)), int(round(ay)), int(round(ax + w)), int(round(ay + h))
+
+
+def export_details(clean: np.ndarray, out_dir: Path, scale: int = 2):
+    """Detalhe de cada reino na carta original: a região em destaque, o restante esmaecido."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    gray = clean.mean(axis=-1, keepdims=True)
+    dim = (clean * 0.35 + gray * 0.65) * 0.36
+    boxes = {}
+    for key in ORDER:
+        pts = REGIONS_PX[key]
+        m = blur(poly_mask(pts), 7)[..., None]
+        out = clean * m + dim * (1 - m)
+        box = detail_box(pts)
+        img = to_img(out).crop(box)
+        img = img.resize((img.width * scale, img.height * scale), Image.LANCZOS)
+        img = img.filter(ImageFilter.UnsharpMask(radius=1.6, percent=60, threshold=2))
+        img.save(out_dir / f'{key}.webp', 'WEBP', quality=86, method=6)
+        boxes[key] = (box, img.size)
+    return boxes
+
+
 # ── Exportação ────────────────────────────────────────────────────────────
 
 
@@ -296,6 +363,10 @@ def main():
     to_img(known).save(OUT / 'mapa-mundo-conhecido.webp', 'WEBP', quality=90, method=6)
     Image.fromarray((land * 255).astype(np.uint8), 'L').resize((1200, 800), Image.BOX).save(OUT / 'mascara-terra.png', optimize=True)
     lo, hi = export_heightmap(elev, OUT / 'relevo-mundo.png')
+
+    print('Detalhes dos reinos…')
+    for key, (box, size) in export_details(clean, OUT / 'carta').items():
+        print(f'  {key}: recorte {box} → {size[0]}×{size[1]}')
 
     data = {
         'estado': 'conceitual',

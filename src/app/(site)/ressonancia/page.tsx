@@ -40,7 +40,7 @@ export default async function ResonancePage() {
 
       <section className="section" style={{ paddingTop: 'var(--space-7)' }}>
         <div className="container">
-          <Figure image={ART.ressonancia} priority />
+          <Figure image={ART.selo.ressonancia} priority />
         </div>
       </section>
 

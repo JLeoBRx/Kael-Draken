@@ -7,6 +7,7 @@ import { MediaImage } from '@/components/ui/media'
 import { PageHero } from '@/components/ui/PageHero'
 import { Prose } from '@/components/ui/Prose'
 import { artImage } from '@/lib/atlas/art'
+import { resolveArt } from '@/lib/atlas/resolve'
 import { getDocument, getTermLabels } from '@/lib/content/queries'
 import { prepareRichText } from '@/lib/content/rich'
 import { getViewer } from '@/lib/content/viewer'
@@ -39,7 +40,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ slug:
   const context = render(d.context, { headingOffset: 2 })
   const reliabilityNote = render(d.reliabilityNote)
   const hidden = transcription.hiddenCount + translation.hiddenCount + context.hiddenCount
-  const illustration = artImage('document', d.slug)
+  const illustration = await resolveArt(artImage('document', d.slug), viewer)
 
   return (
     <article>

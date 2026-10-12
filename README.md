@@ -45,7 +45,7 @@ arquivar todo esse conteúdo.
 | 3D | three.js carregado sob demanda, só quando o leitor pede o modo 3D |
 | Autenticação | senha com hash scrypt + sessão assinada (HMAC-SHA256) em cookie `httpOnly` |
 | Testes | Vitest (unidade), Playwright + axe-core (ponta a ponta, acessibilidade, WebGL) |
-| Artes | scripts procedurais em Python (numpy + Pillow) e Chromium para os brasões |
+| Artes | recortes da carta (Python: numpy + Pillow), selos em SVG rasterizados com sharp, Chromium para o painel de brasões |
 
 Requisitos: **Node.js 22.12 ou superior** e npm. Python 3 só é necessário para
 regenerar as artes.
@@ -90,7 +90,7 @@ O banco local fica em `data/kael-draken.db` e as imagens enviadas pelo painel em
 | `npm run db:migrate` / `db:seed` / `db:setup` | migrações e conteúdo inicial |
 | `npm run db:generate` | gera nova migração após alterar `src/lib/db/schema.ts` |
 | `npm run admin:hash` | gera o hash da senha do painel |
-| `npm run art` | regenera todas as artes procedurais |
+| `npm run art` | regenera a carta, os detalhes dos reinos, os selos e os brasões |
 
 ## Painel administrativo
 
@@ -198,16 +198,38 @@ uma carta nova, troque o arquivo da fonte, ajuste esses valores e rode o comando
 
 ## Imagens do Atlas
 
-As cartas do mundo vêm do mapa ilustrado do manuscrito. As demais imagens em
-`public/images/atlas/` (panoramas dos reinos, brasões, cenas da mitologia) foram
-**produzidas por código** (scripts em `scripts/art/`), não por uma ferramenta de
-geração de imagens por IA. São artes conceituais provisórias, sem texto embutido.
+Nenhuma imagem do site foi criada por ferramenta de geração de imagens por IA.
+O registro das artes de destaque, com textos alternativos e créditos, está em
+`src/lib/atlas/art.ts`:
 
-Para regenerar: `npm run art` (requer `python3` com `numpy` e `Pillow`; os brasões
-usam o Chromium do Playwright). Para trocar uma arte por uma ilustração definitiva,
-substitua o arquivo de mesmo nome (WebP, mesma proporção) ou envie a imagem pelo
-painel e associe-a ao item. O registro das artes, com textos alternativos e
-créditos, está em `src/lib/atlas/art.ts`.
+- **Carta e detalhes dos reinos** — o mapa ilustrado do manuscrito; cada reino
+  ganha um recorte da carta com a região em destaque
+  (`public/images/atlas/carta/<reino>.webp`, gerados por `npm run art:mapas`).
+  Aparecem ao lado do título do verbete do reino, nas faixas do Atlas e no painel
+  da região.
+- **Ilustrações dos capítulos** — a do capítulo I aparece no verbete de Kael, a do
+  III em Brumafunda e a do VII em Manuscritos e em *Lendas e tradições*. São
+  buscadas no banco: valem a imagem, a legenda e o estado de publicação definidos
+  no painel (despublicada, a ilustração some também desses verbetes).
+- **Frontispício** (`public/images/livro-1/frontispicio.webp`, do manuscrito) no
+  topo do Atlas e **cena da capa** (`public/capa/cena-capa.webp`, a capa oficial
+  sem o título) ao fundo da página inicial. Se a capa mudar, troque também esse
+  recorte.
+- **Selos do Arquivo** (`selo-*.webp`) — pranchas simbólicas em linha dourada para
+  os conceitos abstratos (a Chama, o Caos, o Templo, a Ressonância, o Século
+  Perdido e Skrugheim). Não representam a aparência de nada. Gerados por
+  `npm run art:selos` (`scripts/art/sigils.mjs`).
+- **Brasões e painel heráldico** — propostas vetoriais (`scripts/art/emblems.py`).
+
+`safra-antes.webp`, `queda-safra.webp` e `ruinas-safra.webp` são as antigas cenas
+procedurais do verbete de Safra: o texto inicial passou a usar a carta do mundo
+conhecido (atualização aplicada uma vez, só se o texto não tiver sido editado), e
+os arquivos ficam apenas para textos antigos que ainda os citem.
+
+Para regenerar tudo: `npm run art` (requer `python3` com `numpy` e `Pillow`; o
+painel de brasões usa o Chromium do Playwright). Para trocar uma arte, substitua o
+arquivo de mesmo nome ou envie a imagem pelo painel e associe-a ao item — a imagem
+do painel sempre tem prioridade.
 
 ## Capa oficial do Livro I
 
@@ -218,6 +240,14 @@ escolhida no painel → **Configurações** → *Capa oficial* tem prioridade.
 A sinopse do Livro I é o texto da contracapa. Em bancos criados antes, ela
 substitui a apresentação provisória uma única vez, e só se o texto antigo não
 tiver sido editado no painel. O site não inventa ISBN nem data de lançamento.
+
+## Créditos, epígrafe e ícone
+
+O nome do autor (rodapé e página do livro) e a epígrafe do Livro I vêm da página
+de créditos do manuscrito e podem ser editados em **Painel → Configurações**
+(deixe a epígrafe vazia para ocultá-la). Em bancos antigos, o nome do autor é
+preenchido uma única vez, só se o campo estiver vazio. O ícone da aba está em
+`src/app/icon.svg` (e `apple-icon.png` para a tela inicial do celular).
 
 ## Pergaminho de anúncio
 
@@ -338,7 +368,7 @@ src/
   lib/atlas/         registro das artes e geometria das regiões
   data/atlas/        world.json (regiões editáveis do mapa)
   styles/            tokens, base, site, atlas, painel
-public/images/atlas/ carta do manuscrito, relevo, panoramas e brasões
+public/images/atlas/ carta do manuscrito, detalhes dos reinos, relevo, selos e brasões
 public/images/livro-1/ilustracoes/  ilustrações dos capítulos (resolução de impressão)
 public/capa/         capa oficial e capa completa
 scripts/             migrações, seed, hash de senha, geradores de arte e da versão HTML
@@ -349,8 +379,8 @@ drizzle/             migrações SQL versionadas
 
 ## O que ainda é provisório
 
-- **Brasões, cores e panoramas dos reinos:** propostas visuais.
-- **Artes procedurais** (panoramas, brasões, cenas da mitologia): conceituais, substituíveis por ilustrações definitivas.
+- **Brasões e cores dos reinos:** propostas visuais.
+- **Selos do Arquivo e brasões:** ilustrações simbólicas, substituíveis por artes definitivas.
 - **As seis faces da Ressonância** (Forja, Vigília, Elo, Eco, Limiar, Ímpeto):
   nomes provisórios, sem vínculo com reinos.
 - **Brumafunda e Ruínas de Safra:** propostas de local.

@@ -1,7 +1,8 @@
 import Image from 'next/image'
+import Link from 'next/link'
 import type { CSSProperties, ReactNode } from 'react'
-import type { ImageData } from '@/lib/content/media'
-import { BookIcon, ImageIcon, PortraitIcon } from './icons'
+import type { FeatureImage, ImageData } from '@/lib/content/media'
+import { ArrowRight, BookIcon, ImageIcon, PortraitIcon } from './icons'
 
 export function MediaImage({
   image,
@@ -25,6 +26,7 @@ export function MediaImage({
       sizes={sizes}
       className={className}
       priority={priority}
+      style={image.focus ? { objectPosition: image.focus } : undefined}
     />
   )
 }
@@ -41,7 +43,33 @@ export function ImageSlot({ label = 'Ilustração em preparação', ratio = '4 /
   )
 }
 
-export function Figure({ image, sizes, priority }: { image: ImageData; sizes?: string; priority?: boolean }) {
+/** Imagens verticais (como as ilustrações dos capítulos) viram pranchas, com a legenda ao lado. */
+function isPortrait(image: ImageData) {
+  return image.height > image.width * 1.1
+}
+
+export function Figure({ image, sizes, priority }: { image: FeatureImage; sizes?: string; priority?: boolean }) {
+  if (isPortrait(image) || image.kicker) {
+    return (
+      <figure className={`plate-figure${isPortrait(image) ? '' : ' plate-figure--wide'}`}>
+        <div className="plate-figure__media">
+          <MediaImage image={image} sizes={sizes ?? (isPortrait(image) ? '(min-width: 700px) 300px, 72vw' : '(min-width: 1000px) 520px, 100vw')} priority={priority} />
+        </div>
+        <figcaption className="plate-figure__text">
+          {image.kicker ? <span className="plate-figure__kicker">{image.kicker}</span> : null}
+          {image.title ? <span className="plate-figure__title">{image.title}</span> : null}
+          {image.caption ? <span className="plate-figure__caption">{image.caption}</span> : null}
+          {image.note ? <span className="plate-figure__note">{image.note}</span> : null}
+          {image.credit ? <span className="plate-figure__credit">Crédito: {image.credit}</span> : null}
+          {image.href ? (
+            <Link className="plate-figure__link" href={image.href}>
+              {image.hrefLabel ?? 'Ver mais'} <ArrowRight className="btn__arrow" />
+            </Link>
+          ) : null}
+        </figcaption>
+      </figure>
+    )
+  }
   return (
     <figure className="prose-figure">
       <MediaImage image={image} sizes={sizes} priority={priority} />

@@ -6,6 +6,7 @@ import { EntrySection, Facts, Gallery, HiddenNotice, PendingSections, RelatedLis
 import { Figure } from '@/components/ui/media'
 import { PageHero } from '@/components/ui/PageHero'
 import { artImage } from '@/lib/atlas/art'
+import { resolveArt } from '@/lib/atlas/resolve'
 import { getLocation, getTermLabels } from '@/lib/content/queries'
 import { prepareRichText } from '@/lib/content/rich'
 import { getViewer } from '@/lib/content/viewer'
@@ -19,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const data = await getLocation(slug, viewer)
   if (!data) return {}
   if (isLocked(data.location, viewer)) return lockedMetadata
-  return entryMetadata({ title: data.location.name, description: data.location.summary, path: paths.location(slug), image: data.image ?? artImage('location', slug) })
+  return entryMetadata({ title: data.location.name, description: data.location.summary, path: paths.location(slug), image: data.image ?? (await resolveArt(artImage('location', slug), viewer)) })
 }
 
 export default async function LocationPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -32,7 +33,7 @@ export default async function LocationPage({ params }: { params: Promise<{ slug:
 
   const [categories, roles] = await Promise.all([getTermLabels('location_category'), getTermLabels('character_role')])
   const render = await prepareRichText(viewer, [l.body, l.history, l.geography, l.inhabitants])
-  const image = data.image ?? artImage('location', l.slug)
+  const image = data.image ?? (await resolveArt(artImage('location', l.slug), viewer))
   const sections = [
     { id: 'descricao', title: 'Descrição', source: l.body },
     { id: 'importancia', title: 'Importância histórica', source: l.history },

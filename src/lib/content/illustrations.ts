@@ -9,7 +9,7 @@ import { chapterLabel, ILLUSTRATION_EXTENSIONS, illustrationPublicDir, type Illu
 import { toRoman } from '../format'
 import { paths } from '../routes'
 import { SLUG_PATTERN } from '../slug'
-import { getImages, type ImageData } from './media'
+import { getImages, type FeatureImage, type ImageData } from './media'
 import type { Viewer } from './viewer'
 import { isVisible, listable } from './visibility'
 
@@ -144,6 +144,37 @@ export async function getChapterIllustration(book: BookRef, chapterId: number, v
     .innerJoin(s.chapters, eq(s.chapters.id, s.illustrations.chapterId))
     .where(and(eq(s.illustrations.chapterId, chapterId), listable(s.illustrations, viewer), chapterCondition(viewer)))
   return (await toViews(book, rows, viewer))[0] ?? null
+}
+
+/**
+ * Uma ilustração de capítulo usada como imagem de destaque em outro verbete
+ * (por exemplo, a do capítulo I na página de Kael). Segue as regras da
+ * galeria: some se a ilustração for despublicada, se o capítulo exigir um
+ * nível de spoiler maior ou se ainda não houver imagem.
+ */
+export async function getIllustrationFeature(slug: string, viewer: Viewer): Promise<FeatureImage | null> {
+  const rows = await db
+    .select({ illustration: s.illustrations, chapter: s.chapters, book: s.books })
+    .from(s.illustrations)
+    .innerJoin(s.chapters, eq(s.chapters.id, s.illustrations.chapterId))
+    .innerJoin(s.books, eq(s.books.id, s.chapters.bookId))
+    .where(and(eq(s.illustrations.slug, slug), listable(s.illustrations, viewer), chapterCondition(viewer)))
+    .limit(1)
+  const row = rows[0]
+  if (!row || !isVisible(row.book, viewer)) return null
+  const book = { id: row.book.id, slug: row.book.slug, volume: row.book.volume }
+  const [view] = await toViews(book, [row], viewer)
+  if (!view?.image) return null
+  return {
+    ...view.image,
+    caption: view.caption,
+    credit: view.credit,
+    kicker: `Ilustração do capítulo ${view.roman}`,
+    title: view.chapterTitle,
+    href: `${paths.bookIllustrations(book.slug)}#${view.slug}`,
+    hrefLabel: 'Ver na galeria de ilustrações',
+    note: view.artState === 'final' ? undefined : `${view.stateLabel} — ${view.stateDescription}`,
+  }
 }
 
 /** Apenas os campos públicos, serializáveis para componentes de cliente. */

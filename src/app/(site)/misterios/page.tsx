@@ -35,7 +35,7 @@ export default async function MysteriesPage() {
       {prophecyLines.length ? (
         <section className="prophecy" aria-labelledby="profecia-titulo">
           <div className="prophecy__art">
-            <MediaImage image={ART.skrugheim} sizes="100vw" />
+            <MediaImage image={ART.selo.skrugheim} sizes="100vw" />
           </div>
           <div className="container prophecy__inner">
             <p className="eyebrow" id="profecia-titulo">

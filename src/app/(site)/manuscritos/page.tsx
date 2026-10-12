@@ -5,7 +5,8 @@ import { EmptyState } from '@/components/ui/entry'
 import { FilterForm } from '@/components/ui/FilterForm'
 import { Figure, MediaImage } from '@/components/ui/media'
 import { PageHero } from '@/components/ui/PageHero'
-import { ART } from '@/lib/atlas/art'
+import { ILLUSTRATION } from '@/lib/atlas/art'
+import { resolveArt } from '@/lib/atlas/resolve'
 import { getTerms, listDocuments } from '@/lib/content/queries'
 import { getViewer } from '@/lib/content/viewer'
 import { RELIABILITY_INFO, RELIABILITY_STATES } from '@/lib/editorial'
@@ -22,7 +23,7 @@ type Search = { q?: string; tipo?: string; confiabilidade?: string }
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const viewer = await getViewer()
   const filters = await searchParams
-  const [documents, types] = await Promise.all([listDocuments(viewer, filters), getTerms('document_type')])
+  const [documents, types, archive] = await Promise.all([listDocuments(viewer, filters), getTerms('document_type'), resolveArt(ILLUSTRATION.capitulo7, viewer)])
   const typeLabels = new Map(types.map((t) => [t.slug, t.label]))
 
   return (
@@ -36,7 +37,11 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       />
       <section className="section" style={{ paddingTop: 'var(--space-7)' }}>
         <div className="container">
-          <Figure image={ART.manuscritos} />
+          {archive ? (
+            <div className="section-plate">
+              <Figure image={archive} />
+            </div>
+          ) : null}
           <FilterForm action={paths.documents} resetHref={paths.documents}>
             <div className="field field--search">
               <label htmlFor="d-q">Buscar</label>

@@ -14,6 +14,18 @@ export interface ImageData {
   alt: string
   caption?: string
   credit?: string
+  /** Enquadramento quando a imagem é recortada (valor de object-position). */
+  focus?: string
+}
+
+/** Imagem de destaque que pode ser apresentada como prancha (título, legenda e link). */
+export interface FeatureImage extends ImageData {
+  kicker?: string
+  title?: string
+  href?: string
+  hrefLabel?: string
+  /** Observação editorial exibida junto à legenda (por exemplo, "Estudo — arte provisória"). */
+  note?: string
 }
 
 type MediaRow = typeof s.media.$inferSelect

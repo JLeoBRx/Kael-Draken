@@ -829,6 +829,122 @@ main {
   color: var(--text-faint);
 }
 
+/* Prancha: ilustração com a legenda ao lado (ilustrações dos capítulos nos verbetes) */
+
+.plate-figure {
+  display: grid;
+  gap: var(--space-5);
+  align-items: center;
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(ellipse 70% 90% at 0% 50%, color-mix(in srgb, var(--gold-500) 7%, transparent), transparent 70%),
+    var(--ink-900);
+}
+
+.plate-figure__media {
+  position: relative;
+  justify-self: center;
+  width: min(100%, 300px);
+  border: 1px solid var(--line-strong);
+  background: var(--ink-1000);
+  box-shadow: 0 22px 48px -24px rgba(0, 0, 0, 0.9);
+}
+
+.plate-figure__media::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 1px solid color-mix(in srgb, var(--gold-500) 30%, transparent);
+  pointer-events: none;
+}
+
+.plate-figure__media img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.plate-figure--wide .plate-figure__media {
+  width: 100%;
+}
+
+.plate-figure__text {
+  display: grid;
+  gap: var(--space-2);
+  align-content: center;
+  justify-items: start;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.plate-figure__kicker {
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold-400);
+}
+
+.plate-figure__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  line-height: 1.2;
+  color: var(--ivory-50);
+}
+
+.plate-figure__caption {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--stone-200);
+}
+
+.plate-figure__note {
+  padding: 0.35rem 0.6rem;
+  border: 1px dashed var(--line-strong);
+  font-size: var(--fs-xs);
+}
+
+.plate-figure__credit {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+}
+
+.plate-figure__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--gold-300);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--gold-300) 40%, transparent);
+  text-underline-offset: 0.25em;
+}
+
+.plate-figure__link:hover {
+  color: var(--ivory-50);
+}
+
+.section-plate {
+  margin-bottom: var(--space-7);
+}
+
+@media (min-width: 700px) {
+  .plate-figure {
+    grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+    padding: var(--space-5);
+  }
+
+  .plate-figure--wide {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  }
+}
+
 .prose--lead {
   font-size: var(--fs-md);
   color: var(--ivory-50);
@@ -1466,6 +1582,31 @@ main {
 .page-hero h1 {
   font-size: var(--fs-3xl);
   max-width: 22ch;
+}
+
+.page-hero__text {
+  display: grid;
+  gap: var(--space-4);
+  align-content: center;
+  min-width: 0;
+}
+
+.page-hero__media {
+  min-width: 0;
+  margin-top: var(--space-3);
+}
+
+@media (min-width: 900px) {
+  .page-hero--media .page-hero__inner {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 34rem);
+    column-gap: var(--space-8);
+    align-items: center;
+    padding-block: var(--space-7);
+  }
+
+  .page-hero__media {
+    margin-top: 0;
+  }
 }
 
 .page-hero__subtitle {
@@ -3648,28 +3789,40 @@ main {
   pointer-events: none;
 }
 
+/* Cena da capa oficial ao fundo: escurecida do lado do texto, dissolvida na página embaixo */
 .hero__art img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 30%;
-  opacity: 0.32;
+  object-position: 34% 45%;
+  opacity: 0.42;
+  filter: saturate(0.92);
 }
 
 .hero__art::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, var(--ink-950) 0%, rgba(14, 13, 12, 0.82) 45%, rgba(14, 13, 12, 0.55) 100%), linear-gradient(0deg, var(--ink-950), transparent 40%);
+  background:
+    linear-gradient(90deg, var(--ink-950) 0%, rgba(14, 13, 12, 0.78) 45%, rgba(14, 13, 12, 0.5) 100%),
+    linear-gradient(0deg, var(--ink-950) 0%, rgba(14, 13, 12, 0) 45%),
+    linear-gradient(180deg, rgba(14, 13, 12, 0.7) 0%, rgba(14, 13, 12, 0) 22%);
 }
 
 @media (min-width: 960px) {
   .hero__art {
-    left: 40%;
+    left: 34%;
   }
 
   .hero__art img {
-    opacity: 0.6;
+    opacity: 0.85;
+  }
+
+  .hero__art::after {
+    background:
+      linear-gradient(90deg, var(--ink-950) 0%, rgba(14, 13, 12, 0.72) 22%, rgba(14, 13, 12, 0.2) 58%, rgba(14, 13, 12, 0.35) 100%),
+      linear-gradient(0deg, var(--ink-950) 0%, rgba(14, 13, 12, 0) 38%),
+      linear-gradient(180deg, rgba(14, 13, 12, 0.75) 0%, rgba(14, 13, 12, 0) 26%);
   }
 }
 
@@ -4149,4 +4302,42 @@ html:has(.illus-dialog[open]) {
   margin-top: var(--space-3);
   font-size: var(--fs-sm);
   color: var(--gold-300);
+}
+
+/* Livro: autor e epígrafe */
+
+.book-layout__author {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  color: var(--ivory-50);
+}
+
+.book-epigraph {
+  margin: 0;
+  padding: var(--space-5) 0 var(--space-5) var(--space-5);
+  border-left: 2px solid color-mix(in srgb, var(--gold-500) 60%, transparent);
+}
+
+.book-epigraph blockquote {
+  margin: 0;
+}
+
+.book-epigraph p {
+  max-width: 34ch;
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-style: italic;
+  line-height: 1.3;
+  color: var(--gold-300);
+}
+
+.book-epigraph figcaption {
+  margin-top: var(--space-3);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
 }

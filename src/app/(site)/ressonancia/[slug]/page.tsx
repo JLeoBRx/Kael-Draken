@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { ArticleView } from '@/components/content/ArticleView'
 import { SpoilerGate } from '@/components/ui/entry'
 import { artImage } from '@/lib/atlas/art'
+import { resolveArt } from '@/lib/atlas/resolve'
 import { getArticle } from '@/lib/content/queries'
 import { getViewer } from '@/lib/content/viewer'
 import { isLocked } from '@/lib/content/visibility'
@@ -15,7 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const data = await getArticle('ressonancia', slug, viewer)
   if (!data) return {}
   if (isLocked(data.article, viewer)) return lockedMetadata
-  return entryMetadata({ title: data.article.title, description: data.article.summary, path: paths.article('ressonancia', slug), image: data.image ?? artImage('article', `ressonancia/${slug}`) })
+  return entryMetadata({ title: data.article.title, description: data.article.summary, path: paths.article('ressonancia', slug), image: data.image ?? (await resolveArt(artImage('article', `ressonancia/${slug}`), viewer)) })
 }
 
 export default async function ResonanceArticlePage({ params }: { params: Promise<{ slug: string }> }) {

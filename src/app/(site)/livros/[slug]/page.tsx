@@ -52,6 +52,12 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       <div className="container book-layout">
         <div className="book-layout__cover">
           <BookCover cover={cover} title={b.title} priority note="A capa aprovada será exibida aqui assim que o arquivo for adicionado." />
+          {b.volume === 1 && settings.author_name?.trim() ? (
+            <p className="book-layout__author">
+              <span className="eyebrow">Autor</span>
+              {settings.author_name}
+            </p>
+          ) : null}
           {fullCover ? (
             <a className="book-layout__full-cover" href={fullCover.src} target="_blank" rel="noopener">
               Ver a capa completa <span className="related-list__meta">contracapa, lombada e capa</span>
@@ -59,6 +65,14 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
           ) : null}
         </div>
         <div className="entry-main">
+          {b.volume === 1 && settings.book_epigraph?.trim() ? (
+            <figure className="book-epigraph">
+              <blockquote>
+                <p>“{settings.book_epigraph.trim()}”</p>
+              </blockquote>
+              <figcaption>Epígrafe do Livro I</figcaption>
+            </figure>
+          ) : null}
           <EntrySection
             id="sinopse"
             title={b.synopsisOfficial ? 'Sinopse oficial' : 'Apresentação'}

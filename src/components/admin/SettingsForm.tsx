@@ -33,6 +33,12 @@ export function SettingsForm({ values, media, coverFileFound }: { values: Record
             <input id="author_name" name="author_name" defaultValue={values.author_name} />
           </div>
           <div className="adm-field">
+            <label className="adm-label" htmlFor="book_epigraph">
+              Epígrafe do Livro I (página do livro; deixe vazio para ocultar)
+            </label>
+            <textarea id="book_epigraph" name="book_epigraph" rows={2} defaultValue={values.book_epigraph} />
+          </div>
+          <div className="adm-field">
             <label className="adm-label" htmlFor="site_description">
               Descrição do site (rodapé e buscadores)
             </label>

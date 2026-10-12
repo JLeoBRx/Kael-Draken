@@ -7,7 +7,10 @@ import { illustrationTitle } from '../illustrations'
 import {
   SEED_ARTICLES,
   LEGACY_BOOK_SYNOPSIS,
+  LEGACY_SAFRA_BODY,
+  MANUSCRIPT_AUTHOR,
   OFFICIAL_BOOK_SYNOPSIS,
+  SAFRA_BODY,
   SEED_BOOK,
   SEED_CHAPTERS,
   SEED_CHARACTERS,
@@ -378,8 +381,57 @@ export async function ensureOfficialSynopsis(db: Database, opts: { log?: (msg: s
   return changed
 }
 
+/** Marca, em settings, que o verbete de Safra já recebeu a carta do mundo conhecido. */
+export const SAFRA_ART_UPDATE_KEY = 'seed_safra_carta_conhecida'
+
+/**
+ * Troca, uma única vez, as três imagens procedurais do verbete "Safra e a
+ * Noite das Cinzas" pela carta do mundo conhecido (versão do manuscrito) —
+ * apenas se o texto carregado inicialmente continuar intacto.
+ */
+export async function ensureSafraArticleArt(db: Database, opts: { log?: (msg: string) => void } = {}): Promise<boolean> {
+  const log = opts.log ?? (() => {})
+  const [done] = await db.select().from(s.settings).where(eq(s.settings.key, SAFRA_ART_UPDATE_KEY))
+  if (done) return false
+  const now = new Date().toISOString()
+  const [article] = await db
+    .select()
+    .from(s.articles)
+    .where(and(eq(s.articles.section, 'mitologia'), eq(s.articles.slug, 'safra-e-a-noite-das-cinzas')))
+  let changed = false
+  if (article && article.body.trim() === LEGACY_SAFRA_BODY.trim()) {
+    await db.update(s.articles).set({ body: SAFRA_BODY, updatedAt: now }).where(eq(s.articles.id, article.id))
+    changed = true
+  }
+  await db.insert(s.settings).values({ key: SAFRA_ART_UPDATE_KEY, value: now }).onConflictDoNothing()
+  if (changed) log('Verbete de Safra: carta do mundo conhecido no lugar das imagens procedurais.')
+  return changed
+}
+
+/** Marca, em settings, que o crédito do autor já foi preenchido a partir do manuscrito. */
+export const AUTHOR_UPDATE_KEY = 'seed_autor_manuscrito'
+
+/** Preenche, uma única vez, o nome do autor do rodapé — só se o campo ainda estiver vazio. */
+export async function ensureAuthorCredit(db: Database, opts: { log?: (msg: string) => void } = {}): Promise<boolean> {
+  const log = opts.log ?? (() => {})
+  const [done] = await db.select().from(s.settings).where(eq(s.settings.key, AUTHOR_UPDATE_KEY))
+  if (done) return false
+  const now = new Date().toISOString()
+  const [current] = await db.select().from(s.settings).where(eq(s.settings.key, 'author_name'))
+  let changed = false
+  if (!current?.value.trim()) {
+    await db.insert(s.settings).values({ key: 'author_name', value: MANUSCRIPT_AUTHOR }).onConflictDoUpdate({ target: s.settings.key, set: { value: MANUSCRIPT_AUTHOR } })
+    changed = true
+  }
+  await db.insert(s.settings).values({ key: AUTHOR_UPDATE_KEY, value: now }).onConflictDoNothing()
+  if (changed) log('Crédito do autor preenchido a partir do manuscrito.')
+  return changed
+}
+
 /** Atualizações de conteúdo aplicadas uma única vez na inicialização. */
 export async function ensureContentUpdates(db: Database, opts: { log?: (msg: string) => void } = {}) {
   await ensureBookIllustrations(db, opts)
   await ensureOfficialSynopsis(db, opts)
+  await ensureSafraArticleArt(db, opts)
+  await ensureAuthorCredit(db, opts)
 }

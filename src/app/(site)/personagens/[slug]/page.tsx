@@ -6,6 +6,7 @@ import { EntrySection, Facts, Gallery, HiddenNotice, PendingSections, RelatedLis
 import { Figure, ImageSlot, MediaImage } from '@/components/ui/media'
 import { PageHero } from '@/components/ui/PageHero'
 import { artImage } from '@/lib/atlas/art'
+import { resolveArt } from '@/lib/atlas/resolve'
 import { getCharacter, getTermLabels } from '@/lib/content/queries'
 import { prepareRichText } from '@/lib/content/rich'
 import { getViewer } from '@/lib/content/viewer'
@@ -32,7 +33,7 @@ export default async function CharacterPage({ params }: { params: Promise<{ slug
 
   const [roles, relationKinds] = await Promise.all([getTermLabels('character_role'), getTermLabels('relation_kind')])
   const render = await prepareRichText(viewer, [c.personality, c.history, c.family, c.abilities, c.storyRole, c.secrets, ...data.relations.map((r) => r.description)])
-  const illustration = artImage('character', c.slug)
+  const illustration = await resolveArt(artImage('character', c.slug), viewer)
 
   const sections = [
     { id: 'personalidade', title: 'Personalidade', source: c.personality },

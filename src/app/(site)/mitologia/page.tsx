@@ -39,21 +39,21 @@ export default async function MythologyPage() {
           </header>
           <div className="diptych">
             <Link className="diptych__item" href={paths.article('mitologia', 'a-chama-do-dragao')}>
-              <MediaImage image={ART.origemChama} sizes="(min-width: 900px) 50vw, 100vw" />
+              <MediaImage image={ART.selo.chama} sizes="(min-width: 900px) 50vw, 100vw" />
               <span className="diptych__caption">
                 <span className="eyebrow">Criação</span>
                 <span className="diptych__title">A Chama do Dragão</span>
               </span>
             </Link>
             <Link className="diptych__item" href={paths.article('mitologia', 'a-ascensao-do-caos')}>
-              <MediaImage image={ART.caos} sizes="(min-width: 900px) 50vw, 100vw" />
+              <MediaImage image={ART.selo.caos} sizes="(min-width: 900px) 50vw, 100vw" />
               <span className="diptych__caption">
                 <span className="eyebrow">O que nasceu junto</span>
                 <span className="diptych__title">O Caos</span>
               </span>
             </Link>
           </div>
-          <p className="art-note">Ilustrações conceituais. A natureza integral do Caos não é revelada neste arquivo.</p>
+          <p className="art-note">Selos simbólicos do Arquivo — não representam a aparência da Chama nem a do Caos, cuja natureza integral não é revelada neste arquivo.</p>
         </div>
       </section>
 

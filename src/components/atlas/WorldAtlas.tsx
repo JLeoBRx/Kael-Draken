@@ -148,6 +148,7 @@ export function WorldAtlas({ regions, images, heightmap, maskSrc, aspect, drawnL
         reducedMotion: reducedMotion.current,
         lowPower,
         labelText: { erased: ERASED_LABEL },
+        compactLabels: drawnLabels,
         onSelect: (id) => select(id),
         onHover: (id) => setHovered(id),
         onContextLost: () => {

@@ -478,6 +478,59 @@ export interface SeedArticle extends Editorial {
   body?: string
 }
 
+/** Imagens procedurais que o verbete de Safra trazia no texto (mantidas em public/ para textos antigos). */
+const SAFRA_LEGACY_ART = {
+  antes: '![Uma cidade de Safra ao entardecer, com terraços, cúpulas e ruas iluminadas.](/images/atlas/safra-antes.webp "Safra antes da destruição — conceito artístico.")',
+  queda: '![A cidade em chamas sob uma coluna de fumaça; silhuetas distantes observam.](/images/atlas/queda-safra.webp "A Noite das Cinzas — conceito artístico.")',
+  ruinas: '![Arcos partidos cobertos de cinza sob a luz fria da aurora.](/images/atlas/ruinas-safra.webp "Ruínas de Safra — conceito artístico.")',
+}
+
+const SAFRA_KNOWN_MAP =
+  '![A carta do mundo conhecido: o território de Safra aparece em branco, sem registro.](/images/atlas/mapa-mundo-conhecido.webp "O mundo conhecido — a versão oficial da história, com Safra apagada; a partir da carta do manuscrito.")'
+
+function safraBody(legacy: boolean): string {
+  const legacyArt = (line: string) => (legacy ? `\n${line}\n` : '')
+  return `## Uma civilização viva
+
+[[reinos/safra|Safra]] era um dos seis reinos, e possuía uma ligação excepcional com as chamas. Era um povo com suas cidades, suas ruas, sua arquitetura e sua cultura — uma civilização que existiu de verdade.
+${legacyArt(SAFRA_LEGACY_ART.antes)}
+Os detalhes de sua cultura, de suas cidades e de seus costumes ainda estão em desenvolvimento.
+
+## A decisão dos cinco reinos
+
+Os outros cinco reinos decidiram destruir a população de Safra, movidos pela inveja de seu poder.
+
+## A Noite das Cinzas
+
+Safra foi destruída. A catástrofe é lembrada como a **Noite das Cinzas**. Durante esse mesmo período, a [[mitologia/o-desaparecimento-da-chama|Chama desapareceu]].
+${legacyArt(SAFRA_LEGACY_ART.queda)}
+Os detalhes definitivos da destruição não foram estabelecidos.
+
+## A linhagem perdida
+
+Com Safra, perdeu-se a sua linhagem real.
+
+:::spoiler 1
+Um herdeiro sobreviveu após ser enviado por um portal.
+:::
+
+## As ruínas
+
+Restaram [[locais/ruinas-de-safra|ruínas]]. Sua localização e seu estado atual ainda não foram definidos.
+${legacyArt(SAFRA_LEGACY_ART.ruinas)}
+## O apagamento
+
+Depois da destruição, Safra foi apagada da história oficial. A versão reconhecida pelos reinos admite apenas cinco — como mostra o mapa do mundo conhecido no [[atlas|Atlas]].
+${legacy ? '' : `\n${SAFRA_KNOWN_MAP}\n`}
+O destino completo de Safra permanece um mistério preservado.`
+}
+
+/** Verbete de Safra com a carta do mundo conhecido no lugar das imagens procedurais. */
+export const SAFRA_BODY = safraBody(false)
+
+/** O mesmo verbete como era carregado antes (para atualizar bancos antigos sem tocar em textos editados). */
+export const LEGACY_SAFRA_BODY = safraBody(true)
+
 export const SEED_ARTICLES: SeedArticle[] = [
   // ── Mitologia e história antiga ─────────────────────────────
   {
@@ -557,45 +610,7 @@ Onde ele fica, como era sua história completa e o que lhe aconteceu depois do [
     title: 'Safra e a Noite das Cinzas',
     subtitle: 'A ferida da história',
     summary: 'A vida de uma civilização ligada às chamas, a decisão dos cinco reinos, a catástrofe, a linhagem perdida, as ruínas e o apagamento.',
-    body: `## Uma civilização viva
-
-[[reinos/safra|Safra]] era um dos seis reinos, e possuía uma ligação excepcional com as chamas. Era um povo com suas cidades, suas ruas, sua arquitetura e sua cultura — uma civilização que existiu de verdade.
-
-![Uma cidade de Safra ao entardecer, com terraços, cúpulas e ruas iluminadas.](/images/atlas/safra-antes.webp "Safra antes da destruição — conceito artístico.")
-
-Os detalhes de sua cultura, de suas cidades e de seus costumes ainda estão em desenvolvimento.
-
-## A decisão dos cinco reinos
-
-Os outros cinco reinos decidiram destruir a população de Safra, movidos pela inveja de seu poder.
-
-## A Noite das Cinzas
-
-Safra foi destruída. A catástrofe é lembrada como a **Noite das Cinzas**. Durante esse mesmo período, a [[mitologia/o-desaparecimento-da-chama|Chama desapareceu]].
-
-![A cidade em chamas sob uma coluna de fumaça; silhuetas distantes observam.](/images/atlas/queda-safra.webp "A Noite das Cinzas — conceito artístico.")
-
-Os detalhes definitivos da destruição não foram estabelecidos.
-
-## A linhagem perdida
-
-Com Safra, perdeu-se a sua linhagem real.
-
-:::spoiler 1
-Um herdeiro sobreviveu após ser enviado por um portal.
-:::
-
-## As ruínas
-
-Restaram [[locais/ruinas-de-safra|ruínas]]. Sua localização e seu estado atual ainda não foram definidos.
-
-![Arcos partidos cobertos de cinza sob a luz fria da aurora.](/images/atlas/ruinas-safra.webp "Ruínas de Safra — conceito artístico.")
-
-## O apagamento
-
-Depois da destruição, Safra foi apagada da história oficial. A versão reconhecida pelos reinos admite apenas cinco — como mostra o mapa do mundo conhecido no [[atlas|Atlas]].
-
-O destino completo de Safra permanece um mistério preservado.`,
+    body: SAFRA_BODY,
     canon: 'canonico',
   },
   {
@@ -896,6 +911,9 @@ Você também pode escolher o seu nível de spoiler no topo da página. Por padr
 Comece pelo [[atlas|Atlas dos Seis Reinos]] — que pode ser explorado em três dimensões — ou pela [[mitologia|mitologia]].`,
 }
 
+/** Autor, como aparece na página de créditos do manuscrito (© 2026). */
+export const MANUSCRIPT_AUTHOR = 'Pedro Henrique Martins Silva'
+
 export const SEED_SETTINGS: Record<string, string> = {
   home_intro:
     'Antes dos reinos, antes dos nomes, havia a Chama. Dela nasceu o mundo — e, junto dela, o Caos. Seis reinos ergueram-se sobre fragmentos desse poder primordial. Um deles desapareceu. Num vilarejo distante, um rapaz de dezesseis anos começa a sonhar com lugares que não deveriam existir.',
@@ -903,7 +921,8 @@ export const SEED_SETTINGS: Record<string, string> = {
   home_quote_source: 'O Sussurro da Chama Antiga',
   home_quote_href: '/manuscritos/quando-a-chama-despertar',
   site_description: 'Enciclopédia oficial e arquivo de desenvolvimento do universo de Kael Draken — O Sussurro da Chama Antiga.',
-  author_name: '',
+  author_name: MANUSCRIPT_AUTHOR,
+  book_epigraph: 'Há chamas que destroem mundos, e outras que revelam quem realmente somos.',
   cover_media_id: '',
   announcement_enabled: '1',
   announcement_kicker: 'Kael Draken · O Sussurro da Chama Antiga',

@@ -82,6 +82,11 @@ async function main() {
   const cover = await webp(path.join(PUBLIC, 'capa', 'capa-oficial.webp'), 'capa.webp', 720, 84)
   const mapOriginal = await webp(path.join(PUBLIC, 'images', 'atlas', 'mapa-mundo-original.webp'), 'mapa-original.webp', 1536, 82)
   const mapKnown = await webp(path.join(PUBLIC, 'images', 'atlas', 'mapa-mundo-conhecido.webp'), 'mapa-conhecido.webp', 1536, 82)
+  const scene = await webp(path.join(PUBLIC, 'capa', 'cena-capa.webp'), 'cena.webp', 907, 80)
+  const realmMaps: Record<string, Img> = {}
+  for (const k of SEED_KINGDOMS) {
+    realmMaps[k.slug] = await webp(path.join(PUBLIC, 'images', 'atlas', 'carta', `${k.slug}.webp`), `carta/${k.slug}.webp`, 640, 78)
+  }
   const illustrations = []
   for (const ill of SEED_ILLUSTRATIONS) {
     const file = findIllustration(ill.slug)
@@ -96,7 +101,7 @@ async function main() {
   const synopsis = md(OFFICIAL_BOOK_SYNOPSIS)
   const siteUrl = process.env.SITE_URL && !/localhost|127\.0\.0\.1/.test(process.env.SITE_URL) ? process.env.SITE_URL : null
 
-  const body = page({ cover, mapOriginal, mapKnown, illustrations, prophecy: prophecy.transcription, announcement, synopsis, siteUrl })
+  const body = page({ cover, scene, realmMaps, mapOriginal, mapKnown, illustrations, prophecy: prophecy.transcription, announcement, synopsis, siteUrl })
   const head = `<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="${esc('O Sussurro da Chama Antiga está de volta. Capa, sinopse oficial, as ilustrações dos dez primeiros capítulos e o Atlas dos Seis Reinos.')}">
@@ -120,6 +125,8 @@ interface Img {
 
 function page(d: {
   cover: Img
+  scene: Img
+  realmMaps: Record<string, Img>
   mapOriginal: Img
   mapKnown: Img
   illustrations: Array<{ slug: string; chapter: number; label: string; title: string; caption: string; alt: string; artState: string; thumb: Img; large: Img }>
@@ -157,6 +164,7 @@ function page(d: {
   const kingdoms = SEED_KINGDOMS.map(
     (k, i) => `
         <li class="realm${k.slug === 'safra' ? ' realm--lost' : ''}">
+          ${d.realmMaps[k.slug] ? `<img class="realm__map" src="${d.realmMaps[k.slug].src}" width="${d.realmMaps[k.slug].width}" height="${d.realmMaps[k.slug].height}" alt="${esc(`${k.name} na carta do manuscrito`)}" loading="lazy" decoding="async">` : ''}
           <p class="realm__num">${toRoman(i + 1)}</p>
           <h3 class="realm__name">${esc(k.name)}</h3>
           <p class="realm__epithet">${esc(k.epithet || k.government || '')}</p>
@@ -181,7 +189,7 @@ function page(d: {
 </header>
 
 <main>
-  <section class="opening" aria-labelledby="anuncio">
+  <section class="opening" aria-labelledby="anuncio" style="--scene: url('${d.scene.src}')">
     <div class="scroll">
       <div class="scroll__rod" aria-hidden="true"></div>
       <article class="scroll__sheet">
@@ -207,6 +215,8 @@ function page(d: {
       <div class="book__text">
         <p class="eyebrow">${esc(SEED_BOOK.subtitle)}</p>
         <h2 class="book__title" id="livro-titulo">${esc(SEED_BOOK.title)}</h2>
+        <p class="book__author">${esc(SEED_SETTINGS.author_name ?? '')}</p>
+        ${SEED_SETTINGS.book_epigraph ? `<blockquote class="book__epigraph">“${esc(SEED_SETTINGS.book_epigraph)}”</blockquote>` : ''}
         <div class="book__synopsis">${d.synopsis}</div>
         <ul class="genres" aria-label="Gêneros">${genres.map((g) => `<li>${g}</li>`).join('')}</ul>
         <p class="book__meta">Edição independente · 2026</p>
@@ -262,7 +272,7 @@ function page(d: {
   <div class="wrap foot__grid">
     <p class="foot__brand">Kael Draken <em>O Sussurro da Chama Antiga</em></p>
     ${d.siteUrl ? `<p><a class="foot__link" href="${esc(d.siteUrl)}">Visitar o Arquivo da Chama Antiga</a></p>` : ''}
-    <p class="foot__copy">© 2026 Kael Draken. Todos os direitos reservados.</p>
+    <p class="foot__copy">© 2026 ${SEED_SETTINGS.author_name ? `${esc(SEED_SETTINGS.author_name)} · ` : ''}Kael Draken. Todos os direitos reservados.</p>
   </div>
 </footer>
 

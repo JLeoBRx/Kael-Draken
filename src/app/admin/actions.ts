@@ -178,6 +178,7 @@ const SETTING_KEYS = [
   'home_quote_href',
   'site_description',
   'author_name',
+  'book_epigraph',
   'cover_media_id',
   'announcement_kicker',
   'announcement_title',

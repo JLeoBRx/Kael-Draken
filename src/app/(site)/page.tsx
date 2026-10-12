@@ -53,7 +53,7 @@ export default async function HomePage() {
     <>
       <section className="hero" aria-labelledby="titulo-principal">
         <div className="hero__art" aria-hidden="true">
-          <Image src={ART.capa.src} alt="" width={ART.capa.width} height={ART.capa.height} priority sizes="(min-width: 960px) 50vw, 100vw" />
+          <Image src={ART.cenaCapa.src} alt="" width={ART.cenaCapa.width} height={ART.cenaCapa.height} priority quality={90} sizes="(min-width: 960px) 62vw, 100vw" />
         </div>
         <div className="hero__bg">
           <PortolanTexture />
