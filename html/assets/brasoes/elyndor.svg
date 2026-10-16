@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-label="Brasão conceitual de Elyndor (proposta)">
+<title>Brasão conceitual de Elyndor — proposta heráldica</title>
+<defs><linearGradient id="g-elyndor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".10"/><stop offset=".55" stop-color="#ffffff" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity=".25"/></linearGradient></defs>
+<path d="M120 12 L222 36 V128 C222 198 176 246 120 270 C64 246 18 198 18 128 V36 Z" fill="#24301f" stroke="#8d7240" stroke-width="5"/>
+<path d="M120 26 L208 47 V129 C208 189 169 232 120 254 C71 232 32 189 32 129 V47 Z" fill="none" stroke="#cdb27f" stroke-width="1.6" opacity=".7"/>
+<path d="M120 60 C128 74 134 82 132 94 C130 104 125 108 120 110 C115 108 110 104 108 94 C106 82 112 74 120 60 Z" fill="#cdb27f" stroke="#120d09" stroke-width="2"/>
+<path d="M112 112 H128 L124 124 H116 Z" fill="#cdb27f" stroke="#120d09" stroke-width="2"/>
+<path d="M120 196 C100 180 76 178 56 184 V136 C76 130 100 132 120 148 C140 132 164 130 184 136 V184 C164 178 140 180 120 196 Z" fill="#cdb27f" stroke="#120d09" stroke-width="2.5"/>
+<path d="M120 148 V196" stroke="#120d09" stroke-width="2.5"/>
+<g stroke="#120d09" stroke-width="1.6" opacity=".7"><path d="M68 150 C84 146 100 148 112 156"/><path d="M68 162 C84 158 100 160 112 168"/><path d="M128 156 C140 148 156 146 172 150"/><path d="M128 168 C140 160 156 158 172 162"/></g>
+<path d="M78 222 C96 206 108 214 120 206 C132 214 144 206 162 222" fill="none" stroke="#cdb27f" stroke-width="5"/>
+<path d="M120 12 L222 36 V128 C222 198 176 246 120 270 C64 246 18 198 18 128 V36 Z" fill="url(#g-elyndor)"/>
+</svg>

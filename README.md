@@ -300,11 +300,22 @@ uma única vez na inicialização.
 
 ## Versão em HTML
 
-`npm run html` gera `html/index.html` e `html/assets/`: uma página única com o
-pergaminho, a capa e a sinopse, as ilustrações com visualização ampliada e o
-Atlas nas duas versões. Ela abre com dois cliques, sem servidor, e pode ser
-hospedada de graça (GitHub Pages, Netlify). Usa os mesmos textos e imagens do
-site; trechos marcados como spoiler não entram nela.
+`npm run html` gera em `html/` uma versão do arquivo em HTML, CSS e JavaScript
+puros — 41 páginas que abrem com dois cliques, sem servidor, e podem ser
+hospedadas de graça (GitHub Pages, Netlify):
+
+- início (pergaminho, capa e sinopse, ilustrações com visualização ampliada,
+  carta nas duas versões), Livro I e Atlas;
+- um verbete por reino, personagem, local, artigo da mitologia e da
+  Ressonância e documento, além de Cronologia e Mistérios.
+
+Usa os mesmos textos (`src/lib/seed/content.ts`) e as mesmas artes
+(`src/lib/atlas/art.ts`) do site. Trechos e verbetes marcados como spoiler não
+entram: a cada execução o gerador confere que nenhum deles aparece nas páginas,
+além de verificar todos os links, âncoras e imagens. Edições feitas no painel
+não entram automaticamente — a versão parte do conteúdo inicial do arquivo.
+Código: `scripts/html/` (`build-standalone.ts`, `pages.ts`, `kit.ts`,
+`standalone.css`, `site.js`).
 
 ## Testes
 

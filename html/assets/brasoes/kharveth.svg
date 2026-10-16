@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-label="Brasão conceitual de Kharveth (proposta)">
+<title>Brasão conceitual de Kharveth — proposta heráldica</title>
+<defs><linearGradient id="g-kharveth" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".10"/><stop offset=".55" stop-color="#ffffff" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity=".25"/></linearGradient></defs>
+<path d="M120 12 L222 36 V128 C222 198 176 246 120 270 C64 246 18 198 18 128 V36 Z" fill="#2a2b2f" stroke="#8d7240" stroke-width="5"/>
+<path d="M120 26 L208 47 V129 C208 189 169 232 120 254 C71 232 32 189 32 129 V47 Z" fill="none" stroke="#cdb27f" stroke-width="1.6" opacity=".7"/>
+<g fill="#cdb27f" stroke="#120d09" stroke-width="2">
+<circle cx="76" cy="74" r="7"/><circle cx="98" cy="62" r="7"/><circle cx="120" cy="58" r="7"/><circle cx="142" cy="62" r="7"/><circle cx="164" cy="74" r="7"/>
+</g>
+<path d="M44 200 L96 104 L120 136 L146 96 L196 200 Z" fill="#cdb27f" stroke="#120d09" stroke-width="2.5"/>
+<path d="M96 104 L108 128 L100 124 L92 136 Z M146 96 L160 124 L150 120 L142 132 Z" fill="#f1e6cc"/>
+<path d="M84 200 V160 H94 V150 H104 V160 H114 V150 H126 V160 H136 V150 H146 V160 H156 V200 Z" fill="#2a2b2f" stroke="#cdb27f" stroke-width="4"/>
+<path d="M110 200 V180 A10 10 0 0 1 130 180 V200 Z" fill="#cdb27f"/>
+<path d="M120 12 L222 36 V128 C222 198 176 246 120 270 C64 246 18 198 18 128 V36 Z" fill="url(#g-kharveth)"/>
+</svg>

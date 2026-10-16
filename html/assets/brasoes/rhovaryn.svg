@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-label="Brasão conceitual de Rhovaryn (proposta)">
+<title>Brasão conceitual de Rhovaryn — proposta heráldica</title>
+<defs><linearGradient id="g-rhovaryn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".10"/><stop offset=".55" stop-color="#ffffff" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity=".25"/></linearGradient></defs>
+<path d="M120 12 L222 36 V128 C222 198 176 246 120 270 C64 246 18 198 18 128 V36 Z" fill="#26351b" stroke="#8d7240" stroke-width="5"/>
+<path d="M120 26 L208 47 V129 C208 189 169 232 120 254 C71 232 32 189 32 129 V47 Z" fill="none" stroke="#cdb27f" stroke-width="1.6" opacity=".7"/>
+<path d="M114 182 V142 M126 182 V142" stroke="#cdb27f" stroke-width="7"/>
+<circle cx="120" cy="104" r="42" fill="#cdb27f" stroke="#120d09" stroke-width="2.5"/>
+<circle cx="92" cy="124" r="22" fill="#cdb27f" stroke="#120d09" stroke-width="2.5"/>
+<circle cx="148" cy="124" r="22" fill="#cdb27f" stroke="#120d09" stroke-width="2.5"/>
+<path d="M120 182 C108 188 98 188 90 184 M120 182 C132 188 142 188 150 184" stroke="#cdb27f" stroke-width="5" fill="none"/>
+<path d="M44 206 C70 194 92 222 120 208 C148 194 170 222 196 206" fill="none" stroke="#9fb3b0" stroke-width="9"/>
+<path d="M44 206 C70 194 92 222 120 208 C148 194 170 222 196 206" fill="none" stroke="#120d09" stroke-width="1.5" opacity=".6"/>
+<path d="M120 12 L222 36 V128 C222 198 176 246 120 270 C64 246 18 198 18 128 V36 Z" fill="url(#g-rhovaryn)"/>
+</svg>
