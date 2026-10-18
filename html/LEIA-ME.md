@@ -6,7 +6,8 @@ O arquivo de Kael Draken em HTML, CSS e JavaScript puros, sem servidor:
   oficial, as ilustrações dos dez primeiros capítulos (com visualização
   ampliada), a carta nas duas versões e os caminhos para o resto do arquivo.
 - **Livro I** (`livro.html`), **Atlas** (`atlas.html`) e um verbete para cada
-  reino (`reino-*.html`).
+  reino (`reino-*.html`). O Atlas é interativo como no site: regiões
+  clicáveis na carta 2D, as duas versões do mundo e o modo 3D com relevo.
 - **Personagens**, **Mitologia**, **Cronologia**, **Ressonância**, **Locais**,
   **Manuscritos** e **Mistérios** — índices e verbetes, com o estado editorial
   de cada um (estabelecido, proposta, em aberto).
@@ -14,7 +15,9 @@ O arquivo de Kael Draken em HTML, CSS e JavaScript puros, sem servidor:
 Como abrir e publicar:
 
 - **No computador:** dê dois cliques em `index.html` (a pasta `assets/` precisa
-  ficar ao lado das páginas).
+  ficar ao lado das páginas). O 3D também funciona assim: aberto do disco, ele
+  usa a carta e o relevo embutidos em `assets/atlas-dados.js`, porque o
+  navegador não deixa o WebGL ler imagens de arquivos locais.
 - **De graça na internet:** envie a pasta inteira para GitHub Pages, Netlify ou
   qualquer hospedagem de arquivos estáticos.
 - **Atualizar:** não edite à mão — rode `npm run html` na raiz do projeto. As

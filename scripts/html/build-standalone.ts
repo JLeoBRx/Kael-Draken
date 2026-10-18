@@ -23,6 +23,7 @@
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { build } from 'esbuild'
 import sharp from 'sharp'
 import { ART } from '../../src/lib/atlas/art'
 import { chapterLabel } from '../../src/lib/illustrations'
@@ -36,6 +37,7 @@ import {
   SEED_MYSTERIES,
   SEED_SETTINGS,
 } from '../../src/lib/seed/content'
+import type { AtlasAssets } from './atlas'
 import { LinkTable, createMarkdown, fragment, imageRefs, shell, type Img } from './kit'
 import {
   allMarkdown,
@@ -126,7 +128,48 @@ async function buildAssets() {
   copy(path.join(ROOT, 'src', 'app', 'icon.svg'), 'icone.svg')
   copy(path.join(__dirname, 'standalone.css'), 'site.css')
   copy(path.join(__dirname, 'site.js'), 'site.js')
-  return { art, realmCard, emblem, contentImages, cover, coverFull, illustrations }
+  const atlas = await buildAtlas(art, realmCard)
+  return { art, realmCard, emblem, contentImages, cover, coverFull, illustrations, atlas }
+}
+
+const dataUri = (file: string, type: string) => `data:${type};base64,${readFileSync(file).toString('base64')}`
+
+/**
+ * Atlas interativo: o 3D do site empacotado num script clássico, a máscara de
+ * terra embutida na página e, para quem abre as páginas direto do disco (onde
+ * o WebGL não pode ler imagens de arquivos), a carta e o relevo embutidos em
+ * assets/atlas-dados.js — carregado só quando o 3D é aberto.
+ */
+async function buildAtlas(art: Map<string, Img>, realmCard: Record<string, Img>): Promise<AtlasAssets> {
+  const maps = { original: art.get(ART.mapaOriginal.src)!, conhecido: art.get(ART.mapaConhecido.src)! }
+  const relevoSrc = path.join(PUBLIC, 'images', 'atlas', 'relevo-mundo.png')
+  const heightmap = { src: copy(relevoSrc, 'relevo-mundo.png'), width: 600, height: 400 }
+  const maskDataUri = dataUri(path.join(PUBLIC, 'images', 'atlas', 'mascara-terra.png'), 'image/png')
+
+  await build({
+    entryPoints: [path.join(__dirname, 'atlas3d-entry.ts')],
+    bundle: true,
+    format: 'iife',
+    minify: true,
+    target: ['es2020'],
+    platform: 'browser',
+    tsconfig: path.join(ROOT, 'tsconfig.json'),
+    legalComments: 'eof',
+    outfile: path.join(ASSETS, 'atlas3d.js'),
+    logLevel: 'warning',
+  })
+  copy(path.join(__dirname, 'atlas-pagina.js'), 'atlas.js')
+
+  const embedded = {
+    original: dataUri(path.join(OUT, maps.original.src), 'image/webp'),
+    conhecido: dataUri(path.join(OUT, maps.conhecido.src), 'image/webp'),
+    relevo: dataUri(relevoSrc, 'image/png'),
+  }
+  writeFileSync(
+    path.join(ASSETS, 'atlas-dados.js'),
+    `// Carta e relevo embutidos para o modo 3D quando as páginas são abertas direto do disco (file://).\nwindow.KAEL_ATLAS_DADOS = ${JSON.stringify(embedded)};\n`,
+  )
+  return { maps, maskDataUri, heightmap, realmCard, bundle: 'assets/atlas3d.js', embedded: 'assets/atlas-dados.js' }
 }
 
 // ── Conferências ──────────────────────────────────────────────────────────
@@ -141,7 +184,12 @@ function checkLinks(files: string[]) {
   }
   for (const file of files) {
     const html = readFileSync(path.join(OUT, file), 'utf8')
-    const refs = [...html.matchAll(/\s(?:href|src|data-original|data-conhecido)="([^"]+)"/g), ...html.matchAll(/url\('([^']+)'\)/g)].map((m) => m[1])
+    const refs = [
+      ...html.matchAll(/\s(?:href|src|data-original|data-conhecido)="([^"]+)"/g),
+      ...html.matchAll(/url\('([^']+)'\)/g),
+      // caminhos citados em dados JSON (configuração do Atlas)
+      ...html.matchAll(/"(assets\/[^"#?]+)"/g),
+    ].map((m) => m[1])
     for (const ref of refs) {
       if (/^(https?:|mailto:|data:)/.test(ref)) continue
       const [target, hash] = ref.split('#')
@@ -208,6 +256,7 @@ async function main() {
     md: createMarkdown(links, a.contentImages),
     links,
     author: SEED_SETTINGS.author_name ?? '',
+    atlas: a.atlas,
   }
 
   console.log('Páginas…')

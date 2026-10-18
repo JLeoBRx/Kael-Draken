@@ -223,6 +223,8 @@ export interface ShellOptions {
   /** Dados das ilustrações para o visualizador (JSON). */
   viewerData?: string
   ogImage?: string
+  /** Scripts adicionais desta página (além de assets/site.js). */
+  scripts?: string[]
 }
 
 /** Página completa, pronta para gravar em disco. */
@@ -274,5 +276,5 @@ ${o.body}
 ${footer(o.author)}
 ${o.viewer ? VIEWER : ''}
 ${o.viewerData ? `<script type="application/json" id="ilustracoes-dados">${o.viewerData}</script>` : ''}
-<script src="assets/site.js" defer></script>`
+<script src="assets/site.js" defer></script>${(o.scripts ?? []).map((src) => `\n<script src="${src}" defer></script>`).join('')}`
 }

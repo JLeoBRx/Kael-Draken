@@ -305,7 +305,12 @@ puros — 41 páginas que abrem com dois cliques, sem servidor, e podem ser
 hospedadas de graça (GitHub Pages, Netlify):
 
 - início (pergaminho, capa e sinopse, ilustrações com visualização ampliada,
-  carta nas duas versões), Livro I e Atlas;
+  carta nas duas versões), Livro I e Atlas — este interativo como no site:
+  regiões clicáveis na carta 2D, painel e lista de regiões, as duas versões do
+  mundo e o modo 3D com relevo (a mesma cena de `world3d.ts`, empacotada pelo
+  esbuild em `assets/atlas3d.js`, um script comum que carrega até aberto do
+  disco; nesse caso a carta e o relevo vêm embutidos em `assets/atlas-dados.js`,
+  já que o WebGL não pode ler imagens de arquivos locais);
 - um verbete por reino, personagem, local, artigo da mitologia e da
   Ressonância e documento, além de Cronologia e Mistérios.
 
@@ -315,7 +320,7 @@ entram: a cada execução o gerador confere que nenhum deles aparece nas página
 além de verificar todos os links, âncoras e imagens. Edições feitas no painel
 não entram automaticamente — a versão parte do conteúdo inicial do arquivo.
 Código: `scripts/html/` (`build-standalone.ts`, `pages.ts`, `kit.ts`,
-`standalone.css`, `site.js`).
+`atlas.ts`, `atlas-pagina.js`, `atlas3d-entry.ts`, `standalone.css`, `site.js`).
 
 ## Testes
 

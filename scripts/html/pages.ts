@@ -38,6 +38,7 @@ import {
   type MarkdownOptions,
   type ShellOptions,
 } from './kit'
+import { atlasConfig, atlasMarkup, type AtlasAssets } from './atlas'
 
 export interface Illustration {
   slug: string
@@ -63,6 +64,7 @@ export interface Ctx {
   md: (source: string | undefined, options?: MarkdownOptions) => string
   links: LinkTable
   author: string
+  atlas: AtlasAssets
 }
 
 export interface PageSpec {
@@ -183,7 +185,7 @@ function mapDetail(ctx: Ctx, slug: string): string {
   if (!source) return ''
   return `<figure class="map-detail">
       <div class="map-detail__frame">${imgTag(asset(ctx, source.src), source.alt, { lazy: false })}</div>
-      <figcaption class="map-detail__caption"><span>${esc(source.caption ?? '')}</span><a class="map-detail__link" href="${PAGE.atlas}#mapas">Ver no Atlas ${ARROW}</a></figcaption>
+      <figcaption class="map-detail__caption"><span>${esc(source.caption ?? '')}</span><a class="map-detail__link" href="${PAGE.atlas}#regiao-${slug}">Ver no Atlas 2D e 3D ${ARROW}</a></figcaption>
     </figure>`
 }
 
@@ -389,7 +391,7 @@ export function homePage(ctx: Ctx): PageSpec {
       ${mapBlock(ctx, 'atlas-titulo')}
       <ol class="realms">${realmCards(ctx)}
       </ol>
-      <p class="section-more"><a class="btn btn--line" href="${PAGE.atlas}">Abrir o Atlas ${ARROW}</a></p>
+      <p class="section-more"><a class="btn btn--line" href="${PAGE.atlas}#mapas">Explorar o mapa em 2D e 3D ${ARROW}</a></p>
     </div>
   </section>
 
@@ -509,9 +511,10 @@ export function atlasPage(ctx: Ctx): PageSpec {
       <header class="head">
         <p class="eyebrow">Mapas</p>
         <h2 id="mapas-titulo">O mundo, em duas versões</h2>
-        <p class="head__lede">O mapa do mundo original mostra os seis reinos. O mapa do mundo conhecido reproduz a versão oficial, em que Safra foi apagada. Toque na carta para ampliá-la.</p>
+        <p class="head__lede">O mapa do mundo original mostra os seis reinos. O mapa do mundo conhecido reproduz a versão oficial, em que Safra foi apagada. Selecione uma região para ver seus detalhes, ou abra a exploração em três dimensões.</p>
       </header>
-      ${mapBlock(ctx, 'mapas-titulo')}
+      ${atlasMarkup(ctx.atlas)}
+      <script type="application/json" id="atlas-config">${atlasConfig(ctx.atlas)}</script>
     </div>
   </section>
 
@@ -538,7 +541,14 @@ export function atlasPage(ctx: Ctx): PageSpec {
   </section>`
   return {
     file: PAGE.atlas,
-    shell: { title: 'Atlas dos Seis Reinos · Kael Draken', description: 'A carta do manuscrito em duas versões — o mundo original e o mundo conhecido —, os seis reinos e os capítulos da história do mundo.', active: 'atlas', body, viewer: true, ogImage: asset(ctx, ART.mapaOriginal.src).src },
+    shell: {
+      title: 'Atlas dos Seis Reinos · Kael Draken',
+      description: 'A carta do manuscrito em 2D e 3D — o mundo original e o mundo conhecido —, os seis reinos e os capítulos da história do mundo.',
+      active: 'atlas',
+      body,
+      ogImage: asset(ctx, ART.mapaOriginal.src).src,
+      scripts: ['assets/atlas.js'],
+    },
   }
 }
 
@@ -578,7 +588,7 @@ export function kingdomPages(ctx: Ctx): PageSpec[] {
           { label: 'Forma de governo', value: k.government ? esc(k.government) : muted('Em desenvolvimento') },
           { label: 'Na carta do manuscrito', value: CAPITALS[k.slug] ? `${esc(CAPITALS[k.slug])} ${muted('(conceitual)')}` : null },
           { label: 'Lugares documentados', value: here.length ? here.map((l) => `<a href="${PAGE.location(l.slug)}">${esc(l.name)}</a>`).join(', ') : '0' },
-          { label: 'No atlas', value: `<a href="${PAGE.atlas}#reinos">Ver entre os seis reinos</a>` },
+          { label: 'No atlas', value: `<a href="${PAGE.atlas}#regiao-${k.slug}">Ver a zona no mapa 2D e 3D</a>` },
           { label: 'Brasão', value: muted('Proposta heráldica (não aprovada)') },
         ])}
       </div>
