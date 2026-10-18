@@ -2,8 +2,9 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { CanonBadge, SpoilerBadge } from '@/components/ui/editorial'
 import { EmptyState } from '@/components/ui/entry'
+import { Glyph } from '@/components/ui/glyphs'
 import { FilterForm } from '@/components/ui/FilterForm'
-import { ImageSlot, MediaImage } from '@/components/ui/media'
+import { MediaImage } from '@/components/ui/media'
 import { PageHero } from '@/components/ui/PageHero'
 import { getTerms, listCharacters, listKingdoms } from '@/lib/content/queries'
 import { getViewer } from '@/lib/content/viewer'
@@ -27,7 +28,7 @@ export default async function CharactersPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <PageHero
+      <PageHero glyph="personagens"
         eyebrow="Biblioteca"
         title="Personagens"
         lede="Quem vive, lembra e sonha neste mundo. Cada verbete revela apenas o que o seu nível de spoiler permite; segredos e revelações ficam guardados até que você escolha vê-los."
@@ -87,7 +88,13 @@ export default async function CharactersPage({ searchParams }: { searchParams: P
                 <li key={c.id}>
                   <Link className="char-card" href={paths.character(c.slug)}>
                     <span className="char-card__portrait">
-                      {c.portrait ? <MediaImage image={c.portrait} sizes="76px" alt="" /> : <ImageSlot kind="portrait" label="Retrato" ratio="3 / 4" />}
+                      {c.portrait ? (
+                        <MediaImage image={c.portrait} sizes="88px" alt="" />
+                      ) : (
+                        <span className="char-card__cameo" role="img" aria-label="Retrato ainda não definido">
+                          <Glyph name="personagens" />
+                        </span>
+                      )}
                     </span>
                     <span className="char-card__body">
                       <span className="char-card__name">{c.name}</span>
@@ -104,7 +111,7 @@ export default async function CharactersPage({ searchParams }: { searchParams: P
               ))}
             </ul>
           ) : (
-            <EmptyState title="Nenhum personagem encontrado">
+            <EmptyState glyph="personagens" title="Nenhum personagem encontrado">
               <p>Tente outros filtros ou ajuste seu nível de spoiler.</p>
             </EmptyState>
           )}

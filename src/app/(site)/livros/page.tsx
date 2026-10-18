@@ -19,7 +19,7 @@ export default async function BooksPage() {
   const officialCover = await getOfficialCover(settings.cover_media_id, 'Capa oficial')
   return (
     <>
-      <PageHero eyebrow="A saga" title="Livros" crumbs={[{ label: 'Livros' }]} />
+      <PageHero glyph="livro" eyebrow="A saga" title="Livros" crumbs={[{ label: 'Livros' }]} />
       <section className="section" style={{ paddingTop: 'var(--space-7)' }}>
         <div className="container">
           {books.length ? (
@@ -41,7 +41,7 @@ export default async function BooksPage() {
               ))}
             </ul>
           ) : (
-            <EmptyState title="Nenhum livro publicado" />
+            <EmptyState glyph="livro" title="Nenhum livro publicado" />
           )}
         </div>
       </section>

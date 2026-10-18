@@ -88,6 +88,16 @@ export const ART = {
   ),
   /** A cena da capa oficial, sem o título — fundo decorativo da página inicial. */
   cenaCapa: art('/capa/cena-capa.webp', 907, 620, '', 'Cena da capa oficial do Livro I.', 'Capa oficial', false),
+  /** O logotipo da capa oficial, recortado sobre fundo transparente (scripts/art/logotype.py). */
+  logotipo: art(
+    '/images/marca/logotipo-kael-draken.webp',
+    711,
+    450,
+    'Kael Draken — Livro I: O Sussurro da Chama Antiga',
+    'Logotipo da capa oficial do Livro I.',
+    'Capa oficial',
+    false,
+  ),
   painelReinos: art(
     `${BASE}/painel-seis-reinos.webp`,
     2400,

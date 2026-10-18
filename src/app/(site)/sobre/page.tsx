@@ -21,7 +21,7 @@ const LEGACY: Record<string, string> = {
 export default function AboutPage() {
   return (
     <>
-      <PageHero
+      <PageHero glyph="arquivo"
         eyebrow="O projeto"
         title="Sobre o arquivo"
         lede="O Arquivo da Chama Antiga é a enciclopédia oficial e o diário de desenvolvimento do universo de Kael Draken — O Sussurro da Chama Antiga. Ele cresce junto com a escrita da saga."

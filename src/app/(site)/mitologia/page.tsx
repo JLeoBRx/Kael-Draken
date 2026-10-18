@@ -20,7 +20,7 @@ export default async function MythologyPage() {
 
   return (
     <>
-      <PageHero
+      <PageHero glyph="mitologia"
         eyebrow="Crônica"
         title="Mitologia e história antiga"
         lede="A história do mundo contada como um livro de crônicas, da criação ao presente. Cada capítulo traz o seu estado editorial: o que está estabelecido, o que é proposta e o que permanece desconhecido — também para quem vive neste mundo."

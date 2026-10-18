@@ -40,7 +40,7 @@ export default async function ChapterPage({ params }: { params: Params }) {
 
   return (
     <article>
-      <PageHero
+      <PageHero glyph="livro"
         eyebrow={`Capítulo ${data.chapter.number}`}
         title={data.chapter.title}
         subtitle={data.book.title}

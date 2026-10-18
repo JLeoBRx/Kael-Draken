@@ -25,7 +25,7 @@ export default async function LocationsPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <PageHero
+      <PageHero glyph="locais"
         eyebrow="Enciclopédia geográfica"
         title="Cidades e locais"
         lede="Cidades, vilarejos, ruínas, fortalezas, templos, bibliotecas, passagens naturais e regiões ainda inexploradas. Cada verbete indica o estado de desenvolvimento do seu conteúdo."

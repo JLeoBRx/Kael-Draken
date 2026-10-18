@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { ImageData } from '@/lib/content/media'
 import type { RenderResult } from '@/lib/markdown/render'
 import { SPOILER_INFO, type SpoilerLevel } from '@/lib/editorial'
+import { Glyph, type GlyphName } from './glyphs'
 import { MediaImage } from './media'
 import { Prose } from './Prose'
 
@@ -35,6 +36,7 @@ export function PendingSections({ titles, intro }: { titles: string[]; intro?: s
   return (
     <section className="pending" aria-labelledby="pendentes-titulo">
       <h2 className="pending__title" id="pendentes-titulo">
+        <Glyph name="manuscritos" className="pending__glyph" />
         Ainda não documentado
       </h2>
       <p>{intro ?? 'As seções abaixo fazem parte do verbete, mas ainda não foram escritas ou aprovadas.'}</p>
@@ -172,7 +174,10 @@ export function SpoilerGate({ level }: { level: number }) {
   return (
     <div className="container">
       <div className="spoiler-gate">
-        <p className="eyebrow">Conteúdo protegido</p>
+        <span className="spoiler-gate__seal">
+          <Glyph name="misterios" />
+        </span>
+        <p className="eyebrow eyebrow--ember">Conteúdo protegido</p>
         <h1>Este verbete contém {SPOILER_INFO[level as SpoilerLevel].label.toLowerCase()}</h1>
         <p>
           Para preservar a experiência de leitura, o conteúdo só é exibido para quem escolheu o nível de spoiler “{SPOILER_INFO[level as SpoilerLevel].label}”. Você
@@ -186,11 +191,15 @@ export function SpoilerGate({ level }: { level: number }) {
   )
 }
 
-export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
+/** Estado vazio de uma listagem: o símbolo da seção, um título e, se houver, uma orientação. */
+export function EmptyState({ title, children, glyph = 'arquivo' }: { title: string; children?: ReactNode; glyph?: GlyphName }) {
   return (
     <div className="empty-state">
-      <h2>{title}</h2>
-      {children}
+      <Glyph name={glyph} className="empty-state__glyph" />
+      <div className="empty-state__text">
+        <h2>{title}</h2>
+        {children}
+      </div>
     </div>
   )
 }

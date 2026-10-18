@@ -80,7 +80,7 @@ describe('dados cartográficos', () => {
 describe('registro de artes', () => {
   it('todas as imagens registradas existem e são identificadas', () => {
     const entries = [...Object.values(ART).filter((v) => 'src' in v), ...Object.values(ART.selo), ...Object.values(ART.reino)] as Array<{ src: string; alt: string; caption?: string; credit?: string }>
-    expect(entries.length).toBe(17)
+    expect(entries.length).toBe(18)
     for (const e of entries) {
       expect(existsSync(publicFile(e.src)), e.src).toBe(true)
       // a cena da capa é só fundo decorativo (alt vazio); as demais precisam de descrição
@@ -88,6 +88,14 @@ describe('registro de artes', () => {
       expect(e.caption).toBeTruthy()
       expect(e.credit).toBeTruthy()
     }
+  })
+
+  it('o logotipo da página inicial é o da capa oficial, sem fundo', async () => {
+    expect(ART.logotipo.concept).toBe(false)
+    expect(ART.logotipo.credit).toBe('Capa oficial')
+    const meta = await sharp(publicFile(ART.logotipo.src)).metadata()
+    expect([meta.width, meta.height]).toEqual([ART.logotipo.width, ART.logotipo.height])
+    expect(meta.hasAlpha).toBe(true)
   })
 
   it('cada reino tem um detalhe da carta do manuscrito', () => {

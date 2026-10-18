@@ -67,7 +67,7 @@ export default async function KingdomPage({ params }: { params: Promise<{ slug: 
 
   return (
     <article style={{ '--k-accent': k.accent } as CSSProperties}>
-      <PageHero
+      <PageHero glyph="reinos"
         eyebrow="Reino"
         title={k.name}
         subtitle={k.epithet || k.government || undefined}

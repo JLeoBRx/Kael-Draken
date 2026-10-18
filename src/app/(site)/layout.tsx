@@ -14,6 +14,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const [viewer, settings] = await Promise.all([getViewer(), getSettings()])
   const books = await listBooks(viewer)
   const bookHref = books[0] ? paths.book(books[0].slug) : paths.books
+  const galleryHref = books[0] ? paths.bookIllustrations(books[0].slug) : null
   return (
     <>
       <a className="skip-link" href="#conteudo">
@@ -24,7 +25,13 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <main id="conteudo" tabIndex={-1}>
         {children}
       </main>
-      <SiteFooter bookHref={bookHref} authorName={settings.author_name} description={settings.site_description} />
+      <SiteFooter
+        bookHref={bookHref}
+        galleryHref={galleryHref}
+        authorName={settings.author_name}
+        description={settings.site_description}
+        epigraph={settings.book_epigraph?.trim() ?? ''}
+      />
     </>
   )
 }

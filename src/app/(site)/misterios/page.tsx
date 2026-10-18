@@ -25,7 +25,7 @@ export default async function MysteriesPage() {
 
   return (
     <>
-      <PageHero
+      <PageHero glyph="misterios"
         eyebrow="Perguntas em aberto"
         title="Mistérios"
         lede="Lacunas intencionais da história. Nenhuma delas é respondida neste arquivo: as perguntas permanecem abertas até que a própria narrativa as resolva."

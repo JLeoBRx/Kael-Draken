@@ -19,8 +19,9 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:setup": "npm run db:migrate && npm run db:seed",
     "admin:hash": "tsx scripts/hash-password.ts",
-    "art": "python3 scripts/art/manuscript_map.py && node scripts/art/sigils.mjs && python3 scripts/art/emblems.py && node scripts/art/panel.mjs",
+    "art": "python3 scripts/art/manuscript_map.py && python3 scripts/art/logotype.py && node scripts/art/sigils.mjs && python3 scripts/art/emblems.py && node scripts/art/panel.mjs",
     "art:mapas": "python3 scripts/art/manuscript_map.py",
+    "art:logotipo": "python3 scripts/art/logotype.py",
     "art:selos": "node scripts/art/sigils.mjs",
     "html": "tsx scripts/html/build-standalone.ts"
   },

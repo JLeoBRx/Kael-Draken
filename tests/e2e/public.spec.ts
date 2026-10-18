@@ -16,8 +16,34 @@ test('página inicial apresenta o título completo e acessos principais', async 
   await page.goto('/')
   await expect(page.locator('h1')).toContainText('Kael Draken')
   await expect(page.locator('h1')).toContainText('O Sussurro da Chama Antiga')
+  const hero = page.locator('.home-hero')
+  await expect(hero.getByRole('link', { name: /Conhecer o Livro/ })).toHaveAttribute('href', '/livros/o-sussurro-da-chama-antiga')
+  await expect(hero.getByRole('link', { name: 'Explorar o Universo' })).toHaveAttribute('href', '#universo')
+  await expect(page.locator('#universo')).toBeVisible()
   await expect(page.getByRole('link', { name: /Explorar o Atlas dos Seis Reinos/ })).toBeVisible()
   await expect(page.getByText('Quando a Chama despertar, não o fará sozinha.', { exact: false }).first()).toBeVisible()
+
+  // índice do arquivo: as oito seções, todas com destino existente
+  const index = page.locator('.archive-index')
+  const sections: Array<[string, string]> = [
+    ['Reinos', '/atlas#reinos'],
+    ['Personagens', '/personagens'],
+    ['Mitologia', '/mitologia'],
+    ['Sistema da Ressonância', '/ressonancia'],
+    ['Cronologia', '/cronologia'],
+    ['Cidades e locais', '/locais'],
+    ['Manuscritos', '/manuscritos'],
+    ['Mistérios', '/misterios'],
+  ]
+  await expect(index.getByRole('link')).toHaveCount(sections.length)
+  for (const [name, href] of sections) await expect(index.getByRole('link', { name: new RegExp(`^${name}`) })).toHaveAttribute('href', href)
+
+  // Livro I: capa oficial, título e sinopse — sem preço, editora inventada ou links de compra
+  const book = page.locator('#livro')
+  await expect(book.locator('.book-cover__img')).toBeVisible()
+  await expect(book.getByRole('heading', { name: /O Sussurro da Chama Antiga/ })).toBeVisible()
+  await expect(book).toContainText('Quando a Chama desperta')
+  await expect(book).not.toContainText(/R\$|comprar|pré-venda/i)
 })
 
 test('nenhuma página transborda horizontalmente', async ({ page }) => {
@@ -33,6 +59,9 @@ test('navegação principal funciona (menu móvel por toque quando necessário)'
   const vw = page.viewportSize()!.width
   if (vw < 1280) {
     await page.getByRole('button', { name: 'Abrir menu de navegação' }).or(page.locator('.mobile-nav summary')).first().click()
+    // o painel ocupa a tela abaixo do cabeçalho (não fica preso dentro dele)
+    const panel = (await page.locator('.mobile-nav__panel').boundingBox())!
+    expect(panel.height).toBeGreaterThan(page.viewportSize()!.height * 0.6)
     await page.locator('.mobile-nav__list').getByRole('link', { name: 'Mistérios' }).click()
   } else {
     await page.locator('.main-nav').getByRole('link', { name: 'Mistérios' }).click()

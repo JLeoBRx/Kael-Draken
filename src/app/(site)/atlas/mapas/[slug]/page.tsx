@@ -25,7 +25,7 @@ export default async function MapPage({ params, searchParams }: { params: Promis
 
   return (
     <>
-      <PageHero eyebrow="Mapa" title={data.map.title} crumbs={[{ label: 'Atlas', href: paths.atlas }, { label: data.map.title }]}>
+      <PageHero glyph="atlas" eyebrow="Mapa" title={data.map.title} crumbs={[{ label: 'Atlas', href: paths.atlas }, { label: data.map.title }]}>
         <EditorialBadges canon={data.map.canon} spoiler={data.map.spoiler} status={data.map.status} preview={viewer.preview} />
       </PageHero>
       <section className="section" style={{ paddingTop: 'var(--space-7)' }}>

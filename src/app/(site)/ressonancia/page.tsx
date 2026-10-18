@@ -30,7 +30,7 @@ export default async function ResonancePage() {
 
   return (
     <>
-      <PageHero
+      <PageHero glyph="ressonancia"
         eyebrow="Sistema mágico"
         title="A Ressonância"
         lede="O sistema que descreve o poder neste mundo. O que está estabelecido aparece marcado como tal; nomes e definições ainda em proposta são identificados em cada verbete."

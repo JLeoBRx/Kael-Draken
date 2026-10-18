@@ -46,7 +46,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
 
   return (
     <article>
-      <PageHero eyebrow={`Livro ${toRoman(b.volume)}`} title={b.title} subtitle={b.subtitle || undefined} crumbs={[{ label: 'Livros', href: paths.books }, { label: b.title }]}>
+      <PageHero glyph="livro" eyebrow={`Livro ${toRoman(b.volume)}`} title={b.title} subtitle={b.subtitle || undefined} crumbs={[{ label: 'Livros', href: paths.books }, { label: b.title }]}>
         <EditorialBadges canon={b.canon} spoiler={b.spoiler} status={b.status} preview={viewer.preview} />
       </PageHero>
       <div className="container book-layout">

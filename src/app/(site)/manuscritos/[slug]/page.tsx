@@ -44,7 +44,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ slug:
 
   return (
     <article>
-      <PageHero eyebrow={types.get(d.docType) ?? 'Documento'} title={d.title} crumbs={[{ label: 'Manuscritos', href: paths.documents }, { label: d.title }]} className="archive-hero">
+      <PageHero glyph="manuscritos" eyebrow={types.get(d.docType) ?? 'Documento'} title={d.title} crumbs={[{ label: 'Manuscritos', href: paths.documents }, { label: d.title }]} className="archive-hero">
         <EditorialBadges canon={d.canon} spoiler={d.spoiler} status={d.status} preview={viewer.preview} />
       </PageHero>
       <div className="container document-layout">

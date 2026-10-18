@@ -67,7 +67,7 @@ export default async function TimelinePage() {
 
   return (
     <>
-      <PageHero
+      <PageHero glyph="cronologia"
         eyebrow="Linha do tempo"
         title="Cronologia"
         lede="Eras, períodos e acontecimentos do mundo. Nenhuma data exata é atribuída antes de ser estabelecida: cada acontecimento traz o seu grau de certeza."

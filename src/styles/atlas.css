@@ -344,13 +344,10 @@
   pointer-events: none;
 }
 
-/* Carta ilustrada: o título desenhado ocupa o canto superior esquerdo; a faixa vai ao centro, sobre as montanhas */
+/* Carta ilustrada em 2D: a faixa cobriria o título desenhado na própria carta;
+   o aviso de geografia conceitual fica no texto abaixo do mapa */
 .world-atlas[data-drawn='true'][data-mode='2d'] .world-atlas__ribbon {
-  left: 50%;
-  width: max-content;
-  max-width: min(36rem, calc(100% - 2 * var(--space-3)));
-  transform: translateX(-50%);
-  text-align: center;
+  display: none;
 }
 
 .world-atlas__hint {
@@ -714,7 +711,7 @@
   position: relative;
   overflow: hidden;
   border-bottom: 1px solid var(--line);
-  background: #070605;
+  background: var(--grain), var(--ink-1000);
 }
 
 .atlas-opening__art {
@@ -785,6 +782,20 @@
   color: var(--stone-200);
 }
 
+.atlas-opening__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.atlas-opening__hint {
+  font-size: var(--fs-xs);
+  font-style: italic;
+  color: var(--text-muted);
+}
+
 .atlas-opening__nav {
   display: flex;
   flex-wrap: wrap;
@@ -797,9 +808,10 @@
   min-height: 44px;
   padding: 0 1rem;
   border: 1px solid var(--line-strong);
-  background: rgba(14, 13, 12, 0.6);
+  background: rgba(12, 10, 8, 0.6);
   font-size: var(--fs-sm);
   text-decoration: none;
+  transition: border-color var(--dur) var(--ease);
 }
 
 .atlas-opening__nav a:hover {

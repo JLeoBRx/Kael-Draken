@@ -28,6 +28,7 @@ export async function ArticleView({ data, viewer }: { data: ArticleData; viewer:
   return (
     <article className={a.section === 'ressonancia' ? 'resonance-article' : undefined}>
       <PageHero
+        glyph={a.section === 'mitologia' ? 'mitologia' : 'ressonancia'}
         eyebrow={SECTION_LABEL[a.section]}
         title={a.title}
         subtitle={a.subtitle || undefined}

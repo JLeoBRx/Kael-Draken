@@ -21,6 +21,7 @@ arquivar todo esse conteúdo.
 - [Executar localmente](#executar-localmente)
 - [Painel administrativo](#painel-administrativo)
 - [Modelo editorial: canon, spoilers e notas privadas](#modelo-editorial-canon-spoilers-e-notas-privadas)
+- [Identidade visual e página inicial](#identidade-visual-e-página-inicial)
 - [Atlas interativo 2D → 3D](#atlas-interativo-2d--3d)
 - [Imagens do Atlas](#imagens-do-atlas)
 - [Capa oficial do Livro I](#capa-oficial-do-livro-i)
@@ -163,6 +164,52 @@ Revelações que a obra ainda guarda (a identidade de Kael, os detalhes da
 destruição de Safra, a natureza do Caos, o que é Skrugheim) não estão afirmadas em
 nenhuma página: aparecem como mistérios em aberto ou atrás de spoilers.
 
+## Identidade visual e página inicial
+
+Um arquivo literário antigo com interface moderna. Os tokens ficam em
+`src/styles/tokens.css`:
+
+| Papel | Cor |
+| --- | --- |
+| Fundos | carvão quase preto (`--ink-950`, `--ink-1000`) |
+| Superfícies e painéis | marrom profundo (`--ink-850`, `--ink-800`) |
+| Páginas documentais | pergaminho envelhecido (`--parchment-*`) |
+| Detalhes, divisores, ícones e ação principal | dourado envelhecido (`--gold-*`) |
+| Texto | marfim (`--ivory-*`) e pedra aquecida (`--stone-*`, sempre com contraste AA) |
+| Destaques narrativos (fogo, Safra, Caos, spoilers) | vermelho queimado e âmbar (`--ember-*`, `--amber-*`) |
+
+Tipografia: **Cormorant Garamond** nos títulos e **Literata** no texto e na
+interface (ambas via `next/font`, sem requisições externas). Ornamentos próprios:
+o filete com a Chama ao centro (`src/components/ui/ornaments.tsx`), um símbolo em
+linha dourada para cada seção do arquivo (`src/components/ui/glyphs.tsx` — rosa
+dos ventos, escudo, camafeu, códice, anéis, ampulheta, torre, pergaminho,
+fechadura, livro, pena), molduras de filete duplo e uma textura de papel em SVG,
+desenhada uma única vez pelo navegador. Todo cabeçalho de página (`PageHero`) traz
+o símbolo da sua seção ao lado do rótulo e, grande, como marca d'água.
+
+**Página inicial** (`src/app/(site)/page.tsx`), de cima para baixo:
+
+1. **Abertura:** o logotipo da capa oficial sobre a cena da capa, a epígrafe do
+   Livro I e os botões *Conhecer o Livro* e *Explorar o Universo*. O logotipo é
+   recortado da própria capa por `npm run art:logotipo`
+   (`scripts/art/logotype.py`) — nada é redesenhado.
+2. **O universo:** o texto de apresentação do painel, a profecia (texto exato,
+   com link para o manuscrito) e quatro fundamentos da crônica, puxados dos
+   verbetes estabelecidos da mitologia (só aparecem se publicados).
+3. **Atlas:** a carta, o índice dos reinos e o acesso ao mapa interativo.
+4. **Índice do Arquivo:** as oito seções (reinos, personagens, mitologia,
+   Ressonância, cronologia, cidades e locais, manuscritos, mistérios), com a
+   contagem do que está publicado para o nível de spoiler do leitor.
+5. **Livro I:** capa oficial, título, autor, sinopse e informações editoriais do
+   cadastro do livro, e as ilustrações definitivas dos capítulos. Nenhum preço,
+   editora, data ou link de compra é exibido — o site só mostra o que está
+   cadastrado.
+6. **O livro voltou:** o pergaminho do painel (também exibido uma vez na entrada).
+7. **Novidades** do diário e os verbetes atualizados recentemente.
+
+Os textos vêm do painel (*Configurações* e cadastro do livro) e dos verbetes; a
+página não tem texto de preenchimento.
+
 ## Atlas interativo 2D → 3D
 
 Página: `/atlas`.
@@ -194,6 +241,16 @@ Adaptações: sem WebGL o botão 3D não aparece e o mapa 2D segue completo; com
 *movimento reduzido* as transições são cortes curtos; aparelhos modestos ou
 celulares usam menos resolução de textura, sem antialiasing e com densidade de
 pixels limitada; perda de contexto WebGL volta ao 2D com aviso.
+
+**Limitações conhecidas:**
+
+- A geografia é a da carta do manuscrito: nomes, capitais e fronteiras são
+  conceituais, e as regiões clicáveis acompanham as fronteiras desenhadas.
+- A textura do 3D é a própria carta (1536 × 1024): com a câmera muito próxima,
+  a pintura perde nitidez. Uma carta em resolução maior resolveria isso sem
+  mudanças no código (basta regenerar com `npm run art:mapas`).
+- O relevo é uma interpretação do desenho, não uma topografia aprovada.
+- Em celulares e computadores modestos, a malha e a textura são mais leves.
 
 **Carta e regiões:** `npm run art:mapas` (`scripts/art/manuscript_map.py`) parte
 de `scripts/art/fontes/mapa-manuscrito-cor.webp` e gera a carta original, a versão
@@ -383,6 +440,7 @@ src/
   app/(site)/        páginas públicas
   app/admin/         painel (login, coleções, mídia, categorias, configurações)
   components/        componentes do site, do atlas (2D/3D) e do painel
+                     (ui/glyphs.tsx e ui/ornaments.tsx: símbolos e ornamentos do Arquivo)
   lib/db/            esquema, conexão e migrações
   lib/content/       consultas públicas, visibilidade, spoilers, mídia
   lib/markdown/      renderização segura do Markdown editorial
@@ -394,6 +452,7 @@ src/
 public/images/atlas/ carta do manuscrito, detalhes dos reinos, relevo, selos e brasões
 public/images/livro-1/ilustracoes/  ilustrações dos capítulos (resolução de impressão)
 public/capa/         capa oficial e capa completa
+public/images/marca/ logotipo recortado da capa oficial
 scripts/             migrações, seed, hash de senha, geradores de arte e da versão HTML
 html/                versão em HTML puro (gerada por npm run html)
 tests/               unidade, ponta a ponta e ferramentas de verificação

@@ -36,7 +36,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
 
   return (
     <article>
-      <PageHero eyebrow={labels.get(p.category) ?? 'Novidade'} title={p.title} crumbs={[{ label: 'Novidades', href: paths.news }, { label: p.title }]}>
+      <PageHero glyph="novidades" eyebrow={labels.get(p.category) ?? 'Novidade'} title={p.title} crumbs={[{ label: 'Novidades', href: paths.news }, { label: p.title }]}>
         <p className="post-item__meta">
           <time dateTime={date}>{formatDate(date)}</time>
         </p>

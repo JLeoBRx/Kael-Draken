@@ -62,7 +62,7 @@ export default async function CharacterPage({ params }: { params: Promise<{ slug
 
   return (
     <article>
-      <PageHero eyebrow="Personagem" title={c.name} subtitle={c.titles || undefined} crumbs={[{ label: 'Personagens', href: paths.characters }, { label: c.name }]}>
+      <PageHero glyph="personagens" eyebrow="Personagem" title={c.name} subtitle={c.titles || undefined} crumbs={[{ label: 'Personagens', href: paths.characters }, { label: c.name }]}>
         <EditorialBadges canon={c.canon} spoiler={c.spoiler} status={c.status} preview={viewer.preview} />
       </PageHero>
 

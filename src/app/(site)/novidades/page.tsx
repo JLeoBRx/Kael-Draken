@@ -37,7 +37,7 @@ export default async function NewsPage({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      <PageHero
+      <PageHero glyph="novidades"
         eyebrow="Diário de desenvolvimento"
         title="Novidades"
         lede="Anúncios de novos mapas, documentos, personagens e reinos, e notas sobre a construção do universo."

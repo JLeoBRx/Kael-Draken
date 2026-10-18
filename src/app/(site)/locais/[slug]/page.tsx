@@ -49,7 +49,7 @@ export default async function LocationPage({ params }: { params: Promise<{ slug:
 
   return (
     <article>
-      <PageHero
+      <PageHero glyph="locais"
         eyebrow={l.isCapital ? 'Capital' : (categories.get(l.category) ?? 'Local')}
         title={l.name}
         crumbs={[{ label: 'Locais', href: paths.locations }, { label: l.name }]}

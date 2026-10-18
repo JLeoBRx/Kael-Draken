@@ -17,7 +17,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHero eyebrow="Arquivo" title="Buscar" crumbs={[{ label: 'Busca' }]} />
+      <PageHero glyph="busca" eyebrow="Arquivo" title="Buscar" crumbs={[{ label: 'Busca' }]} />
       <section className="section" style={{ paddingTop: 'var(--space-7)' }}>
         <div className="container container--narrow">
           <form className="search-form" action="/busca" method="get" role="search">

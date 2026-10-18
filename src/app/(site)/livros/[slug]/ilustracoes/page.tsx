@@ -46,7 +46,7 @@ export default async function BookIllustrationsPage({ params }: { params: Params
 
   return (
     <article>
-      <PageHero
+      <PageHero glyph="livro"
         eyebrow={`Livro ${volume} · ${book.title}`}
         title={`Ilustrações do Livro ${volume}`}
         lede={<em>“{INTRO}”</em>}
@@ -84,7 +84,7 @@ export default async function BookIllustrationsPage({ params }: { params: Params
             <IllustrationGallery items={toIllustrationItems(views)} />
           </>
         ) : (
-          <EmptyState title="Nenhuma ilustração publicada">
+          <EmptyState glyph="livro" title="Nenhuma ilustração publicada">
             <p>As ilustrações deste livro ainda não foram publicadas.</p>
           </EmptyState>
         )}

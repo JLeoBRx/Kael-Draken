@@ -4,8 +4,11 @@ import Link from 'next/link'
 import type { CSSProperties } from 'react'
 import { WorldAtlas } from '@/components/atlas/WorldAtlas'
 import { CanonBadge } from '@/components/ui/editorial'
+import { Glyph } from '@/components/ui/glyphs'
+import { ArrowRight } from '@/components/ui/icons'
 import { Breadcrumbs } from '@/components/ui/PageHero'
 import { MediaImage } from '@/components/ui/media'
+import { Fleuron } from '@/components/ui/ornaments'
 import { ART, ILLUSTRATION, emblemArt, type ArtSource } from '@/lib/atlas/art'
 import { resolveArt } from '@/lib/atlas/resolve'
 import { getAtlasRegions } from '@/lib/atlas/regions'
@@ -52,16 +55,27 @@ export default async function AtlasPage({ searchParams }: { searchParams: Promis
         </div>
         <div className="container atlas-opening__inner">
           <Breadcrumbs items={[{ label: 'Atlas' }]} />
-          <p className="eyebrow">Kael Draken — Livro I: O Sussurro da Chama Antiga</p>
+          <div className="page-hero__kicker">
+            <span className="page-hero__seal">
+              <Glyph name="atlas" />
+            </span>
+            <p className="eyebrow">Kael Draken — Livro I: O Sussurro da Chama Antiga</p>
+          </div>
           <h1 className="atlas-opening__title">
             Atlas dos <span>Seis Reinos</span>
           </h1>
+          <Fleuron align="start" />
           <p className="atlas-opening__lede">
             A Chama do Dragão criou o mundo. Com a criação surgiu o Caos, contido pela Chama. Seis reinos foram estabelecidos — e um deles, Safra, foi destruído e apagado da
             história oficial. Este atlas reúne os mapas, os reinos e os capítulos dessa história, distinguindo o que está estabelecido do que ainda é proposta.
           </p>
+          <div className="atlas-opening__actions">
+            <a className="btn btn--primary" href="#mapas">
+              Abrir o mapa interativo <ArrowRight className="btn__arrow" />
+            </a>
+            <span className="atlas-opening__hint">Carta 2D com as regiões clicáveis · maquete 3D sob demanda</span>
+          </div>
           <nav className="atlas-opening__nav" aria-label="Capítulos do atlas">
-            <a href="#mapas">Mapas</a>
             <a href="#reinos">Os seis reinos</a>
             <a href="#capitulos">Capítulos</a>
             <Link href="/misterios">Mistérios</Link>

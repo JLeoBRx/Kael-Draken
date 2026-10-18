@@ -1,56 +1,66 @@
 /* ────────────────────────────────────────────────────────────
    Kael Draken — tokens de design
-   Carvão · grafite · pedra · dourado envelhecido · vermelho profundo · pergaminho
+   Um arquivo antigo com interface moderna: carvão nos fundos, marrom
+   profundo nas superfícies, pergaminho nos documentos, dourado envelhecido
+   nos detalhes, marfim no texto. Vermelho queimado e âmbar ficam para os
+   destaques narrativos (fogo, Safra, Caos, spoilers).
    ──────────────────────────────────────────────────────────── */
 
 :root {
   color-scheme: dark;
 
-  /* Carvão e grafite */
-  --ink-1000: #090807;
-  --ink-950: #0e0d0c;
-  --ink-900: #131210;
-  --ink-850: #181715;
-  --ink-800: #1f1d1b;
-  --ink-700: #2a2825;
-  --ink-600: #393632;
+  /* Carvão (fundos) */
+  --ink-1000: #070605;
+  --ink-950: #0c0a08;
+  --ink-900: #110d0a;
 
-  /* Pedra */
-  --stone-500: #5c5751;
-  --stone-400: #8a847b;
-  --stone-300: #aba497;
-  --stone-200: #cbc4b5;
+  /* Marrom profundo (superfícies e painéis) */
+  --ink-850: #17110c;
+  --ink-800: #1f1710;
+  --ink-700: #2b2016;
+  --ink-600: #3a2c1f;
 
-  /* Marfim e pergaminho */
-  --ivory-100: #ebe4d4;
-  --ivory-50: #f5f0e5;
-  --parchment-100: #ece3cd;
-  --parchment-200: #e2d6b9;
-  --parchment-300: #d2c29d;
-  --parchment-ink: #2a2118;
-  --parchment-muted: #5b4e3f;
-  --parchment-line: #c4b38d;
+  /* Pedra aquecida (texto secundário) */
+  --stone-500: #6b6155;
+  --stone-400: #978c7c;
+  --stone-300: #b6ab98;
+  --stone-200: #d3c8b4;
 
-  /* Dourado envelhecido (texto pequeno usa --gold-400 para manter o contraste) */
-  --gold-600: #96773f;
-  --gold-500: #b8975a;
-  --gold-400: #cdb27f;
-  --gold-300: #ddc9a2;
+  /* Marfim (texto) e pergaminho (páginas documentais) */
+  --ivory-100: #ece2ce;
+  --ivory-50: #f6efe1;
+  --parchment-100: #ece1c6;
+  --parchment-200: #e1d2ae;
+  --parchment-300: #cfbb8f;
+  --parchment-ink: #2a1f14;
+  --parchment-muted: #5c4a36;
+  --parchment-line: #c2aa7c;
 
-  /* Vermelho profundo — fogo, Safra, Caos */
-  --ember-900: #3d0f0a;
-  --ember-800: #5a160e;
-  --ember-700: #7a1f14;
-  --ember-600: #9c2c1c;
-  --ember-400: #d9735c;
+  /* Dourado envelhecido (texto pequeno usa --gold-400 para manter o contraste;
+     --gold-600 e --gold-700 só em linhas e ornamentos) */
+  --gold-700: #6e5432;
+  --gold-600: #94723f;
+  --gold-500: #b8955a;
+  --gold-400: #cdb07c;
+  --gold-300: #e0cba0;
+
+  /* Vermelho queimado e âmbar — destaques narrativos */
+  --ember-900: #3a0e08;
+  --ember-800: #57160b;
+  --ember-700: #7b2313;
+  --ember-600: #9e331c;
+  --ember-400: #de7b5c;
+  --amber-500: #d0903c;
+  --amber-400: #e5ad62;
 
   /* Papéis semânticos */
   --bg: var(--ink-950);
   --bg-raised: var(--ink-900);
   --surface: var(--ink-850);
   --surface-2: var(--ink-800);
-  --line: #2f2c28;
-  --line-strong: #46423c;
+  --line: #2d2219;
+  --line-strong: #4a3a2a;
+  --line-gold: rgba(184, 149, 90, 0.38);
   --text: var(--ivory-100);
   --text-muted: var(--stone-300);
   --text-faint: var(--stone-400);
@@ -60,20 +70,26 @@
   --fire-text: var(--ember-400);
   --focus: #e8c987;
 
-  /* Tipografia */
+  /* Textura discreta de papel (ruído em SVG, desenhado uma única vez pelo navegador) */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.86 0 0 0 0 0.74 0 0 0 0 0.56 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+
+  /* Tipografia: serifa elegante nos títulos, serifa de leitura no texto e na interface */
   --font-display: var(--font-cormorant), 'Cormorant Garamond', 'Garamond', Georgia, serif;
   --font-body: var(--font-literata), 'Literata', Georgia, 'Times New Roman', serif;
   --font-ui: var(--font-literata), 'Literata', Georgia, serif;
 
+  --fs-2xs: 0.75rem;
   --fs-xs: 0.8125rem;
   --fs-sm: 0.9375rem;
   --fs-base: 1.0625rem;
   --fs-md: 1.1875rem;
   --fs-lg: 1.375rem;
   --fs-xl: clamp(1.6rem, 1.1rem + 1.6vw, 2.1rem);
-  --fs-2xl: clamp(2rem, 1.2rem + 2.6vw, 2.9rem);
+  --fs-2xl: clamp(2.05rem, 1.2rem + 2.7vw, 3rem);
   --fs-3xl: clamp(2.5rem, 1.3rem + 4.2vw, 4.25rem);
   --fs-display: clamp(3rem, 1.4rem + 6vw, 5.75rem);
+
+  --tracking-label: 0.18em;
 
   /* Espaçamento */
   --space-1: 0.25rem;
@@ -92,7 +108,7 @@
   --container-wide: 1440px;
   --measure: 68ch;
 
-  --radius: 2px;
+  --radius: 1px;
   --header-h: 64px;
 
   --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
@@ -102,7 +118,7 @@
 @media (min-width: 720px) {
   :root {
     --gutter: 32px;
-    --header-h: 72px;
+    --header-h: 76px;
   }
 }
 

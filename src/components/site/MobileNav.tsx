@@ -42,7 +42,8 @@ export function MobileNav({ items }: { items: NavItem[] }) {
         <span className="mobile-nav__label" aria-hidden="true">Menu</span>
       </summary>
       <nav className="mobile-nav__panel" aria-label="Navegação principal">
-        <NavLinks items={items} className="mobile-nav__list" />
+        <p className="eyebrow mobile-nav__kicker">Arquivo da Chama Antiga</p>
+        <NavLinks items={items} className="mobile-nav__list" glyphs />
         <Link className="btn" href="/busca">
           <SearchIcon width={18} height={18} /> Buscar no arquivo
         </Link>

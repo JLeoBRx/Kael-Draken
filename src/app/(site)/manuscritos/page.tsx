@@ -28,7 +28,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <PageHero
+      <PageHero glyph="manuscritos"
         eyebrow="Arquivo"
         title="Manuscritos e documentos antigos"
         lede="Um arquivo recolhido entre ruínas e bibliotecas. Cada documento traz sua transcrição, sua origem conhecida, seu contexto e o grau de confiança que merece — alguns contradizem a história oficial."
@@ -99,7 +99,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
               ))}
             </ul>
           ) : (
-            <EmptyState title="Nenhum documento encontrado" />
+            <EmptyState glyph="manuscritos" title="Nenhum documento encontrado" />
           )}
         </div>
       </section>
