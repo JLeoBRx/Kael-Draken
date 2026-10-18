@@ -27,7 +27,8 @@ export interface WorldData {
   cartaIlustrada?: boolean
   largura: number
   altura: number
-  relevo: { arquivo: string; codificacao: 'rg16'; largura: number; altura: number; nivelDoMar: number }
+  /** Relevo lido do desenho da carta; `arquivoConhecido` é o do mundo conhecido, com Safra plana. */
+  relevo: { arquivo: string; arquivoConhecido: string; codificacao: 'rg16'; largura: number; altura: number; nivelDoMar: number }
   mascaraTerra: string
   regioes: WorldRegion[]
 }

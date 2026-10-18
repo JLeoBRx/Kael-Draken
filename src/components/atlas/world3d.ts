@@ -1,10 +1,12 @@
 /**
  * Cena tridimensional do Atlas (three.js), carregada sob demanda.
  *
- * O terreno é deslocado pelo mesmo mapa de altura que gerou as cartas 2D,
- * e recebe como textura a própria carta da versão escolhida — por isso o
- * mapa "ganha relevo" sem trocar de imagem. As zonas dos reinos são
- * desenhadas numa textura composta e recortadas pela máscara de terra.
+ * O terreno é deslocado pelo mapa de altura lido do desenho da carta (as
+ * montanhas sobem onde a carta pinta montanhas) e recebe como textura a
+ * própria carta da versão escolhida — por isso o mapa "ganha relevo" sem
+ * trocar de imagem. Cada versão pode ter o seu relevo: ao trocar de versão, o
+ * terreno se transforma suavemente. As zonas dos reinos são desenhadas numa
+ * textura composta e recortadas pela máscara de terra.
  *
  * Toda a geografia é conceitual (ver src/data/atlas/world.json).
  */
@@ -48,7 +50,8 @@ export interface World3D {
   enter(): Promise<void>
   exit(): Promise<void>
   setSelected(id: string | null, focus?: boolean): void
-  setVersion(textureUrl: string, regions: Region3D[]): Promise<void>
+  /** Troca a carta e as regiões; com `heightmapUrl`, o relevo também muda (com transição). */
+  setVersion(textureUrl: string, regions: Region3D[], heightmapUrl?: string): Promise<void>
   zoom(factor: number): void
   rotate(radians: number): void
   tilt(radians: number): void
@@ -92,9 +95,31 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
   // ── Dados: relevo e máscara de terra ──────────────────────────────────
   const [hmImg, maskImg] = await Promise.all([loadImage(opts.heightmapUrl), loadImage(opts.maskUrl)])
   const [HW, HH] = opts.heightmapSize
-  const hmPx = readPixels(hmImg, HW, HH)
-  const heights = new Float32Array(HW * HH)
-  for (let i = 0; i < HW * HH; i++) heights[i] = (hmPx[i * 4] * 256 + hmPx[i * 4 + 1]) / 65535
+  const readHeights = (img: HTMLImageElement) => {
+    const px = readPixels(img, HW, HH)
+    const out = new Float32Array(HW * HH)
+    for (let i = 0; i < HW * HH; i++) out[i] = (px[i * 4] * 256 + px[i * 4 + 1]) / 65535
+    return out
+  }
+  let heightmapUrl = opts.heightmapUrl
+  const heights = readHeights(hmImg)
+  /** Retângulo de texels em que dois relevos diferem (null se forem iguais). */
+  const diffBox = (a: Float32Array, b: Float32Array) => {
+    let x0 = HW
+    let x1 = -1
+    let y0 = HH
+    let y1 = -1
+    for (let y = 0; y < HH; y++) {
+      for (let x = 0; x < HW; x++) {
+        if (Math.abs(a[y * HW + x] - b[y * HW + x]) < 1e-6) continue
+        x0 = Math.min(x0, x)
+        x1 = Math.max(x1, x)
+        y0 = Math.min(y0, y)
+        y1 = Math.max(y1, y)
+      }
+    }
+    return x1 < 0 ? null : { x0, x1, y0, y1 }
+  }
   const MW = 600
   const MH = Math.round(600 / opts.aspect)
   const maskPx = readPixels(maskImg, MW, MH)
@@ -145,9 +170,7 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
   const geometry = new THREE.PlaneGeometry(WX, WZ, segX, segZ)
   geometry.rotateX(-Math.PI / 2)
   const pos = geometry.attributes.position as THREE.BufferAttribute
-  const uv = geometry.attributes.uv as THREE.BufferAttribute
-  for (let i = 0; i < pos.count; i++) pos.setY(i, elevation(uv.getX(i), 1 - uv.getY(i)))
-  geometry.computeVertexNormals()
+  const nrm = geometry.attributes.normal as THREE.BufferAttribute
 
   // Textura composta: carta + zonas conceituais recortadas pela terra
   const texSize = opts.lowPower ? 1200 : 2048
@@ -202,29 +225,74 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
   group.add(terrain)
 
   // Laterais da maquete
-  const skirtPositions: number[] = []
-  const edge = (u0: number, v0: number, u1: number, v1: number, steps: number) => {
-    for (let k = 0; k < steps; k++) {
-      const ua = u0 + ((u1 - u0) * k) / steps
-      const va = v0 + ((v1 - v0) * k) / steps
-      const ub = u0 + ((u1 - u0) * (k + 1)) / steps
-      const vb = v0 + ((v1 - v0) * (k + 1)) / steps
-      const xa = (ua - 0.5) * WX
-      const za = (va - 0.5) * WZ
-      const xb = (ub - 0.5) * WX
-      const zb = (vb - 0.5) * WZ
-      const ya = elevation(ua, va)
-      const yb = elevation(ub, vb)
-      skirtPositions.push(xa, ya, za, xa, BASE_Y, za, xb, yb, zb, xb, yb, zb, xa, BASE_Y, za, xb, BASE_Y, zb)
+  const skirtPositions = () => {
+    const out: number[] = []
+    const edge = (u0: number, v0: number, u1: number, v1: number, steps: number) => {
+      for (let k = 0; k < steps; k++) {
+        const ua = u0 + ((u1 - u0) * k) / steps
+        const va = v0 + ((v1 - v0) * k) / steps
+        const ub = u0 + ((u1 - u0) * (k + 1)) / steps
+        const vb = v0 + ((v1 - v0) * (k + 1)) / steps
+        const xa = (ua - 0.5) * WX
+        const za = (va - 0.5) * WZ
+        const xb = (ub - 0.5) * WX
+        const zb = (vb - 0.5) * WZ
+        const ya = elevation(ua, va)
+        const yb = elevation(ub, vb)
+        out.push(xa, ya, za, xa, BASE_Y, za, xb, yb, zb, xb, yb, zb, xa, BASE_Y, za, xb, BASE_Y, zb)
+      }
+    }
+    edge(0, 1, 1, 1, segX)
+    edge(1, 1, 1, 0, segZ)
+    edge(1, 0, 0, 0, segX)
+    edge(0, 0, 0, 1, segZ)
+    return out
+  }
+  const skirtGeometry = new THREE.BufferGeometry()
+  skirtGeometry.setAttribute('position', new THREE.Float32BufferAttribute(skirtPositions(), 3))
+
+  // Ergue o terreno conforme as alturas atuais. A malha é uma grade regular
+  // (vértice = linha × coluna): as normais saem de diferenças centrais, e uma
+  // transição entre versões recalcula só as células que mudam.
+  type Cells = [c0: number, c1: number, r0: number, r1: number]
+  const cols = segX + 1
+  const rows = segZ + 1
+  const P = pos.array as Float32Array
+  const N = nrm.array as Float32Array
+  const applyRelief = ([c0, c1, r0, r1]: Cells = [0, cols - 1, 0, rows - 1]) => {
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) P[(r * cols + c) * 3 + 1] = elevation(c / segX, r / segZ)
+    const dx = WX / segX
+    const dz = WZ / segZ
+    for (let r = Math.max(0, r0 - 1); r <= Math.min(rows - 1, r1 + 1); r++) {
+      const up = Math.max(0, r - 1)
+      const down = Math.min(rows - 1, r + 1)
+      for (let c = Math.max(0, c0 - 1); c <= Math.min(cols - 1, c1 + 1); c++) {
+        const left = Math.max(0, c - 1)
+        const right = Math.min(cols - 1, c + 1)
+        const gx = (P[(r * cols + right) * 3 + 1] - P[(r * cols + left) * 3 + 1]) / ((right - left) * dx)
+        const gz = (P[(down * cols + c) * 3 + 1] - P[(up * cols + c) * 3 + 1]) / ((down - up) * dz)
+        const len = Math.hypot(gx, 1, gz)
+        const i = (r * cols + c) * 3
+        N[i] = -gx / len
+        N[i + 1] = 1 / len
+        N[i + 2] = -gz / len
+      }
+    }
+    pos.needsUpdate = true
+    nrm.needsUpdate = true
+    if (c0 === 0 || r0 === 0 || c1 === cols - 1 || r1 === rows - 1) {
+      const skirt = skirtGeometry.attributes.position as THREE.BufferAttribute
+      skirt.copyArray(skirtPositions())
+      skirt.needsUpdate = true
+      skirtGeometry.computeVertexNormals()
     }
   }
-  edge(0, 1, 1, 1, segX)
-  edge(1, 1, 1, 0, segZ)
-  edge(1, 0, 0, 0, segX)
-  edge(0, 0, 0, 1, segZ)
-  const skirtGeometry = new THREE.BufferGeometry()
-  skirtGeometry.setAttribute('position', new THREE.Float32BufferAttribute(skirtPositions, 3))
-  skirtGeometry.computeVertexNormals()
+  const settleRelief = () => {
+    geometry.computeBoundingBox()
+    geometry.computeBoundingSphere()
+  }
+  applyRelief()
+  settleRelief()
   const skirtMaterial = new THREE.MeshStandardMaterial({ color: 0x2a211a, roughness: 1, side: THREE.DoubleSide })
   group.add(new THREE.Mesh(skirtGeometry, skirtMaterial))
   const baseGeometry = new THREE.PlaneGeometry(WX, WZ)
@@ -349,9 +417,11 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
   }
   renderer.setAnimationLoop((now) => {
     if (disposed) return
+    // o quadro em que uma animação termina também é desenhado
+    const animating = animations.size > 0
     for (const step of [...animations]) if (!step(now)) animations.delete(step)
     const moved = controls.enabled ? controls.update() : false
-    if (needsRender || moved || animations.size) {
+    if (needsRender || moved || animating) {
       renderer.render(scene, camera)
       updateLabels()
       needsRender = false
@@ -405,6 +475,9 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
       true,
     )
   }
+
+  let versionSeq = 0
+  let reliefSeq = 0
 
   // Comandos dados durante a entrada esperam o relevo se erguer; e, se houve
   // algum, a câmera não voa sozinha até a região selecionada ao final.
@@ -588,12 +661,40 @@ export async function createWorld3D(opts: World3DOptions): Promise<World3D> {
         })
       }
     },
-    async setVersion(textureUrl, nextRegions) {
-      baseMap = await loadImage(textureUrl)
+    async setVersion(textureUrl, nextRegions, nextHeightmapUrl = heightmapUrl) {
+      // um pedido mais novo substitui o anterior, mesmo que este termine de carregar depois
+      const seq = ++versionSeq
+      const reliefChanged = nextHeightmapUrl !== heightmapUrl
+      const [img, hmNext] = await Promise.all([loadImage(textureUrl), reliefChanged ? loadImage(nextHeightmapUrl) : null])
+      if (disposed || seq !== versionSeq) return
+      baseMap = img
       regions = nextRegions
       buildLabels()
       drawTexture()
       requestRender()
+      if (!hmNext) return
+      // o relevo passa de uma versão à outra (Safra se aplaina ou se reergue);
+      // uma nova transição parte de onde esta estiver
+      heightmapUrl = nextHeightmapUrl
+      const morph = ++reliefSeq
+      const to = readHeights(hmNext)
+      const box = diffBox(heights, to)
+      if (!box) return
+      const from = heights.slice()
+      const cells: Cells = [
+        Math.max(0, Math.floor(((box.x0 - 1) / (HW - 1)) * segX)),
+        Math.min(cols - 1, Math.ceil(((box.x1 + 1) / (HW - 1)) * segX)),
+        Math.max(0, Math.floor(((box.y0 - 1) / (HH - 1)) * segZ)),
+        Math.min(rows - 1, Math.ceil(((box.y1 + 1) / (HH - 1)) * segZ)),
+      ]
+      await animate(900, (t) => {
+        if (morph !== reliefSeq || disposed) return
+        for (let y = box.y0; y <= box.y1; y++) {
+          for (let i = y * HW + box.x0; i <= y * HW + box.x1; i++) heights[i] = from[i] + (to[i] - from[i]) * t
+        }
+        applyRelief(cells)
+        if (t === 1) settleRelief()
+      })
     },
     zoom(factor) {
       whenReady(() => {

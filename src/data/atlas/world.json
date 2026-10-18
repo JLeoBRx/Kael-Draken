@@ -6,10 +6,11 @@
   "altura": 1024,
   "relevo": {
     "arquivo": "/images/atlas/relevo-mundo.png",
+    "arquivoConhecido": "/images/atlas/relevo-mundo-conhecido.png",
     "codificacao": "rg16",
     "largura": 600,
     "altura": 400,
-    "nivelDoMar": 0.05884
+    "nivelDoMar": 0.06
   },
   "mascaraTerra": "/images/atlas/mascara-terra.png",
   "regioes": [

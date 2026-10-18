@@ -83,7 +83,12 @@ export default async function AtlasPage({ searchParams }: { searchParams: Promis
           <WorldAtlas
             regions={regions}
             images={{ original: ART.mapaOriginal, conhecido: ART.mapaConhecido }}
-            heightmap={{ src: WORLD.relevo.arquivo, width: WORLD.relevo.largura, height: WORLD.relevo.altura, seaLevel: WORLD.relevo.nivelDoMar }}
+            heightmap={{
+              src: { original: WORLD.relevo.arquivo, conhecido: WORLD.relevo.arquivoConhecido },
+              width: WORLD.relevo.largura,
+              height: WORLD.relevo.altura,
+              seaLevel: WORLD.relevo.nivelDoMar,
+            }}
             maskSrc={WORLD.mascaraTerra}
             aspect={WORLD_ASPECT}
             drawnLabels={!!WORLD.cartaIlustrada}

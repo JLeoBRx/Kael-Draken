@@ -174,7 +174,7 @@
     if (!cfg.versions[id] || id === state.version) return
     state.version = id
     render()
-    if (world && sources) void world.setVersion(sources[id], regions3d())
+    if (world && sources) void world.setVersion(sources[id].texture, regions3d(), sources[id].relief)
   }
 
   const showMessage = (text) => {
@@ -263,14 +263,14 @@
     return scripts.get(src)
   }
 
-  // Abertas do disco (file://), as imagens não podem ser lidas pelo WebGL:
-  // nesse caso a carta e o relevo vêm embutidos em assets/atlas-dados.js.
+  // Carta e relevo de cada versão. Abertas do disco (file://), as imagens não
+  // podem ser lidas pelo WebGL: nesse caso vêm embutidas em assets/atlas-dados.js.
   const resolveSources = async (embedded) => {
     if (embedded || location.protocol === 'file:') {
       await loadScript(cfg.embedded)
       return window.KAEL_ATLAS_DADOS
     }
-    return { original: cfg.versions.original.texture, conhecido: cfg.versions.conhecido.texture, relevo: cfg.heightmap.src }
+    return Object.fromEntries(Object.entries(cfg.versions).map(([id, v]) => [id, { texture: v.texture, relief: v.relief }]))
   }
 
   const createWorld = async (src) => {
@@ -278,11 +278,11 @@
     return window.KaelAtlas3D.createWorld3D({
       container: glHost,
       labelLayer: labels3d,
-      heightmapUrl: src.relevo,
+      heightmapUrl: src[state.version].relief,
       heightmapSize: [cfg.heightmap.width, cfg.heightmap.height],
       seaLevel: cfg.heightmap.seaLevel,
       aspect: cfg.aspect,
-      textureUrl: src[state.version],
+      textureUrl: src[state.version].texture,
       maskUrl: cfg.mask,
       regions: regions3d(),
       selectedId: state.selected,

@@ -16,8 +16,9 @@ Como abrir e publicar:
 
 - **No computador:** dê dois cliques em `index.html` (a pasta `assets/` precisa
   ficar ao lado das páginas). O 3D também funciona assim: aberto do disco, ele
-  usa a carta e o relevo embutidos em `assets/atlas-dados.js`, porque o
-  navegador não deixa o WebGL ler imagens de arquivos locais.
+  usa as cartas e os relevos (um por versão do mundo) embutidos em
+  `assets/atlas-dados.js`, porque o navegador não deixa o WebGL ler imagens de
+  arquivos locais.
 - **De graça na internet:** envie a pasta inteira para GitHub Pages, Netlify ou
   qualquer hospedagem de arquivos estáticos.
 - **Atualizar:** não edite à mão — rode `npm run html` na raiz do projeto. As

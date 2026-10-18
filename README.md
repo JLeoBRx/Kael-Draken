@@ -172,10 +172,16 @@ Página: `/atlas`.
    alternância entre a **versão original** (seis reinos) e a **versão conhecida**
    (Safra apagada, cinco reinos). A seleção abre um painel com o resumo do reino
    e o link para a página completa; o estado fica na URL (`?regiao=&versao=`).
-2. **Explorar em 3D:** o three.js é baixado só agora. O relevo é construído a
-   partir de `public/images/atlas/relevo-mundo.png` (altura em 16 bits) com o
-   próprio mapa como textura; a câmera desce da vista superior — que coincide com
-   o 2D — enquanto o relevo se ergue.
+2. **Explorar em 3D:** o three.js é baixado só agora. A própria carta vira a
+   maquete: ela é a textura do terreno, e o relevo
+   (`public/images/atlas/relevo-mundo.png`, altura em 16 bits) é lido do desenho —
+   as montanhas sobem onde a carta pinta montanhas (as cordilheiras do norte,
+   Kharveth, os vulcões de Safra com os rios de lava como vales), enquanto campos,
+   florestas e as tarjas com nomes ficam quase planos. A câmera desce da vista
+   superior — que coincide com o 2D — enquanto o relevo se ergue. Cada versão tem
+   o seu relevo: no mundo conhecido (`relevo-mundo-conhecido.png`) o território
+   apagado de Safra é terra plana, e ao trocar de versão o terreno se transforma
+   suavemente.
 3. **No 3D:** arrastar gira, roda do mouse ou pinça aproxima, botão direito ou
    dois dedos deslocam; botões de aproximar, afastar, girar, inclinar e
    reposicionar; setas, `+`, `-` e `0` no teclado. Clicar numa região ou num
@@ -192,8 +198,9 @@ pixels limitada; perda de contexto WebGL volta ao 2D com aviso.
 **Carta e regiões:** `npm run art:mapas` (`scripts/art/manuscript_map.py`) parte
 de `scripts/art/fontes/mapa-manuscrito-cor.webp` e gera a carta original, a versão
 conhecida (Safra em branco, como no encarte da própria carta), a máscara de terra,
-o relevo 3D e `src/data/atlas/world.json`. As fronteiras clicáveis, os pontos dos
-rótulos e as zonas montanhosas ficam no topo do script, em pixels da carta: para
+os dois relevos 3D e `src/data/atlas/world.json`. As fronteiras clicáveis, os pontos
+dos rótulos, as zonas montanhosas (`MOUNTAINS`) e as alturas do maciço e dos picos
+(`MASSIF_HEIGHT`, `PEAK_HEIGHT`) ficam no topo do script, em pixels da carta: para
 uma carta nova, troque o arquivo da fonte, ajuste esses valores e rode o comando.
 
 ## Imagens do Atlas
@@ -309,8 +316,8 @@ hospedadas de graça (GitHub Pages, Netlify):
   regiões clicáveis na carta 2D, painel e lista de regiões, as duas versões do
   mundo e o modo 3D com relevo (a mesma cena de `world3d.ts`, empacotada pelo
   esbuild em `assets/atlas3d.js`, um script comum que carrega até aberto do
-  disco; nesse caso a carta e o relevo vêm embutidos em `assets/atlas-dados.js`,
-  já que o WebGL não pode ler imagens de arquivos locais);
+  disco; nesse caso as cartas e os relevos das duas versões vêm embutidos em
+  `assets/atlas-dados.js`, já que o WebGL não pode ler imagens de arquivos locais);
 - um verbete por reino, personagem, local, artigo da mitologia e da
   Ressonância e documento, além de Cronologia e Mistérios.
 

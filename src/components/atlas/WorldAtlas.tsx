@@ -13,7 +13,8 @@ import type { World3D } from './world3d'
 interface Props {
   regions: AtlasRegionView[]
   images: Record<MapVersionId, ImageData>
-  heightmap: { src: string; width: number; height: number; seaLevel: number }
+  /** Relevo de cada versão da carta (no mundo conhecido, Safra é terra plana, sem registro). */
+  heightmap: { src: Record<MapVersionId, string>; width: number; height: number; seaLevel: number }
   maskSrc: string
   /** Proporção largura/altura da carta. */
   aspect: number
@@ -50,6 +51,7 @@ export function WorldAtlas({ regions, images, heightmap, maskSrc, aspect, drawnL
   const reducedMotion = useRef(false)
 
   const erased = MAP_VERSIONS[version].erased
+  const reliefSrc = heightmap.src[version]
   const isErased = useCallback((id: string) => erased.includes(id), [erased])
   const active = regions.find((r) => r.id === selected) ?? null
 
@@ -98,8 +100,8 @@ export function WorldAtlas({ regions, images, heightmap, maskSrc, aspect, drawnL
   }, [selected])
   const lowPowerRef = useRef(false)
   useEffect(() => {
-    if (worldRef.current) void worldRef.current.setVersion(optimized(images[version].src, lowPowerRef.current ? 1200 : 2048), regions3d)
-  }, [version, images, regions3d])
+    if (worldRef.current) void worldRef.current.setVersion(optimized(images[version].src, lowPowerRef.current ? 1200 : 2048), regions3d, reliefSrc)
+  }, [version, images, regions3d, reliefSrc])
 
   useEffect(() => () => worldRef.current?.dispose(), [])
 
@@ -137,7 +139,7 @@ export function WorldAtlas({ regions, images, heightmap, maskSrc, aspect, drawnL
       const world = await createWorld3D({
         container: glHostRef.current,
         labelLayer: labelHostRef.current,
-        heightmapUrl: heightmap.src,
+        heightmapUrl: reliefSrc,
         heightmapSize: [heightmap.width, heightmap.height],
         seaLevel: heightmap.seaLevel,
         aspect,

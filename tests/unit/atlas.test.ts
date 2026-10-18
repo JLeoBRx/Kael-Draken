@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import sharp from 'sharp'
 import { describe, expect, it } from 'vitest'
 import { ART, ILLUSTRATION, artImage, emblemArt } from '@/lib/atlas/art'
 import { SEED_ILLUSTRATIONS } from '@/lib/seed/content'
@@ -8,6 +9,23 @@ import { normalizePair } from '@/lib/content/link-pairs'
 import { slugify } from '@/lib/slug'
 
 const publicFile = (src: string) => path.join(process.cwd(), 'public', src)
+
+/** Altura acima do mar (rg16) num ponto (u, v) da carta. */
+async function readRelief(src: string) {
+  const { data, info } = await sharp(publicFile(src)).raw().toBuffer({ resolveWithObject: true })
+  return (u: number, v: number) => {
+    const i = (Math.round(v * (info.height - 1)) * info.width + Math.round(u * (info.width - 1))) * info.channels
+    return (data[i] * 256 + data[i + 1]) / 65535 - WORLD.relevo.nivelDoMar
+  }
+}
+
+/** Percentil 90 das alturas amostradas dentro de uma região. */
+function p90(height: (u: number, v: number) => number, polygon: [number, number][]) {
+  const values: number[] = []
+  for (let u = 0; u < 1; u += 0.01) for (let v = 0; v < 1; v += 0.01) if (pointInPolygon(u, v, polygon)) values.push(height(u, v))
+  values.sort((a, b) => a - b)
+  return values[Math.floor(values.length * 0.9)]
+}
 
 describe('dados cartográficos', () => {
   it('declara as seis regiões conceituais, uma por reino', () => {
@@ -36,9 +54,26 @@ describe('dados cartográficos', () => {
 
   it('aponta para arquivos de relevo e máscara existentes', () => {
     expect(existsSync(publicFile(WORLD.relevo.arquivo))).toBe(true)
+    expect(existsSync(publicFile(WORLD.relevo.arquivoConhecido))).toBe(true)
     expect(existsSync(publicFile(WORLD.mascaraTerra))).toBe(true)
     expect(WORLD.relevo.nivelDoMar).toBeGreaterThan(0)
     expect(WORLD.relevo.nivelDoMar).toBeLessThan(1)
+  })
+
+  it('ergue montanhas onde a carta pinta montanhas e aplaina Safra no mundo conhecido', async () => {
+    const original = await readRelief(WORLD.relevo.arquivo)
+    const known = await readRelief(WORLD.relevo.arquivoConhecido)
+    const polygon = (id: string) => WORLD.regioes.find((r) => r.id === id)!.poligono
+    // Safra (vulcões) e Kharveth (rochedos) são montanhosos; Nácaris, Aurelion e Elyndor, campos e florestas
+    expect(p90(original, polygon('safra'))).toBeGreaterThan(0.25)
+    expect(p90(original, polygon('kharveth'))).toBeGreaterThan(0.2)
+    for (const id of ['nacaris', 'aurelion', 'elyndor']) expect(p90(original, polygon(id))).toBeLessThan(0.08)
+    // no mundo conhecido, o território apagado é terra plana; o resto não muda
+    expect(p90(known, polygon('safra'))).toBeLessThan(0.06)
+    for (const id of ['aurelion', 'nacaris', 'kharveth', 'elyndor', 'rhovaryn']) expect(Math.abs(p90(known, polygon(id)) - p90(original, polygon(id)))).toBeLessThan(0.01)
+    // mar aberto no nível do mar
+    expect(Math.abs(original(0.9, 0.7))).toBeLessThan(0.005)
+    expect(Math.abs(known(0.9, 0.7))).toBeLessThan(0.005)
   })
 })
 

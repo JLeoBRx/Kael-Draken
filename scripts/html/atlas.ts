@@ -14,7 +14,8 @@ export interface AtlasAssets {
   maps: Record<MapVersionId, Img>
   /** Máscara de terra embutida (data URI): serve ao recorte e ao clique mesmo aberta do disco. */
   maskDataUri: string
-  heightmap: Img
+  /** Relevo de cada versão da carta. */
+  heightmap: Record<MapVersionId, Img>
   realmCard: Record<string, Img>
   /** Scripts carregados sob demanda pelo modo 3D. */
   bundle: string
@@ -57,6 +58,7 @@ export function atlasConfig(a: AtlasAssets): string {
         erased: MAP_VERSIONS[id].erased,
         src: a.maps[id].src,
         texture: a.maps[id].src,
+        relief: a.heightmap[id].src,
         alt: id === 'original' ? ART.mapaOriginal.alt : ART.mapaConhecido.alt,
       },
     ]),
@@ -65,7 +67,7 @@ export function atlasConfig(a: AtlasAssets): string {
     aspect: WORLD_ASPECT,
     erasedLabel: ERASED_LABEL,
     mask: a.maskDataUri,
-    heightmap: { src: a.heightmap.src, width: WORLD.relevo.largura, height: WORLD.relevo.altura, seaLevel: WORLD.relevo.nivelDoMar },
+    heightmap: { width: WORLD.relevo.largura, height: WORLD.relevo.altura, seaLevel: WORLD.relevo.nivelDoMar },
     bundle: a.bundle,
     embedded: a.embedded,
     versions,

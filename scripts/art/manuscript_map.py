@@ -10,6 +10,7 @@ Produz:
   - public/images/atlas/mapa-mundo-conhecido.webp  (versão oficial: Safra em branco)
   - public/images/atlas/mascara-terra.png          (terra = branco)
   - public/images/atlas/relevo-mundo.png           (altura 16 bits em R+G, para o 3D)
+  - public/images/atlas/relevo-mundo-conhecido.png (o mesmo relevo, com Safra plana e sem registro)
   - src/data/atlas/world.json                       (regiões dos seis reinos, traçadas sobre a carta)
   - public/images/atlas/carta/<reino>.webp          (detalhe de cada reino na carta, com a região em destaque)
 
@@ -65,23 +66,30 @@ NAME_PLATES = [
     (460, 64, 600, 104), (770, 118, 915, 182), (1000, 185, 1125, 230),  # Terras do Norte, Montanhas Eternas, Além das Montanhas
 ]
 
-# Zonas montanhosas lidas na carta: (polígono em pixels, intensidade)
+# Cordilheiras pintadas na carta: (polígono em pixels, tipo de pintura, força).
+# Dentro de cada zona, a altura vem do próprio desenho: em "rocha" os picos são
+# as faces iluminadas e a neve (claras); em "vulcao" (Safra) os picos são a
+# rocha escura, e os rios de lava, o fundo dos vales. Fora das zonas, não há montanhas.
 MOUNTAINS = [
-    # cordilheira do norte (Terras do Norte e Montanhas Eternas)
-    ([(380, 60), (560, 30), (760, 30), (980, 40), (1150, 110), (1230, 170), (1250, 230), (1180, 250), (1060, 210), (930, 190), (800, 170), (700, 170), (600, 140), (520, 120), (420, 110)], 1.0),
+    # Terras do Norte, Montanhas Eternas e a crista ao norte de Aurelion
+    ([(185, 95), (300, 80), (380, 50), (470, 25), (560, 18), (700, 12), (820, 18), (960, 28), (1060, 60), (1150, 110), (1230, 160), (1262, 230), (1240, 292), (1170, 292), (1080, 272), (1000, 252), (930, 232), (880, 202), (820, 177), (760, 166), (700, 160), (640, 152), (580, 166), (520, 172), (460, 162), (400, 152), (330, 162), (260, 162), (200, 142)], 'rocha', 1.0),
     # Além das Montanhas
-    ([(1260, 200), (1360, 220), (1450, 290), (1490, 380), (1470, 480), (1420, 560), (1370, 560), (1385, 470), (1370, 390), (1320, 320), (1260, 270)], 0.7),
+    ([(1240, 200), (1330, 215), (1420, 260), (1480, 330), (1492, 420), (1472, 500), (1422, 572), (1372, 572), (1350, 500), (1330, 430), (1300, 360), (1260, 300)], 'rocha', 0.8),
     # Kharveth
-    ([(950, 500), (1170, 520), (1320, 590), (1325, 735), (955, 740), (950, 600)], 0.85),
-    # Safra
-    ([(500, 520), (700, 455), (860, 470), (920, 560), (900, 680), (800, 760), (700, 790), (560, 760), (520, 650)], 0.8),
+    ([(938, 468), (1010, 468), (1100, 498), (1180, 518), (1250, 558), (1312, 588), (1327, 650), (1322, 720), (1302, 746), (958, 746), (944, 690), (950, 600), (934, 520)], 'rocha', 0.95),
+    # serra entre Elyndor, Safra e Kharveth
+    ([(878, 378), (950, 368), (1012, 418), (1004, 482), (942, 502), (898, 472)], 'rocha', 0.8),
+    # Safra: picos vulcânicos entre rios de lava (o nome usa o polígono da região)
+    ('safra', 'vulcao', 0.95),
     # ilhas montanhosas do sul
-    ([(200, 790), (330, 790), (480, 830), (500, 900), (200, 900)], 0.55),
-    ([(640, 840), (760, 830), (900, 800), (945, 830), (945, 900), (640, 900)], 0.5),
-    # colinas de Elyndor e do norte de Aurelion
-    ([(660, 200), (900, 190), (950, 330), (900, 440), (700, 440), (640, 320)], 0.25),
-    ([(380, 100), (560, 110), (600, 180), (450, 200), (360, 170)], 0.35),
+    ([(200, 788), (330, 783), (480, 818), (560, 848), (560, 906), (200, 906)], 'rocha', 0.6),
+    ([(630, 828), (760, 818), (900, 788), (952, 818), (952, 906), (630, 906)], 'rocha', 0.6),
 ]
+
+# Alturas na escala do relevo exportado: o maciço de cada cordilheira e os
+# picos pintados por cima dele (os picos são estreitos; mais altos, viram agulhas)
+MASSIF_HEIGHT = 0.30
+PEAK_HEIGHT = 0.13
 
 # Faixa de nuvens ao pé da carta (sem relevo)
 FOG_BAND_Y = 905
@@ -185,52 +193,79 @@ def distance_inside(mask: np.ndarray, steps: int = 40, factor: int = 4) -> np.nd
     return np.asarray(big, dtype=F) * factor
 
 
+def bandpass(x: np.ndarray, small: float, big: float) -> np.ndarray:
+    return blur(x, small) - blur(x, big)
+
+
 def heightmap(clean: np.ndarray, land: np.ndarray, noise: Noise) -> np.ndarray:
     """
-    Relevo interpretado da carta: zonas montanhosas lidas no desenho, moduladas
-    pela textura local (onde há picos desenhados, há contraste), mais um
-    planalto suave no interior e pequenas ondulações.
+    Relevo lido do desenho da carta. As montanhas sobem só onde a carta pinta
+    montanhas (zonas de MOUNTAINS): um maciço largo, mais alto onde há mais
+    montanhas pintadas e que se ergue aos poucos da borda para o centro da zona
+    (sem platôs nem paredões), e por cima os picos do próprio desenho — em
+    rocha, as faces iluminadas e a neve; em Safra, a rocha escura entre os rios
+    de lava, que ficam como vales. Campos e planícies ficam quase planos;
+    florestas, levemente onduladas; as tarjas com nomes, lisas.
     """
-    lum = clean.mean(axis=-1)
-    mean = blur(lum, 3)
-    var = np.clip(blur(lum * lum, 3) - mean * mean, 0, None)
-    rough = np.clip(np.sqrt(var) / 0.14, 0, 1)
-    plates = np.zeros((H, W), F)
+    h, s, v = rgb_to_hsv(blur(clean, 0.7))
+    lum = (clean * np.array([0.299, 0.587, 0.114], F)).sum(-1)
+    green = ((h > 60) & (h < 170) & (s > 0.2)).astype(F)
+    water = ((h > 175) & (h < 235) & (s > 0.28)).astype(F) * land
+    lava = (((h < 50) | (h > 335)) & (s > 0.5) & (v > 0.5)).astype(F)
+
+    # rios e lagos contam como fundo de vale
+    water_soft = blur(water, 1)
+    rock_lum = lum * (1 - water_soft) + 0.1 * water_soft
+    peak_rock = blur(np.clip((bandpass(rock_lum, 2.0, 12.0) + 0.01) / 0.12, 0, 1), 1.5)
+    lava_soft = blur(lava, 1.5)
+    dark = (1 - lum) * (1 - lava_soft)
+    peak_volcano = blur(np.clip((bandpass(dark, 2.0, 12.0) + 0.01) / 0.14, 0, 1), 1.5)
+    trees = 1 - 0.6 * blur(green, 1.5)
+
+    massif = np.zeros((H, W), F)
+    peaks = np.zeros((H, W), F)
+    for pts, kind, strength in MOUNTAINS:
+        poly = poly_mask(REGIONS_PX[pts] if isinstance(pts, str) else pts)
+        zone = blur(poly, 14)
+        peak = (peak_volcano if kind == 'vulcao' else peak_rock) * trees
+        # quantas montanhas a carta pinta em volta, e quão longe da borda da zona
+        density = np.clip(blur(zone * peak, 22) / 0.3, 0, 1) ** 0.8
+        dome = blur(smoothstep(0.0, 110.0, distance_inside(poly)) ** 0.7, 6)
+        massif = np.maximum(massif, zone * strength * density * (0.15 + 0.85 * dome))
+        detail = zone * strength * peak
+        if kind == 'vulcao':
+            detail = detail - zone * lava_soft * 0.35
+        peaks = np.maximum(peaks, detail)
+
+    # tarjas com nomes desenhados: sem picos nem ondulações, para os nomes ficarem legíveis
     k = W / 1152  # as tarjas foram medidas na prévia de 1152 px
+    plates = np.zeros((H, W), F)
     for x0, y0, x1, y1 in NAME_PLATES:
         plates[int(y0 * k) - 6 : int(y1 * k) + 6, int(x0 * k) - 6 : int(x1 * k) + 6] = 1
-    hard = plates.copy()
     plates = blur(plates, 6)
-    # dentro das tarjas, a rugosidade vem dos arredores (sem degraus no relevo)
-    keep = 1 - hard
-    fill = blur(rough * keep, 28) / np.maximum(blur(keep, 28), 1e-3)
-    rough = rough * (1 - plates) + fill * plates
-    zones = np.zeros((H, W), F)
-    for pts, strength in MOUNTAINS:
-        zones = np.maximum(zones, poly_mask(pts) * strength)
-    zones = blur(zones, 24)
-    ridges = blur(rough, 2.5) ** 1.3
+
     ys, xs = np.mgrid[0:H, 0:W].astype(F)
-    peaks = noise.ridged(xs / 60, ys / 60, 5)
-    mountain = zones * (0.45 + 0.55 * ridges) * (0.7 + 0.3 * peaks)
-    inland = blur(land, 26)
-    inland = np.clip((inland - 0.5) * 2.4, 0, 1) ** 0.9
-    # as montanhas descem até a costa e até as cartelas, sem paredões
-    shore = smoothstep(4.0, 95.0, distance_inside(land))
-    away_from_boxes = smoothstep(4.0, 110.0, distance_inside(1 - boxes_mask()))
-    # as nuvens do pé da carta escondem o relevo aos poucos
-    ys0 = np.arange(H, dtype=F)[:, None]
-    fade = 1 - smoothstep(FOG_BAND_Y - 130, FOG_BAND_Y, ys0)
-    mountain = mountain * shore * away_from_boxes * fade
-    detail = noise.fbm(xs / 30, ys / 30, 4)
-    elev = land * (0.035 + (inland * 0.09 + detail * 0.018) * fade + mountain * 0.75)
-    coast = blur(land, 12)
-    depth = -0.05 * (1 - np.clip(coast * 3, 0, 1))
-    elev = np.where(land > 0.5, np.maximum(elev, 0.025), depth)
-    elev = blur(elev, 2.6)
-    # superfície lisa sob as tarjas, para os nomes ficarem legíveis no 3D
-    elev = elev * (1 - plates) + blur(elev, 10) * plates
-    return elev.astype(F)
+    plains = noise.fbm(xs / 45, ys / 45, 4)
+    forest = blur(green * land, 1.5) * np.clip(bandpass(lum, 0.8, 4.0) / 0.1 + 0.5, 0, 1)
+    # praias baixas, cartelas planas e o relevo some sob as nuvens do pé da carta
+    shore = smoothstep(1.0, 22.0, distance_inside(land))
+    away_from_boxes = smoothstep(4.0, 60.0, distance_inside(1 - boxes_mask()))
+    fade = 1 - smoothstep(FOG_BAND_Y - 120, FOG_BAND_Y, np.arange(H, dtype=F)[:, None])
+    relief = (MASSIF_HEIGHT * massif + PEAK_HEIGHT * peaks * (1 - plates)) * shore * away_from_boxes * fade
+    elev = land * (0.025 + 0.008 * plains + 0.012 * forest * (1 - plates) + relief)
+    return blur(elev, 0.9).astype(F)
+
+
+def known_heightmap(elev: np.ndarray, area: np.ndarray, noise: Noise) -> np.ndarray:
+    """
+    Relevo do mundo conhecido: o território apagado de Safra vira terra plana,
+    sem registro. O aplainamento vai um pouco além do papel em branco, para que
+    a borda pontilhada também fique plana (sem um rebordo de montanhas em volta).
+    """
+    ys, xs = np.mgrid[0:H, 0:W].astype(F)
+    blank = 0.025 + 0.006 * noise.fbm(xs / 60 + 7.3, ys / 60 + 2.1, 3)
+    cover = blur((blur(area, 6) > 0.01).astype(F), 6)
+    return (elev * (1 - cover) + np.minimum(elev, blank) * cover).astype(F)
 
 
 def safra_area(clean: np.ndarray, land: np.ndarray) -> np.ndarray:
@@ -331,9 +366,14 @@ def export_details(clean: np.ndarray, out_dir: Path, scale: int = 2):
 # ── Exportação ────────────────────────────────────────────────────────────
 
 
+# Escala do relevo exportado: uma unidade de altura da carta ocupa a faixa
+# inteira do PNG de 16 bits (o 3D multiplica pela sua própria escala vertical).
+RELIEF_RANGE = (-0.06, 0.94)
+
+
 def export_heightmap(elev: np.ndarray, path: Path, size=(600, 400)):
-    lo, hi = float(elev.min()), float(elev.max())
-    norm = (elev - lo) / (hi - lo)
+    lo, hi = RELIEF_RANGE
+    norm = np.clip((elev - lo) / (hi - lo), 0, 1)
     small = np.asarray(Image.fromarray(norm.astype(np.float32), 'F').resize(size, Image.BOX), dtype=np.float64)
     v = np.clip(np.round(small * 65535), 0, 65535).astype(np.uint32)
     rgb = np.zeros(small.shape + (3,), dtype=np.uint8)
@@ -363,6 +403,7 @@ def main():
     to_img(known).save(OUT / 'mapa-mundo-conhecido.webp', 'WEBP', quality=90, method=6)
     Image.fromarray((land * 255).astype(np.uint8), 'L').resize((1200, 800), Image.BOX).save(OUT / 'mascara-terra.png', optimize=True)
     lo, hi = export_heightmap(elev, OUT / 'relevo-mundo.png')
+    export_heightmap(known_heightmap(elev, safra_area(clean, land), noise), OUT / 'relevo-mundo-conhecido.png')
 
     print('Detalhes dos reinos…')
     for key, (box, size) in export_details(clean, OUT / 'carta').items():
@@ -376,6 +417,7 @@ def main():
         'altura': H,
         'relevo': {
             'arquivo': '/images/atlas/relevo-mundo.png',
+            'arquivoConhecido': '/images/atlas/relevo-mundo-conhecido.png',
             'codificacao': 'rg16',
             'largura': 600,
             'altura': 400,

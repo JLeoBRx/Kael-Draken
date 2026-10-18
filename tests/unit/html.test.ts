@@ -40,7 +40,8 @@ describe('versão em HTML', () => {
 
   it('o Atlas interativo traz as seis regiões, com verbete, polígono e versões da carta', () => {
     const img = { src: 'assets/x.webp', width: 1536, height: 1024 }
-    const assets = { maps: { original: img, conhecido: img }, maskDataUri: 'data:image/png;base64,AA==', heightmap: img, realmCard: {}, bundle: 'assets/atlas3d.js', embedded: 'assets/atlas-dados.js' }
+    const relief = { original: { ...img, src: 'assets/relevo-mundo.png' }, conhecido: { ...img, src: 'assets/relevo-mundo-conhecido.png' } }
+    const assets = { maps: { original: img, conhecido: img }, maskDataUri: 'data:image/png;base64,AA==', heightmap: relief, realmCard: {}, bundle: 'assets/atlas3d.js', embedded: 'assets/atlas-dados.js' }
     const cfg = JSON.parse(atlasConfig(assets))
     expect(cfg.regions).toHaveLength(6)
     for (const r of cfg.regions) {
@@ -48,6 +49,8 @@ describe('versão em HTML', () => {
       expect(r.polygon.length).toBeGreaterThan(10)
     }
     expect(cfg.versions.conhecido.erased).toEqual(['safra'])
+    expect(cfg.versions.original.relief).toBe('assets/relevo-mundo.png')
+    expect(cfg.versions.conhecido.relief).toBe('assets/relevo-mundo-conhecido.png')
     const html = atlasMarkup(assets)
     expect(html.match(/class="atlas-region"/g)).toHaveLength(6)
     expect(html).toContain('id="regiao-safra"')

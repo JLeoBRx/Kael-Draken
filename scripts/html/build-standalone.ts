@@ -26,6 +26,7 @@ import path from 'node:path'
 import { build } from 'esbuild'
 import sharp from 'sharp'
 import { ART } from '../../src/lib/atlas/art'
+import { WORLD } from '../../src/lib/atlas/world'
 import { chapterLabel } from '../../src/lib/illustrations'
 import {
   SEED_ARTICLES,
@@ -137,13 +138,20 @@ const dataUri = (file: string, type: string) => `data:${type};base64,${readFileS
 /**
  * Atlas interativo: o 3D do site empacotado num script clássico, a máscara de
  * terra embutida na página e, para quem abre as páginas direto do disco (onde
- * o WebGL não pode ler imagens de arquivos), a carta e o relevo embutidos em
- * assets/atlas-dados.js — carregado só quando o 3D é aberto.
+ * o WebGL não pode ler imagens de arquivos), as cartas e os relevos de cada
+ * versão embutidos em assets/atlas-dados.js — carregado só quando o 3D é aberto.
  */
 async function buildAtlas(art: Map<string, Img>, realmCard: Record<string, Img>): Promise<AtlasAssets> {
   const maps = { original: art.get(ART.mapaOriginal.src)!, conhecido: art.get(ART.mapaConhecido.src)! }
-  const relevoSrc = path.join(PUBLIC, 'images', 'atlas', 'relevo-mundo.png')
-  const heightmap = { src: copy(relevoSrc, 'relevo-mundo.png'), width: 600, height: 400 }
+  // cada versão da carta tem o seu relevo (no mundo conhecido, Safra é terra plana)
+  const reliefFiles = {
+    original: path.join(PUBLIC, WORLD.relevo.arquivo),
+    conhecido: path.join(PUBLIC, WORLD.relevo.arquivoConhecido),
+  }
+  const heightmap = {
+    original: { src: copy(reliefFiles.original, path.basename(reliefFiles.original)), width: WORLD.relevo.largura, height: WORLD.relevo.altura },
+    conhecido: { src: copy(reliefFiles.conhecido, path.basename(reliefFiles.conhecido)), width: WORLD.relevo.largura, height: WORLD.relevo.altura },
+  }
   const maskDataUri = dataUri(path.join(PUBLIC, 'images', 'atlas', 'mascara-terra.png'), 'image/png')
 
   await build({
@@ -161,13 +169,12 @@ async function buildAtlas(art: Map<string, Img>, realmCard: Record<string, Img>)
   copy(path.join(__dirname, 'atlas-pagina.js'), 'atlas.js')
 
   const embedded = {
-    original: dataUri(path.join(OUT, maps.original.src), 'image/webp'),
-    conhecido: dataUri(path.join(OUT, maps.conhecido.src), 'image/webp'),
-    relevo: dataUri(relevoSrc, 'image/png'),
+    original: { texture: dataUri(path.join(OUT, maps.original.src), 'image/webp'), relief: dataUri(reliefFiles.original, 'image/png') },
+    conhecido: { texture: dataUri(path.join(OUT, maps.conhecido.src), 'image/webp'), relief: dataUri(reliefFiles.conhecido, 'image/png') },
   }
   writeFileSync(
     path.join(ASSETS, 'atlas-dados.js'),
-    `// Carta e relevo embutidos para o modo 3D quando as páginas são abertas direto do disco (file://).\nwindow.KAEL_ATLAS_DADOS = ${JSON.stringify(embedded)};\n`,
+    `// Cartas e relevos (por versão) embutidos para o modo 3D quando as páginas são abertas direto do disco (file://).\nwindow.KAEL_ATLAS_DADOS = ${JSON.stringify(embedded)};\n`,
   )
   return { maps, maskDataUri, heightmap, realmCard, bundle: 'assets/atlas3d.js', embedded: 'assets/atlas-dados.js' }
 }
