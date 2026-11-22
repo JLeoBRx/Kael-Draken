@@ -16,6 +16,20 @@ const PATHS: Record<number, string> = {
   [ITEM.Medkit]: 'M18 8h28v18H18z M29 11h6v5h5v5h-5v4h-6v-4h-5v-5h5z',
   [ITEM.ShieldCell]: 'M27 6h10v3h2v19H25V9h2z',
   [ITEM.ShieldBattery]: 'M22 4h20v3h3v22H19V7h3z M27 12h10v3H27z M27 18h10v3H27z',
+  [ITEM.Pickaxe]: 'M14 5c10-3 26-3 36 2l-2 3c-6-2-11-3-14-3v21h-5V7c-4 0-8 1-13 3z',
+}
+
+/** Ícones das peças de construção (mesmo viewBox). */
+export const BUILD_ICONS: Record<number, string> = {
+  1: 'M14 4h36v24H14z M16 6v20h32V6z M30 6h4v20h-4z M16 15h32v2H16z',
+  2: 'M6 18l20-10h32L38 18z M6 18h32v4H6z M38 18l20-10v4L38 22z',
+  3: 'M10 28L44 4h8L18 28z M10 28h8v2h-8z',
+  4: 'M4 24L32 6l28 18h-6L32 12L10 24z',
+}
+
+export function buildIconSvg(kind: number): string {
+  const d = BUILD_ICONS[kind]
+  return d ? `<svg viewBox="0 0 64 32" aria-hidden="true"><path d="${d}" fill="currentColor" fill-rule="evenodd"/></svg>` : ''
 }
 
 export function itemIconSvg(item: number): string {

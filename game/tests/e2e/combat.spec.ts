@@ -21,7 +21,7 @@ test('offline: pega o fuzil do arsenal, acerta o boneco, recarrega e solta pelo 
   // Estande: boneco a 10 m em (-6, 45), atirando da linha (z ≈ 33)
   await walkTo(page, -6, 33)
   const s = await combat(page)
-  const aim = aimAt(s, -6, 6.15 + 1.0, 45)
+  const aim = aimAt(s, -6, 8.0 + 1.0, 45)
   await look(page, aim.yaw, aim.pitch)
   await mouseButton(page, 2, true)
   await page.waitForTimeout(600)

@@ -9,8 +9,8 @@ termina com uma entrega que pode ser jogada.
 | --- | --- | --- | --- |
 | 1 — Fundação | personagem, câmera, movimentação, mapa de testes, servidor autoritativo e rede básica | 1 semana | **concluída** |
 | 2 — Gameplay | armas, tiros, vida/escudo, inventário, coleta, baús, mapa principal (1ª versão), HUD completa | 2–3 semanas | **concluída** |
-| 3 — Construção | paredes, rampas, pisos, telhados; pré-visualização, recursos, vida e destruição sincronizadas | 2 semanas | próxima |
-| 4 — IA | bots com navegação, loot, combate, fuga, abrigo, construção e zona; níveis de dificuldade; zona segura; partida BR completa offline | 2–3 semanas | |
+| 3 — Construção | paredes, rampas, pisos, telhados; pré-visualização, recursos, vida e destruição sincronizadas | 2 semanas | **concluída** |
+| 4 — IA | bots com navegação, loot, combate, fuga, abrigo, construção e zona; níveis de dificuldade; zona segura; partida BR completa offline | 2–3 semanas | próxima |
 | 5 — Multijogador local | lobby LAN, equipes, descoberta na rede, reconexão, tela dividida, testes com vários jogadores | 1–2 semanas | |
 | 6 — Online | plataforma (contas, amigos, convites, grupos, matchmaking, salas públicas/privadas, código de convite), alocação de servidores, segurança, gerência de interesse e compressão | 3–4 semanas | |
 | 7 — Polimento | arte final (GLTF, animações esqueléticas), sons, efeitos, pós-processamento, otimização, acessibilidade, correção de bugs | 3 semanas | |
@@ -92,14 +92,51 @@ demais armas de bala); só explosivos são projéteis simulados. Projéteis com
 compensação exigem retroceder o mundo a cada tick de voo, com ganho pequeno
 para o jogador — pode ser revisto no polimento.
 
-## Fase 3 — Construção
+## Fase 3 — Construção ✅
 
-- Grade de construção (células de 4 m), peças: parede, rampa (45°), piso, telhado.
-- Pré-visualização (fantasma) com validação local; confirmação pelo servidor.
-- Custo em materiais (madeira, pedra, metal) com vida e tempo de construção por material.
-- Coleta de materiais (picareta) em árvores, rochas, carros, estruturas.
-- Dano e destruição de peças, incluindo colapso de peças sem apoio.
-- Sincronização: criação/destruição como eventos confiáveis + estado no snapshot.
+Entregue:
+
+- Grade de construção alinhada ao mundo (células de 4 m, níveis de 4 m) e
+  quatro peças: parede, piso, rampa de 45° (4 direções) e telhado de duas
+  águas — cada uma feita das mesmas caixas orientadas na colisão e no desenho.
+- Modo construção: Q parede · Z piso · V rampa · T telhado (a mesma tecla sai),
+  R gira, G ou botão direito troca o material, roda troca a peça; no controle,
+  direcional (cima = peça, esquerda = girar, direita = material).
+- Fantasma azul/vermelho com o mesmo cálculo de alvo do servidor e o motivo de
+  bloqueio no HUD ("Ocupado", "Sem apoio", "Falta madeira"…).
+- Construção prevista no cliente (sobe na rampa sem esperar a rede) e
+  confirmada/recusada pelo servidor; corrida de rampas sem correções com 100 ms
+  de latência.
+- Materiais com custo, vida e tempo de construção (madeira 150/3 s, pedra
+  300/6 s, metal 450/9 s); a peça cresce de 10% até a vida máxima.
+- Integridade estrutural: só se constrói apoiado; ao quebrar uma peça, o que
+  ficou sem ligação com o chão desaba junto.
+- Dano em peças por balas, picareta (50) e explosões (×3), com destruição
+  sincronizada, poeira/lascas e sons.
+- Picareta sempre na tecla 1: golpe com animação, 20 de dano em jogadores e
+  coleta de madeira, pedra e metal em árvores, rochas, caixotes, carros,
+  contêineres e estruturas (árvores, rochas e caixotes quebram).
+- HUD: picareta na barra, barra de construção (peça, material, custo, motivo
+  de bloqueio), materiais em destaque, vida da construção sob a mira, números
+  de coleta ("+8 Madeira").
+- Pátio do Campo de Provas alinhado à grade (superfície a 8 m) e mesas de
+  materiais no arsenal.
+- Testes: geometria, alvo, apoio e desabamento, corrida de rampas; servidor
+  (construção autoritativa, custo e intervalo, bloqueio de tiros, quebra,
+  desabamento, explosões, picareta, coleta, sincronização); predição em rede;
+  navegador (construir, subir, derrubar e coletar offline; peça vista e
+  derrubada entre dois navegadores no servidor dedicado).
+
+Decisões de projeto:
+
+- **Eventos confiáveis, não snapshot.** Peças mudam pouco e precisam chegar
+  todas: vão como eventos ordenados (com idade e dano para quem entra depois),
+  e o snapshot continua pequeno.
+- **Grade absoluta.** Como em outros jogos do gênero, a grade não acompanha o
+  relevo: em encostas as peças podem ficar parcialmente enterradas. O nível
+  escolhido é o do corpo do jogador, não o da altura absoluta do olhar.
+- Editar peças (abrir janelas/portas) fica para depois da Fase 4, se os testes
+  de jogo pedirem.
 
 ## Fase 4 — Inteligência artificial
 

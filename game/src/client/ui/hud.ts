@@ -1,15 +1,25 @@
-import { AMMO_INFO, MATERIAL_INFO, NO_ITEM, RARITIES, itemDef } from '../../shared/config/items'
-import { MAX_HEALTH, MAX_SHIELD, type Slot } from '../../shared/player/player'
+import { BUILD, BUILD_KIND_NAMES, BUILD_MATERIALS, BuildKind } from '../../shared/config/building'
+import { AMMO_INFO, ITEM, MATERIAL_INFO, NO_ITEM, RARITIES, itemDef } from '../../shared/config/items'
+import { MAX_HEALTH, MAX_SHIELD, PICKAXE_SLOT, type Slot } from '../../shared/player/player'
 import { h } from './dom'
-import { itemIconSvg } from './icons'
+import { buildIconSvg, itemIconSvg } from './icons'
 
 /**
  * HUD da partida: vida e escudo, espaços do inventário com munição, recursos,
  * minimapa (montado pela partida), tempo, jogadores vivos, eliminações,
  * posição, bússola, mira dinâmica, marcador de acerto, indicador de dano,
  * feed de eliminações, avisos de interação, barra de progresso, mira de
- * sniper, tela de eliminado e painel técnico (F3).
+ * sniper, tela de eliminado e painel técnico (F3). Fase 3: picareta,
+ * barra de construção (peça, material, motivo de bloqueio) e vida da
+ * construção sob a mira.
  */
+
+export interface BuildHud {
+  kind: number
+  material: number
+  /** null = pode construir; senão, o motivo. */
+  blocked: string | null
+}
 
 export interface HudInfo {
   fps: number
@@ -37,8 +47,15 @@ export interface HudInfo {
   progress: { label: string; value: number } | null
   prompt: string | null
   scoped: boolean
+  /** Modo construção ativo (null = fora dele). */
+  build: BuildHud | null
+  /** Construção sob a mira: vida atual e máxima. */
+  target: { name: string; health: number; max: number } | null
   debug: Record<string, string | number>
 }
+
+/** Tecla de cada peça (mesma ordem de BuildKind). */
+const BUILD_KEYS_LABEL: Record<number, string> = { [BuildKind.Wall]: 'Q', [BuildKind.Floor]: 'Z', [BuildKind.Ramp]: 'V', [BuildKind.Roof]: 'T' }
 
 const CARDINALS: Record<number, string> = { 0: 'N', 45: 'NE', 90: 'L', 135: 'SE', 180: 'S', 225: 'SO', 270: 'O', 315: 'NO' }
 const TICK_DEG = 5
@@ -76,6 +93,12 @@ export class Hud {
   private readonly slotEls: HTMLElement[]
   private readonly ammoEl: HTMLElement
   private readonly matEls: HTMLElement[]
+  private readonly buildEl: HTMLElement
+  private readonly buildEls: HTMLElement[]
+  private readonly buildInfo: HTMLElement
+  private readonly targetEl: HTMLElement
+  private readonly targetFill: HTMLElement
+  private readonly targetText: HTMLElement
   private readonly promptEl: HTMLElement
   private readonly progressEl: HTMLElement
   private readonly progressFill: HTMLElement
@@ -126,7 +149,8 @@ export class Hud {
     this.helpEl = h('div', { class: 'help', html: [
       '<kbd>WASD</kbd> mover · <kbd>Shift</kbd> correr · <kbd>Espaço</kbd> pular · <kbd>C</kbd> agachar/deslizar',
       '<kbd>Botão esq.</kbd> atirar/usar · <kbd>Botão dir.</kbd> mirar · <kbd>R</kbd> recarregar · <kbd>E</kbd> pegar/abrir',
-      '<kbd>1–5</kbd> / roda: espaços · <kbd>Tab</kbd> inventário · <kbd>M</kbd> mapa · <kbd>H</kbd> ocultar',
+      '<kbd>1</kbd> picareta · <kbd>2–6</kbd> / roda: espaços · <kbd>Tab</kbd> inventário · <kbd>M</kbd> mapa',
+      '<kbd>Q</kbd> parede · <kbd>Z</kbd> piso · <kbd>V</kbd> rampa · <kbd>T</kbd> telhado · <kbd>R</kbd> girar · <kbd>G</kbd> material · <kbd>H</kbd> ocultar',
     ].join('<br>') })
     this.debugEl = h('div', { class: 'debug' })
     this.debugEl.hidden = true
@@ -152,11 +176,22 @@ export class Hud {
     this.promptEl.hidden = true
 
     this.slotEls = Array.from({ length: 5 }, (_, k) => h('div', { class: 'slot', 'data-slot': k }))
+    // Picareta: sempre no primeiro lugar da barra (tecla 1)
+    this.slotEls.push(h('div', { class: 'slot pickaxe', 'data-slot': PICKAXE_SLOT, title: 'Picareta', html: `<i>1</i>${itemIconSvg(ITEM.Pickaxe)}` }))
+    this.buildEls = [BuildKind.Wall, BuildKind.Floor, BuildKind.Ramp, BuildKind.Roof].map((k) =>
+      h('div', { class: 'build-piece', 'data-build': k, title: BUILD_KIND_NAMES[k], html: `<i>${BUILD_KEYS_LABEL[k]}</i>${buildIconSvg(k)}` }))
+    this.buildInfo = h('div', { class: 'build-info' })
+    this.buildEl = h('div', { class: 'buildbar', 'data-hud': 'build' }, h('div', { class: 'build-pieces' }, ...this.buildEls), this.buildInfo)
+    this.buildEl.hidden = true
+    this.targetFill = h('span', { class: 'fill' })
+    this.targetText = h('b')
+    this.targetEl = h('div', { class: 'struct-health', 'data-hud': 'target' }, h('div', { class: 'bar' }, this.targetFill, this.targetText))
+    this.targetEl.hidden = true
     this.ammoEl = h('div', { class: 'ammo', 'data-hud': 'ammo' })
     this.matEls = MATERIAL_INFO.map((m) => h('span', { class: 'mat', title: m.name }))
     const loadout = h('div', { class: 'loadout' },
       this.ammoEl,
-      h('div', { class: 'slots' }, ...this.slotEls),
+      h('div', { class: 'slots' }, this.slotEls[PICKAXE_SLOT], ...this.slotEls.slice(0, PICKAXE_SLOT)),
       h('div', { class: 'mats', 'data-hud': 'materials' }, ...this.matEls))
 
     this.feedEl = h('div', { class: 'killfeed', 'data-hud': 'killfeed' })
@@ -176,6 +211,7 @@ export class Hud {
       this.vignetteEl,
       this.fx,
       this.crossEl,
+      this.targetEl,
       this.hitEl,
       this.dirLayer,
       h('div', { class: 'compass' }, this.strip, h('div', { class: 'needle' })),
@@ -183,7 +219,7 @@ export class Hud {
       h('div', { class: 'hud-tr' }, this.minimapSlot, this.regionEl, this.matchEl, this.mapEl, h('div', { class: 'row', style: 'justify-content:flex-end;gap:6px' }, this.connEl), this.feedEl),
       h('div', { class: 'hud-bl' }, h('div', { class: 'stance' }, ...Object.values(this.stanceEls)), this.speedEl, this.helpEl),
       h('div', { class: 'hud-bc' }, this.promptEl, this.progressEl, vitals),
-      h('div', { class: 'hud-br' }, this.toastsEl, loadout),
+      h('div', { class: 'hud-br' }, this.toastsEl, this.buildEl, loadout),
       this.bannerEl,
       this.deathEl,
       this.debugEl,
@@ -256,17 +292,18 @@ export class Hud {
     this.deathEl.dataset.respawnAt = info.respawnAt ? String(info.respawnAt) : ''
   }
 
-  private renderSlots(slots: Slot[], selected: number): void {
-    const key = JSON.stringify(slots) + selected
+  private renderSlots(slots: Slot[], selected: number, building: boolean): void {
+    const key = JSON.stringify(slots) + selected + building
     if (key === this.lastSlotsKey) return
     this.lastSlotsKey = key
+    this.slotEls[PICKAXE_SLOT].className = `slot pickaxe${selected === PICKAXE_SLOT && !building ? ' selected' : ''}`
     slots.forEach((s, k) => {
       const el = this.slotEls[k]
       const def = itemDef(s.item)
-      el.className = `slot${k === selected ? ' selected' : ''}${s.item === NO_ITEM ? ' empty' : ''}`
+      el.className = `slot${k === selected && !building ? ' selected' : ''}${s.item === NO_ITEM ? ' empty' : ''}`
       const color = s.item === NO_ITEM ? '' : `#${(RARITIES[def?.kind === 'consumable' ? def.rarity : s.rarity]?.color ?? 0x888888).toString(16).padStart(6, '0')}`
       el.style.setProperty('--rarity', color || 'transparent')
-      el.innerHTML = s.item === NO_ITEM ? `<i>${k + 1}</i>` : `<i>${k + 1}</i>${itemIconSvg(s.item)}<small>${def?.kind === 'weapon' ? s.ammo : `×${s.count}`}</small>`
+      el.innerHTML = s.item === NO_ITEM ? `<i>${k + 2}</i>` : `<i>${k + 2}</i>${itemIconSvg(s.item)}<small>${def?.kind === 'weapon' ? s.ammo : `×${s.count}`}</small>`
       el.title = def ? def.name : 'Vazio'
     })
   }
@@ -287,7 +324,22 @@ export class Hud {
     // Barras e espaços: baratos, a cada quadro
     this.shieldFill.style.width = `${(info.shield / MAX_SHIELD) * 100}%`
     this.healthFill.style.width = `${(info.health / MAX_HEALTH) * 100}%`
-    this.renderSlots(info.slots, info.selected)
+    this.renderSlots(info.slots, info.selected, !!info.build)
+    this.buildEl.hidden = !info.build
+    this.crossEl.classList.toggle('building', !!info.build)
+    if (info.build) {
+      const b = info.build
+      this.buildEls.forEach((el) => el.classList.toggle('on', Number(el.dataset.build) === b.kind))
+      const have = info.materials[b.material] ?? 0
+      const reason = b.blocked ?? (have < BUILD.cost ? `Falta ${BUILD_MATERIALS[b.material].name.toLowerCase()}` : null)
+      this.buildInfo.className = `build-info${reason ? ' bad' : ''}`
+      this.buildInfo.innerHTML = `<i class="m${b.material}"></i>${BUILD_MATERIALS[b.material].name} · ${BUILD.cost}${reason ? ` · <b>${reason}</b>` : ''}`
+    }
+    this.targetEl.hidden = !info.target
+    if (info.target) {
+      this.targetFill.style.width = `${Math.max(0, Math.min(1, info.target.health / info.target.max)) * 100}%`
+      this.targetText.textContent = `${info.target.name} ${Math.ceil(info.target.health)}/${info.target.max}`
+    }
     if (info.progress) {
       this.progressEl.hidden = false
       this.progressLabel.textContent = info.progress.label
@@ -307,9 +359,14 @@ export class Hud {
     const sel = info.slots[info.selected]
     const def = itemDef(sel?.item ?? NO_ITEM)
     if (def?.kind === 'weapon') this.ammoEl.innerHTML = `<b>${sel.ammo}</b><span>/ ${info.reserve}</span><em>${AMMO_INFO[def.ammoType].short}</em>`
+    else if (info.build) this.ammoEl.innerHTML = `<em>Construindo: ${BUILD_KIND_NAMES[info.build.kind]}</em>`
     else if (def) this.ammoEl.innerHTML = `<b>${sel.count}</b><em>${def.name}</em>`
+    else if (info.selected === PICKAXE_SLOT) this.ammoEl.innerHTML = '<em>Picareta</em>'
     else this.ammoEl.innerHTML = '<em>Mãos vazias</em>'
-    info.materials.forEach((n, k) => { this.matEls[k].innerHTML = `<i class="m${k}"></i>${n}` })
+    info.materials.forEach((n, k) => {
+      this.matEls[k].innerHTML = `<i class="m${k}"></i>${n}`
+      this.matEls[k].classList.toggle('on', info.build?.material === k)
+    })
     this.headingEl.textContent = `${Math.round(heading)}°`
     this.regionEl.textContent = info.region
     this.mapEl.textContent = info.mapName

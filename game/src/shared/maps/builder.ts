@@ -2,7 +2,7 @@ import { Rng } from '../math/rng'
 import { smoothstep } from '../math/scalar'
 import { CollisionWorld, Surface, type SurfaceId } from '../world/collision-world'
 import { Heightfield } from '../world/heightfield'
-import { makeObb } from '../world/obb'
+import { makeObb, rampObb, type Obb } from '../world/obb'
 import type { Chest, FixedLoot, GameMap, LootSpot, MapDefinition, MapLabel, MaterialId, Prop, PropKind, Region, SpawnPoint, StaticBox, TargetDummy } from './types'
 
 const SURFACE_OF: Record<MaterialId, SurfaceId> = {
@@ -73,6 +73,7 @@ export class MapBuilder {
   readonly chests: Chest[] = []
   readonly lootSpots: LootSpot[] = []
   readonly targets: TargetDummy[] = []
+  readonly propColliders = new Map<number, number>()
   private world: CollisionWorld | null = null
 
   constructor(def: MapDefinition) {
@@ -127,12 +128,7 @@ export class MapBuilder {
 
   /** Caixa com centro e dimensões completas. Fecha a edição do relevo. */
   box(cx: number, cy: number, cz: number, sx: number, sy: number, sz: number, material: MaterialId, yaw = 0, pitch = 0): StaticBox {
-    const world = this.ensureWorld()
-    const obb = makeObb(cx, cy, cz, sx / 2, sy / 2, sz / 2, yaw, pitch)
-    const colliderId = world.add(obb, SURFACE_OF[material])
-    const b = { obb, material, colliderId }
-    this.boxes.push(b)
-    return b
+    return this.addObb(makeObb(cx, cy, cz, sx / 2, sy / 2, sz / 2, yaw, pitch), material)
   }
 
   /** Caixa apoiada em `baseY` (base) — afunda `sink` metros para não deixar fresta no relevo. */
@@ -145,17 +141,14 @@ export class MapBuilder {
    * direção "frente" do yaw (yaw 0 sobe em direção a -Z).
    */
   ramp(x: number, z: number, baseY: number, width: number, rise: number, angle: number, yaw: number, material: MaterialId, thickness = 0.3): StaticBox {
-    const len = rise / Math.sin(angle)
-    const run = rise / Math.tan(angle)
-    const fx = -Math.sin(yaw)
-    const fz = -Math.cos(yaw)
-    const nx = Math.sin(yaw) * Math.sin(angle)
-    const ny = Math.cos(angle)
-    const nz = Math.cos(yaw) * Math.sin(angle)
-    const sx = x + fx * (run / 2)
-    const sy = baseY + rise / 2
-    const sz = z + fz * (run / 2)
-    return this.box(sx - nx * (thickness / 2), sy - ny * (thickness / 2), sz - nz * (thickness / 2), width, thickness, len, material, yaw, angle)
+    return this.addObb(rampObb(x, baseY, z, width, rise, angle, yaw, thickness), material)
+  }
+
+  private addObb(obb: Obb, material: MaterialId): StaticBox {
+    const colliderId = this.ensureWorld().add(obb, SURFACE_OF[material])
+    const b = { obb, material, colliderId }
+    this.boxes.push(b)
+    return b
   }
 
   /** Escada maciça subindo na direção "frente" do yaw a partir de (x, baseY, z). */
@@ -365,17 +358,20 @@ export class MapBuilder {
 
   prop(kind: PropKind, x: number, z: number, yaw: number, scale: number): void {
     const y = this.heightAt(x, z)
+    const index = this.props.length
     this.props.push({ kind, x, y, z, yaw, scale })
     const world = this.ensureWorld()
     // Colisão aproximada: tronco das árvores, volume das rochas e caixotes.
+    let id = -1
     if (kind === 'pine' || kind === 'broadleaf') {
       const r = (kind === 'pine' ? 0.22 : 0.3) * scale
-      world.add(makeObb(x, y + 2 * scale, z, r, 2 * scale + 0.5, r, yaw), Surface.Wood)
+      id = world.add(makeObb(x, y + 2 * scale, z, r, 2 * scale + 0.5, r, yaw), Surface.Wood)
     } else if (kind === 'rock') {
-      world.add(makeObb(x, y + 0.35 * scale, z, 0.75 * scale, 0.65 * scale, 0.6 * scale, yaw), Surface.Rock)
+      id = world.add(makeObb(x, y + 0.35 * scale, z, 0.75 * scale, 0.65 * scale, 0.6 * scale, yaw), Surface.Rock)
     } else if (kind === 'crate') {
-      world.add(makeObb(x, y + 0.5 * scale, z, 0.5 * scale, 0.5 * scale, 0.5 * scale, yaw), Surface.Wood)
+      id = world.add(makeObb(x, y + 0.5 * scale, z, 0.5 * scale, 0.5 * scale, 0.5 * scale, yaw), Surface.Wood)
     }
+    if (id >= 0) this.propColliders.set(id, index)
   }
 
   label(text: string, x: number, y: number, z: number, yaw = 0, size = 0.8): void {
@@ -427,6 +423,7 @@ export class MapBuilder {
       chests: this.chests,
       lootSpots: this.lootSpots,
       targets: this.targets,
+      propColliders: this.propColliders,
     }
   }
 }

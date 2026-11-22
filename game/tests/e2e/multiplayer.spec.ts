@@ -100,3 +100,63 @@ test('A pega um fuzil e acerta B; o servidor aplica o dano e os dois veem', asyn
   expect(errA).toEqual([])
   expect(errB).toEqual([])
 })
+
+test('A ergue uma parede e B a vê; A a derruba com a picareta e ela some para B', async ({ browser }) => {
+  test.setTimeout(480_000)
+  const ctxA = await browser.newContext()
+  const ctxB = await browser.newContext()
+  const a = await ctxA.newPage()
+  const b = await ctxB.newPage()
+  const errA = await prepare(a, 'Ana')
+  const errB = await prepare(b, 'Bruno')
+  const join = async (page: Page) => {
+    await page.goto('/')
+    await page.click('[data-action="join"]')
+    await page.click('[data-action="connect"]')
+    await enterGame(page)
+  }
+  await join(a)
+  await join(b)
+  await expect.poll(async () => (await state(a)).remotes).toBe(1)
+  // B pode ter entrado depois de construções de testes anteriores: conta a partir daqui
+  const base = (await combat(b)).pieces
+
+  // A pega madeira (contornando as mesas) e vai a um ponto livre no meio de uma célula
+  await walkTo(a, -15, 14, 0.6)
+  await walkTo(a, -15, 9.4, 0.6)
+  await walkTo(a, -12.5, 8.9, 0.5)
+  await look(a, 0, -0.4)
+  await expect.poll(async () => (await combat(a)).prompt ?? '').toContain('Madeira')
+  await a.keyboard.press('KeyE')
+  await expect.poll(async () => (await combat(a)).materials[0]).toBeGreaterThanOrEqual(10)
+  await walkTo(a, 10, -6, 0.35)
+  await look(a, 0, 0)
+  await a.keyboard.press('KeyQ')
+  await expect.poll(async () => {
+    const mode = (await combat(a)).build
+    return mode ? mode.blocked : 'fora do modo construção'
+  }).toBeNull()
+  await mouseButton(a, 0, true)
+  await a.waitForTimeout(250)
+  await mouseButton(a, 0, false)
+  await expect.poll(async () => (await combat(a)).predictedPieces).toBe(0)
+  expect((await combat(a)).pieces).toBe(base + 1)
+  // B recebe a peça pelo servidor e a desenha
+  await expect.poll(async () => (await combat(b)).pieces).toBe(base + 1)
+  expect((await combat(b)).drawnPieces).toBeGreaterThanOrEqual(1)
+
+  // A troca para a picareta e derruba a parede (3 golpes depois de pronta)
+  await a.keyboard.press('Digit1')
+  await walkTo(a, 10, -6.8, 0.3)
+  await look(a, 0, 0)
+  await a.waitForTimeout(3000)
+  await mouseButton(a, 0, true)
+  await expect.poll(async () => (await combat(b)).pieces, { timeout: 90_000 }).toBe(base)
+  await mouseButton(a, 0, false)
+  expect((await combat(a)).pieces).toBe(base)
+
+  await ctxA.close()
+  await ctxB.close()
+  expect(errA).toEqual([])
+  expect(errB).toEqual([])
+})

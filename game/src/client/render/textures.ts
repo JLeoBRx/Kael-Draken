@@ -271,3 +271,83 @@ export function textTexture(text: string, opts: { height?: number; bg?: string; 
   texture.anisotropy = 4
   return { texture, aspect: w / h }
 }
+
+/**
+ * Painel de construção (uma face inteira de 4 m por tile): moldura reforçada
+ * e miolo no estilo do material — tábuas, blocos de pedra ou chapa rebitada.
+ */
+export function buildPanelTexture(material: number): THREE.CanvasTexture {
+  const size = 512
+  const [c, ctx] = canvas(size)
+  const frame = 26
+  if (material === 0) {
+    // Madeira: tábuas verticais com travessas em X
+    const planks = 8
+    const pw = size / planks
+    for (let k = 0; k < planks; k++) {
+      const col = new THREE.Color(0xb08251).multiplyScalar(0.82 + ((k * 53) % 13) / 45)
+      ctx.fillStyle = `#${col.getHexString()}`
+      ctx.fillRect(k * pw, 0, pw, size)
+      ctx.strokeStyle = 'rgba(50,25,8,0.22)'
+      ctx.lineWidth = 2
+      for (let g = 0; g < 3; g++) {
+        const gx = k * pw + 8 + g * (pw / 3)
+        ctx.beginPath()
+        ctx.moveTo(gx, 0)
+        ctx.bezierCurveTo(gx + 4, size * 0.35, gx - 4, size * 0.65, gx + 2, size)
+        ctx.stroke()
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'
+      ctx.fillRect(k * pw, 0, 3, size)
+    }
+    ctx.strokeStyle = '#7a5530'
+    ctx.lineWidth = 30
+    ctx.beginPath()
+    ctx.moveTo(frame, frame); ctx.lineTo(size - frame, size - frame)
+    ctx.moveTo(size - frame, frame); ctx.lineTo(frame, size - frame)
+    ctx.stroke()
+    ctx.strokeStyle = '#6a4626'
+  } else if (material === 1) {
+    // Pedra: blocos irregulares com argamassa
+    ctx.fillStyle = '#8f8c86'
+    ctx.fillRect(0, 0, size, size)
+    const rows = 6
+    const rh = size / rows
+    for (let r = 0; r < rows; r++) {
+      const off = (r % 2) * (size / 6)
+      for (let k = -1; k < 4; k++) {
+        const x = k * (size / 3) + off
+        const v = 0.78 + (((r * 7 + k * 13) % 9) / 9) * 0.3
+        const col = new THREE.Color(0xa9a59c).multiplyScalar(v)
+        ctx.fillStyle = `#${col.getHexString()}`
+        ctx.fillRect(x + 5, r * rh + 5, size / 3 - 10, rh - 10)
+      }
+    }
+    ctx.strokeStyle = '#5f5c57'
+  } else {
+    // Metal: chapa corrugada horizontal com rebites
+    const bands = 16
+    for (let k = 0; k < bands; k++) {
+      const g = ctx.createLinearGradient(0, (k * size) / bands, 0, ((k + 1) * size) / bands)
+      g.addColorStop(0, '#5d6b77')
+      g.addColorStop(0.5, '#a4b2bd')
+      g.addColorStop(1, '#5d6b77')
+      ctx.fillStyle = g
+      ctx.fillRect(0, (k * size) / bands, size, size / bands)
+    }
+    ctx.fillStyle = '#3a434b'
+    for (let k = 0; k < 6; k++) {
+      const p = frame + 10 + (k * (size - 2 * frame - 20)) / 5
+      for (const [x, y] of [[p, frame / 2], [p, size - frame / 2], [frame / 2, p], [size - frame / 2, p]]) {
+        ctx.beginPath()
+        ctx.arc(x, y, 5, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+    ctx.strokeStyle = '#46515b'
+  }
+  ctx.lineWidth = frame
+  ctx.strokeRect(frame / 2, frame / 2, size - frame, size - frame)
+  grain(ctx, size, material === 2 ? 0.1 : 0.16, 101 + material, 10)
+  return finish(c)
+}

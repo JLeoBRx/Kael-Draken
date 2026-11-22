@@ -217,3 +217,22 @@ export function rayVsObb(
   out.nz = o.uz * ln[0] + o.vz * ln[1] + o.wz * ln[2]
   return true
 }
+
+/**
+ * Rampa (placa inclinada) cuja borda inferior está centrada em (x, baseY, z) e
+ * que sobe na direção "frente" do yaw (yaw 0 sobe em direção a -Z).
+ * Mesma geometria para rampas do mapa e rampas construídas pelos jogadores.
+ */
+export function rampObb(x: number, baseY: number, z: number, width: number, rise: number, angle: number, yaw: number, thickness: number): Obb {
+  const len = rise / Math.sin(angle)
+  const run = rise / Math.tan(angle)
+  const fx = -Math.sin(yaw)
+  const fz = -Math.cos(yaw)
+  const nx = Math.sin(yaw) * Math.sin(angle)
+  const ny = Math.cos(angle)
+  const nz = Math.cos(yaw) * Math.sin(angle)
+  const sx = x + fx * (run / 2)
+  const sy = baseY + rise / 2
+  const sz = z + fz * (run / 2)
+  return makeObb(sx - nx * (thickness / 2), sy - ny * (thickness / 2), sz - nz * (thickness / 2), width / 2, thickness / 2, len / 2, yaw, angle)
+}

@@ -10,6 +10,7 @@ import { ITEM } from '../../shared/config/items'
 export type SoundName =
   | 'shot-pistol' | 'shot-smg' | 'shot-rifle' | 'shot-shotgun' | 'shot-sniper' | 'shot-launcher'
   | 'explosion' | 'reload' | 'dry' | 'pickup' | 'chest' | 'hit' | 'headshot' | 'shieldbreak' | 'hurt' | 'heal' | 'throw' | 'eliminated'
+  | 'build' | 'swing' | 'chop' | 'mine' | 'clank' | 'break' | 'collapse'
 
 interface Recipe {
   dur: number
@@ -34,7 +35,41 @@ function shot(bright: number, thump: number, decay: number): Recipe {
   }
 }
 
+/** Batida percussiva: ruído filtrado + tom grave que cai (madeira, pedra, metal). */
+function knock(bright: number, tone: number, decay: number, ring = 0): Recipe {
+  let lp = 0
+  return {
+    dur: decay * 7 + ring * 0.4,
+    fn: (t, rnd) => {
+      lp += ((rnd() * 2 - 1) - lp) * bright
+      const body = Math.sin(2 * Math.PI * tone * t * (1 - t)) * Math.exp(-t / decay)
+      const bell = ring ? (Math.sin(2 * Math.PI * tone * 5.3 * t) + Math.sin(2 * Math.PI * tone * 7.9 * t) * 0.5) * Math.exp(-t / (decay * 4)) * ring : 0
+      return (lp * 1.1 + body + bell) * env(t, 0.002, decay)
+    },
+  }
+}
+
 const RECIPES: Record<SoundName, () => Recipe> = {
+  build: () => {
+    const a = knock(0.35, 180, 0.03)
+    const b = knock(0.45, 240, 0.025)
+    return { dur: 0.32, fn: (t, r) => (a.fn(t, r) + (t > 0.12 ? b.fn(t - 0.12, r) : 0)) * 0.8 }
+  },
+  swing: () => {
+    let lp = 0
+    return { dur: 0.25, fn: (t, r) => { lp += ((r() * 2 - 1) - lp) * (0.05 + 0.25 * Math.sin(Math.PI * Math.min(1, t / 0.2))); return lp * Math.sin(Math.PI * Math.min(1, t / 0.22)) * 0.9 } }
+  },
+  chop: () => knock(0.3, 140, 0.04),
+  mine: () => knock(0.6, 320, 0.025, 0.12),
+  clank: () => knock(0.7, 420, 0.02, 0.45),
+  break: () => {
+    let lp = 0
+    return { dur: 0.9, fn: (t, r) => { lp += ((r() * 2 - 1) - lp) * 0.25; const crackle = r() < 0.04 * Math.exp(-t * 4) ? (r() * 2 - 1) * 2 : 0; return (lp + crackle) * env(t, 0.003, 0.18) * 0.9 } }
+  },
+  collapse: () => {
+    let lp = 0
+    return { dur: 1.6, fn: (t, r) => { lp += ((r() * 2 - 1) - lp) * 0.06; return (lp * 2.2 + Math.sin(2 * Math.PI * 55 * t) * 0.4 * Math.exp(-t * 2)) * env(t, 0.03, 0.4) } }
+  },
   'shot-pistol': () => shot(0.5, 160, 0.05),
   'shot-smg': () => shot(0.55, 190, 0.035),
   'shot-rifle': () => shot(0.42, 120, 0.06),

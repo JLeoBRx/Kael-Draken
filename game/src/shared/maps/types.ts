@@ -143,4 +143,6 @@ export interface GameMap {
   chests: Chest[]
   lootSpots: LootSpot[]
   targets: TargetDummy[]
+  /** Colisor → índice do adereço (árvores, rochas e caixotes podem ser quebrados). */
+  propColliders: Map<number, number>
 }

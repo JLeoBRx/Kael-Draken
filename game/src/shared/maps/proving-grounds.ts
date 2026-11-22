@@ -12,7 +12,8 @@ import type { MapDefinition, MaterialId } from './types'
  * validar movimentação, câmera, colisão e desempenho antes do mapa principal.
  */
 
-const PAD_Y = 6
+// Superfície do pátio em y = 8 m: alinhada à grade de construção (níveis de 4 m)
+const PAD_Y = 7.85
 const SEED = 0x5eed_c4a5
 
 function terrainHeight(x: number, z: number): number {
@@ -195,6 +196,12 @@ function buildTrainingPad(b: MapBuilder): void {
     b.lootSpot(x, 11.5, 0, y + 0.9, { item, rarity: 2, count }, 8)
   })
   b.label('ARSENAL · REPÕE A CADA 8 s · E para pegar', -11, y + 2.4, 16.5, 0, 0.55)
+  // Materiais para treinar construção
+  ;[[ITEM.Wood, -12.5], [ITEM.Stone, -7.5], [ITEM.Metal, -2.5]].forEach(([item, x]) => {
+    b.block(x, 7.5, y, 1.4, 0.9, 0.9, 'wood-dark')
+    b.lootSpot(x, 7.5, 0, y + 0.9, { item, rarity: 0, count: 300 }, 8)
+  })
+  b.label('MATERIAIS · Q parede · Z piso · V rampa · T telhado', -7.5, y + 2.2, 8.2, 0, 0.5)
 
   // J — Estande de tiro ao sul: bonecos a 10, 25, 50 e 75 m da linha
   b.box(0, PAD_Y + 0.02, 35, 26, 0.06, 0.4, 'grid-orange')

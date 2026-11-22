@@ -80,12 +80,14 @@ export function pickupItem(p: PlayerState, it: WorldItem): PickupResult {
 }
 
 function firstFree(p: PlayerState): number {
-  if (p.slots[p.selected].item === NO_ITEM) return p.selected
+  if (p.selected < SLOT_COUNT && p.slots[p.selected].item === NO_ITEM) return p.selected
   for (let k = 0; k < SLOT_COUNT; k++) if (p.slots[k].item === NO_ITEM) return k
   return -1
 }
 
 function swapIntoSelected(p: PlayerState, incoming: Slot): PickupResult {
+  // Com a picareta na mão e o inventário cheio, não troca nada
+  if (p.selected >= SLOT_COUNT) return { taken: 0, swapped: null }
   const out = { ...p.slots[p.selected] }
   Object.assign(p.slots[p.selected], incoming)
   p.reloadTimer = 0

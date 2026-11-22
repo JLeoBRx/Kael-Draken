@@ -1,8 +1,9 @@
-import { AMMO_TYPES, MATERIAL_TYPES, NO_ITEM } from '../config/items'
+import { encodeBuild, decodeBuild } from '../config/building'
+import { AMMO_TYPES, ITEM, MATERIAL_TYPES, NO_ITEM } from '../config/items'
 import { MOVE } from '../config/movement'
 import { TAU, clamp } from '../math/scalar'
 import { BUTTONS_MASK, CHARACTER_STATE_FIELDS, type CharacterState } from '../movement/character'
-import { SLOT_COUNT, createPlayerState, type PlayerCommand, type PlayerState } from '../player/player'
+import { PICKAXE_SLOT, SELECT_COUNT, createPlayerState, type PlayerCommand, type PlayerState } from '../player/player'
 import { BinaryReader, BinaryWriter, ProtocolError } from './binary'
 
 /**
@@ -13,7 +14,7 @@ import { BinaryReader, BinaryWriter, ProtocolError } from './binary'
  * inventário). O servidor executa a simulação e devolve o estado oficial.
  */
 
-export const PROTOCOL_VERSION = 2
+export const PROTOCOL_VERSION = 3
 
 export const C2S = { Hello: 1, Input: 2, Ping: 3, Inventory: 4 } as const
 export const S2C = { Welcome: 10, Snapshot: 11, Pong: 12, PlayerInfo: 13, PlayerLeft: 14, Kick: 15, Events: 16 } as const
@@ -80,8 +81,19 @@ export type GameEvent =
   | { type: 'explosion'; id: number; item: number; x: number; y: number; z: number; radius: number }
   | { type: 'target'; id: number; health: number; down: boolean }
   | { type: 'respawn'; player: number }
+  | { type: 'piecePlaced'; id: number; kind: number; i: number; j: number; k: number; dir: number; material: number; builder: number; seq: number; age: number; damage: number }
+  | { type: 'pieceDamaged'; id: number; damage: number }
+  | { type: 'pieceRemoved'; id: number; collapse: boolean }
+  | { type: 'propDestroyed'; prop: number }
+  | { type: 'harvest'; material: number; amount: number; x: number; y: number; z: number }
 
-export const TargetKind = { Player: 0, Dummy: 1 } as const
+export const TargetKind = { Player: 0, Dummy: 1, Structure: 2 } as const
+
+/** Peça inexistente vira "fora do modo construção"; material fora da faixa vira metal (decodeBuild). */
+function normBuild(b: number): number {
+  const d = decodeBuild(b | 0)
+  return encodeBuild(d.kind, d.rot, d.material)
+}
 
 export interface WelcomeMessage {
   type: 'welcome'
@@ -145,8 +157,9 @@ export function quantizeCommand(c: InputCommand): InputCommand {
     yaw: dequantYaw(quantYaw(c.yaw)),
     pitch: dequantPitch(quantPitch(c.pitch)),
     buttons: c.buttons & BUTTONS_MASK,
-    slot: clamp(c.slot | 0, 0, SLOT_COUNT - 1),
+    slot: clamp(c.slot | 0, 0, SELECT_COUNT - 1),
     viewTick: quantViewTick(c.viewTick) / 8,
+    build: normBuild(c.build),
   }
 }
 
@@ -167,8 +180,9 @@ export function sanitizeCommand(c: InputCommand): InputCommand {
     yaw: finite(c.yaw),
     pitch: clamp(finite(c.pitch), -MOVE.maxPitch, MOVE.maxPitch),
     buttons: c.buttons & BUTTONS_MASK,
-    slot: clamp(Number.isInteger(c.slot) ? c.slot : 0, 0, SLOT_COUNT - 1),
+    slot: clamp(Number.isInteger(c.slot) ? c.slot : 0, 0, SELECT_COUNT - 1),
     viewTick: Math.max(0, finite(c.viewTick)),
+    build: normBuild(c.build),
   }
 }
 
@@ -181,10 +195,10 @@ export function encodeHello(name: string): Uint8Array {
 
 export function encodeInputs(commands: readonly InputCommand[]): Uint8Array {
   if (commands.length > MAX_COMMANDS_PER_MESSAGE) throw new ProtocolError('comandos demais em uma mensagem')
-  const w = new BinaryWriter(8 + commands.length * 17).u8(C2S.Input).u8(commands.length)
+  const w = new BinaryWriter(8 + commands.length * 18).u8(C2S.Input).u8(commands.length)
   for (const c of commands) {
     w.u32(c.seq >>> 0).i8(quantAxis(c.forward)).i8(quantAxis(c.right)).u16(quantYaw(c.yaw)).i16(quantPitch(c.pitch))
-      .u16(c.buttons & BUTTONS_MASK).u8(clamp(c.slot | 0, 0, SLOT_COUNT - 1)).u32(quantViewTick(c.viewTick))
+      .u16(c.buttons & BUTTONS_MASK).u8(clamp(c.slot | 0, 0, SELECT_COUNT - 1)).u32(quantViewTick(c.viewTick)).u8(normBuild(c.build))
   }
   return w.finish()
 }
@@ -220,8 +234,9 @@ export function decodeClientMessage(data: Uint8Array): ClientMessage {
           yaw: dequantYaw(r.u16()),
           pitch: dequantPitch(r.i16()),
           buttons: r.u16() & BUTTONS_MASK,
-          slot: Math.min(r.u8(), SLOT_COUNT - 1),
+          slot: Math.min(r.u8(), SELECT_COUNT - 1),
           viewTick: r.u32() / 8,
+          build: normBuild(r.u8()),
         })
       }
       msg = { type: 'input', commands }
@@ -263,7 +278,7 @@ export function writePlayerState(w: BinaryWriter, p: PlayerState): void {
   for (const s of p.slots) w.u8(s.item).u8(s.rarity).u16(s.count).u16(s.ammo)
   for (let k = 0; k < AMMO_TYPES; k++) w.u16(p.ammo[k])
   for (let k = 0; k < MATERIAL_TYPES; k++) w.u16(p.materials[k])
-  w.f64(p.equipTimer).f64(p.fireCooldown).f64(p.reloadTimer).f64(p.useTimer).f64(p.bloom)
+  w.f64(p.equipTimer).f64(p.fireCooldown).f64(p.reloadTimer).f64(p.useTimer).f64(p.bloom).f64(p.buildCooldown)
 }
 
 export function readPlayerState(r: BinaryReader): PlayerState {
@@ -272,7 +287,7 @@ export function readPlayerState(r: BinaryReader): PlayerState {
   p.alive = r.u8() === 1
   p.health = r.f64()
   p.shield = r.f64()
-  p.selected = Math.min(r.u8(), SLOT_COUNT - 1)
+  p.selected = Math.min(r.u8(), SELECT_COUNT - 1)
   for (const s of p.slots) {
     s.item = r.u8()
     s.rarity = r.u8()
@@ -286,6 +301,7 @@ export function readPlayerState(r: BinaryReader): PlayerState {
   p.reloadTimer = r.f64()
   p.useTimer = r.f64()
   p.bloom = r.f64()
+  p.buildCooldown = r.f64()
   return p
 }
 
@@ -299,9 +315,9 @@ export function encodeWelcome(m: Omit<WelcomeMessage, 'type'>): Uint8Array {
 /** Escreve o estado público de um jogador como entidade de snapshot. */
 export function writeEntity(w: BinaryWriter, id: number, p: PlayerState): void {
   const s = p.char
-  const slot = p.slots[p.selected]
+  const slot = p.selected === PICKAXE_SLOT ? null : p.slots[p.selected]
   w.u16(id).f32(s.x).f32(s.y).f32(s.z).u16(quantYaw(s.yaw)).i16(quantPitch(s.pitch)).u16(s.flags)
-    .i16(quantVel(s.vx)).i16(quantVel(s.vy)).i16(quantVel(s.vz)).u8(slot?.item ?? NO_ITEM).u8(slot?.rarity ?? 0)
+    .i16(quantVel(s.vx)).i16(quantVel(s.vy)).i16(quantVel(s.vz)).u8(slot ? slot.item : p.selected === PICKAXE_SLOT ? ITEM.Pickaxe : NO_ITEM).u8(slot?.rarity ?? 0)
 }
 
 /** Bytes por entidade em um snapshot (para estimativas de banda). */
@@ -331,7 +347,10 @@ export function encodeKick(reason: string): Uint8Array {
   return new BinaryWriter(64).u8(S2C.Kick).string(reason).finish()
 }
 
-const EV = { shot: 1, hit: 2, damaged: 3, eliminated: 4, itemSpawn: 5, itemRemove: 6, chestOpen: 7, projSpawn: 8, explosion: 9, target: 10, respawn: 11 } as const
+const EV = {
+  shot: 1, hit: 2, damaged: 3, eliminated: 4, itemSpawn: 5, itemRemove: 6, chestOpen: 7, projSpawn: 8, explosion: 9, target: 10, respawn: 11,
+  piecePlaced: 12, pieceDamaged: 13, pieceRemoved: 14, propDestroyed: 15, harvest: 16,
+} as const
 
 function writeEvent(w: BinaryWriter, e: GameEvent): void {
   w.u8(EV[e.type])
@@ -370,6 +389,21 @@ function writeEvent(w: BinaryWriter, e: GameEvent): void {
       break
     case 'respawn':
       w.u16(e.player)
+      break
+    case 'piecePlaced':
+      w.u16(e.id).u8(e.kind).i16(e.i).i16(e.j).i8(e.k).u8(e.dir).u8(e.material).u16(e.builder).u32(e.seq >>> 0).u16(Math.min(65535, e.age)).u16(Math.min(65535, Math.round(e.damage)))
+      break
+    case 'pieceDamaged':
+      w.u16(e.id).u16(Math.min(65535, Math.round(e.damage)))
+      break
+    case 'pieceRemoved':
+      w.u16(e.id).u8(e.collapse ? 1 : 0)
+      break
+    case 'propDestroyed':
+      w.u16(e.prop)
+      break
+    case 'harvest':
+      w.u8(e.material).u8(e.amount).f32(e.x).f32(e.y).f32(e.z)
       break
   }
 }
@@ -413,6 +447,16 @@ function readEvent(r: BinaryReader): GameEvent {
       return { type: 'target', id: r.u8(), health: r.u16(), down: r.u8() === 1 }
     case EV.respawn:
       return { type: 'respawn', player: r.u16() }
+    case EV.piecePlaced:
+      return { type: 'piecePlaced', id: r.u16(), kind: r.u8(), i: r.i16(), j: r.i16(), k: r.i8(), dir: r.u8(), material: r.u8(), builder: r.u16(), seq: r.u32(), age: r.u16(), damage: r.u16() }
+    case EV.pieceDamaged:
+      return { type: 'pieceDamaged', id: r.u16(), damage: r.u16() }
+    case EV.pieceRemoved:
+      return { type: 'pieceRemoved', id: r.u16(), collapse: r.u8() === 1 }
+    case EV.propDestroyed:
+      return { type: 'propDestroyed', prop: r.u16() }
+    case EV.harvest:
+      return { type: 'harvest', material: r.u8(), amount: r.u8(), x: r.f32(), y: r.f32(), z: r.f32() }
     default:
       throw new ProtocolError(`evento desconhecido: ${t}`)
   }

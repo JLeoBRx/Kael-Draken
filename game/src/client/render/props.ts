@@ -74,14 +74,21 @@ const PART_FACTORIES: Record<PropKind, (materials: MaterialLibrary) => Part[]> =
   ],
 }
 
-export function buildPropMeshes(props: readonly Prop[], materials: MaterialLibrary): THREE.InstancedMesh[] {
-  const byKind = new Map<PropKind, Prop[]>()
-  for (const p of props) {
+export interface PropMeshes {
+  meshes: THREE.InstancedMesh[]
+  /** Esconde um adereço quebrado (índice em map.props). */
+  hide(index: number): void
+}
+
+export function buildPropMeshes(props: readonly Prop[], materials: MaterialLibrary): PropMeshes {
+  const byKind = new Map<PropKind, { p: Prop; index: number }[]>()
+  props.forEach((p, index) => {
     let list = byKind.get(p.kind)
     if (!list) byKind.set(p.kind, (list = []))
-    list.push(p)
-  }
+    list.push({ p, index })
+  })
   const meshes: THREE.InstancedMesh[] = []
+  const instances = new Map<number, [THREE.InstancedMesh, number][]>()
   const m = new THREE.Matrix4()
   const q = new THREE.Quaternion()
   const s = new THREE.Vector3()
@@ -93,7 +100,10 @@ export function buildPropMeshes(props: readonly Prop[], materials: MaterialLibra
     parts.forEach((part, pi) => {
       const mesh = new THREE.InstancedMesh(part.geometry, part.material, list.length)
       const rng = new Rng(list.length * 31 + pi)
-      list.forEach((p, k) => {
+      list.forEach(({ p, index }, k) => {
+        let refs = instances.get(index)
+        if (!refs) instances.set(index, (refs = []))
+        refs.push([mesh, k])
         q.setFromAxisAngle(up, p.yaw)
         s.setScalar(p.scale)
         // sementes no chão: afunda um pouco para não flutuar em encostas
@@ -112,5 +122,14 @@ export function buildPropMeshes(props: readonly Prop[], materials: MaterialLibra
       meshes.push(mesh)
     })
   }
-  return meshes
+  const zero = new THREE.Matrix4().makeScale(0, 0, 0)
+  return {
+    meshes,
+    hide(index) {
+      for (const [mesh, k] of instances.get(index) ?? []) {
+        mesh.setMatrixAt(k, zero)
+        mesh.instanceMatrix.needsUpdate = true
+      }
+    },
+  }
 }

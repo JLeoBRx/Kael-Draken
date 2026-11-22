@@ -1,5 +1,8 @@
 import { AMMO_INFO, AMMO_TYPES, MATERIAL_TYPES, NO_ITEM, RARITIES, itemDef, type ConsumableDef, type WeaponDef } from '../config/items'
+import { BUILD, PICKAXE, decodeBuild } from '../config/building'
 import { aimFrame, createAimFrame } from '../combat/aim'
+import { buildTarget, type PieceSpec } from '../building/grid'
+import type { BuildingWorld } from '../building/buildings'
 import { hash2i } from '../math/rng'
 import { Buttons, CharFlag, copyCharacterState, createCharacterState, stepCharacter, type CharacterState, type MoveCommand } from '../movement/character'
 import type { CollisionWorld } from '../world/collision-world'
@@ -14,6 +17,10 @@ import type { CollisionWorld } from '../world/collision-world'
  */
 
 export const SLOT_COUNT = 5
+/** Índice de seleção da picareta (sempre disponível, fora dos 5 espaços). */
+export const PICKAXE_SLOT = 5
+/** Seleções possíveis: 5 espaços + picareta. */
+export const SELECT_COUNT = 6
 export const MAX_HEALTH = 100
 export const MAX_SHIELD = 100
 /** Velocidade de queda a partir da qual há dano (≈ 6 m de altura). */
@@ -33,8 +40,10 @@ export interface Slot {
 
 export interface PlayerCommand extends MoveCommand {
   seq: number
-  /** Espaço do inventário desejado (0–4). */
+  /** Seleção desejada: espaços 0–4 ou PICKAXE_SLOT. */
   slot: number
+  /** Modo construção (encodeBuild): 0 = desligado. */
+  build: number
 }
 
 export interface PlayerState {
@@ -56,6 +65,8 @@ export interface PlayerState {
   useTimer: number
   /** Dispersão extra acumulada por disparos seguidos (rad). */
   bloom: number
+  /** Tempo até poder colocar outra peça. */
+  buildCooldown: number
 }
 
 export interface ShotRay {
@@ -74,6 +85,18 @@ export type PlayerEvent =
   | { type: 'dry'; item: number }
   | { type: 'consumed'; item: number }
   | { type: 'fall'; damage: number }
+  | { type: 'build'; spec: PieceSpec; material: number }
+  | { type: 'swing'; ox: number; oy: number; oz: number; dx: number; dy: number; dz: number }
+
+/**
+ * Quem decide se uma peça pode ser colocada. Servidor: valida nas construções
+ * oficiais e coloca. Cliente: valida na sua visão e coloca uma peça prevista.
+ */
+export interface BuildDelegate {
+  readonly buildings: BuildingWorld
+  /** true se a peça foi (ou já estava) colocada para este comando. */
+  tryBuild(spec: PieceSpec, material: number, seq: number): boolean
+}
 
 export function emptySlot(): Slot {
   return { item: NO_ITEM, rarity: 0, count: 0, ammo: 0 }
@@ -85,7 +108,7 @@ export function createPlayerState(char: CharacterState = createCharacterState(0,
     alive: true,
     health: MAX_HEALTH,
     shield: 0,
-    selected: 0,
+    selected: PICKAXE_SLOT,
     slots: Array.from({ length: SLOT_COUNT }, emptySlot),
     ammo: new Array(AMMO_TYPES).fill(0),
     materials: new Array(MATERIAL_TYPES).fill(0),
@@ -94,6 +117,7 @@ export function createPlayerState(char: CharacterState = createCharacterState(0,
     reloadTimer: 0,
     useTimer: 0,
     bloom: 0,
+    buildCooldown: 0,
   }
 }
 
@@ -111,6 +135,7 @@ export function copyPlayerState(src: PlayerState, dst: PlayerState): PlayerState
   dst.reloadTimer = src.reloadTimer
   dst.useTimer = src.useTimer
   dst.bloom = src.bloom
+  dst.buildCooldown = src.buildCooldown
   return dst
 }
 
@@ -118,8 +143,15 @@ export function clonePlayerState(src: PlayerState): PlayerState {
   return copyPlayerState(src, createPlayerState())
 }
 
+/** Espaço selecionado (null com a picareta na mão). */
+export function selectedSlot(p: PlayerState): Slot | null {
+  return p.selected < SLOT_COUNT ? p.slots[p.selected] : null
+}
+
 export function selectedWeapon(p: PlayerState): WeaponDef | null {
-  const it = itemDef(p.slots[p.selected].item)
+  const s = selectedSlot(p)
+  if (!s) return null
+  const it = itemDef(s.item)
   return it && it.kind === 'weapon' ? it : null
 }
 
@@ -174,7 +206,7 @@ function clearSlotIfEmpty(slot: Slot): void {
 
 function startReload(p: PlayerState, w: WeaponDef, rarity: number): boolean {
   const slot = p.slots[p.selected]
-  if (p.reloadTimer > 0 || slot.ammo >= w.magSize || p.ammo[w.ammoType] <= 0) return false
+  if (!slot || p.reloadTimer > 0 || slot.ammo >= w.magSize || p.ammo[w.ammoType] <= 0) return false
   p.reloadTimer = w.reloadTime * (RARITIES[rarity]?.reload ?? 1)
   return true
 }
@@ -184,7 +216,7 @@ function startReload(p: PlayerState, w: WeaponDef, rarity: number): boolean {
  * recarga, disparo, consumíveis e arremessos. Eventos vão para `events`
  * (o servidor resolve acertos; o cliente toca efeitos).
  */
-export function stepPlayer(p: PlayerState, cmd: PlayerCommand, world: CollisionWorld, dt: number, playerId: number, events: PlayerEvent[] | null): void {
+export function stepPlayer(p: PlayerState, cmd: PlayerCommand, world: CollisionWorld, dt: number, playerId: number, events: PlayerEvent[] | null, builder: BuildDelegate | null = null): void {
   if (!p.alive) return
   const prev = p.char.prevButtons
   stepCharacter(p.char, cmd, world, dt)
@@ -202,15 +234,42 @@ export function stepPlayer(p: PlayerState, cmd: PlayerCommand, world: CollisionW
   if (p.fireCooldown > -dt) p.fireCooldown -= dt
   else p.fireCooldown = -dt
 
-  // Troca de espaço
+  // Troca de espaço (0–4) ou picareta
   const want = cmd.slot | 0
-  if (want >= 0 && want < SLOT_COUNT && want !== p.selected) {
+  if (want >= 0 && want < SELECT_COUNT && want !== p.selected) {
     p.selected = want
     p.reloadTimer = 0
     p.useTimer = 0
     p.bloom = 0
-    const it = itemDef(p.slots[want].item)
-    p.equipTimer = it?.kind === 'weapon' ? it.equipTime : it ? CONSUMABLE_EQUIP : 0
+    const it = want < SLOT_COUNT ? itemDef(p.slots[want].item) : undefined
+    p.equipTimer = it?.kind === 'weapon' ? it.equipTime : CONSUMABLE_EQUIP
+  }
+
+  // Modo construção: o botão de tiro coloca peças; armas ficam guardadas
+  p.buildCooldown = Math.max(0, p.buildCooldown - dt)
+  const build = decodeBuild(cmd.build | 0)
+  if (build.kind !== 0) {
+    p.reloadTimer = 0
+    p.useTimer = 0
+    if (buttons & Buttons.Fire && p.buildCooldown <= 0 && builder && p.materials[build.material] >= BUILD.cost) {
+      const spec = buildTarget(p.char, build.kind, build.rot, (i, j, k, d) => builder.buildings.hasRamp(i, j, k, d))
+      if (builder.tryBuild(spec, build.material, cmd.seq)) {
+        p.materials[build.material] -= BUILD.cost
+        p.buildCooldown = BUILD.cooldown
+        events?.push({ type: 'build', spec, material: build.material })
+      }
+    }
+    return
+  }
+
+  // Picareta: golpes em ritmo fixo (o servidor decide o que foi atingido)
+  if (p.selected === PICKAXE_SLOT) {
+    if (buttons & Buttons.Fire && p.fireCooldown <= 0 && p.equipTimer <= 0) {
+      p.fireCooldown = Math.max(p.fireCooldown, -dt) + PICKAXE.interval
+      const f = aimFrame(p.char, frame)
+      events?.push({ type: 'swing', ox: f.ox, oy: f.oy, oz: f.oz, dx: f.fx, dy: f.fy, dz: f.fz })
+    }
+    return
   }
 
   const slot = p.slots[p.selected]

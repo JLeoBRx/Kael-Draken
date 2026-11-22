@@ -12,7 +12,7 @@ import {
 import { Buttons, DT, addBox, flatWorld } from './helpers'
 
 function cmd(seq: number, partial: Partial<PlayerCommand> = {}): PlayerCommand {
-  return { seq, forward: 0, right: 0, yaw: 0, pitch: 0, buttons: 0, slot: 0, ...partial }
+  return { seq, forward: 0, right: 0, yaw: 0, pitch: 0, buttons: 0, slot: 0, build: 0, ...partial }
 }
 
 function armed(item: number, rarity = 2, reserve = 120): PlayerState {
@@ -22,6 +22,7 @@ function armed(item: number, rarity = 2, reserve = 120): PlayerState {
   const w = weaponDef(item)!
   pickupItem(p, { id: 1, item, rarity, count: 1, ammo: w.magSize, x: 0, y: 0, z: 0 })
   p.ammo[w.ammoType] = reserve
+  p.selected = 0
   p.equipTimer = 0
   return p
 }
@@ -186,6 +187,9 @@ describe('inventário', () => {
     pickupItem(p, at(ITEM.Rifle, 1, 2, 30))
     pickupItem(p, at(ITEM.Smg, 1, 2, 30))
     pickupItem(p, at(ITEM.Pistol, 1, 2, 16))
+    // com a picareta na mão (padrão) e o inventário cheio, não troca
+    expect(pickupItem(p, at(ITEM.Sniper, 1, 3, 1)).taken).toBe(0)
+    p.selected = 0
     const r = pickupItem(p, at(ITEM.Sniper, 1, 3, 1))
     expect(r.swapped?.item).toBe(ITEM.Bandage)
     expect(p.slots[0].item).toBe(ITEM.Sniper)

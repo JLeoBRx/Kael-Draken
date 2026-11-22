@@ -47,6 +47,8 @@ interface DamageNumber {
   life: number
 }
 
+/** Cor (linear) das lascas por material: madeira, pedra, metal. */
+const DEBRIS_COLORS: [number, number, number][] = [[0.62, 0.42, 0.22], [0.55, 0.54, 0.5], [0.66, 0.7, 0.74]]
 const TRACERS = 64
 const PARTICLES = 600
 const tmpV = new THREE.Vector3()
@@ -205,7 +207,37 @@ export class Effects {
     this.projectiles.delete(id)
   }
 
-  damageNumber(pos: THREE.Vector3, amount: number, kind: 'body' | 'head' | 'shield'): void {
+  /** Lascas e poeira de construção quebrando/desabando, na cor do material. */
+  debris(min: THREE.Vector3, max: THREE.Vector3, material: number, amount = 1): void {
+    const color = DEBRIS_COLORS[material] ?? DEBRIS_COLORS[0]
+    const n = Math.round(26 * amount)
+    for (let k = 0; k < n; k++) {
+      const x = min.x + Math.random() * (max.x - min.x)
+      const y = min.y + Math.random() * (max.y - min.y)
+      const z = min.z + Math.random() * (max.z - min.z)
+      const v = 0.8 + Math.random() * 0.4
+      this.spawnParticle(x, y, z, (Math.random() - 0.5) * 3, Math.random() * 3.5, (Math.random() - 0.5) * 3, 0.6 + Math.random() * 0.6, color[0] * v, color[1] * v, color[2] * v, 0.14 + Math.random() * 0.12)
+    }
+  }
+
+  /** Lascas de um golpe de picareta (madeira, pedra ou metal). */
+  chips(pos: THREE.Vector3, material: number): void {
+    const color = DEBRIS_COLORS[material] ?? DEBRIS_COLORS[0]
+    for (let k = 0; k < 8; k++) {
+      this.spawnParticle(pos.x, pos.y, pos.z, (Math.random() - 0.5) * 2.4, Math.random() * 2.6, (Math.random() - 0.5) * 2.4, 0.35 + Math.random() * 0.3, color[0], color[1], color[2], 0.08)
+    }
+  }
+
+  /** Texto flutuante (ex.: "+8 Madeira" ao coletar). */
+  floatText(pos: THREE.Vector3, text: string, cls: string): void {
+    const el = document.createElement('div')
+    el.className = `dmg ${cls}`
+    el.textContent = text
+    this.overlay.append(el)
+    this.numbers.push({ el, pos: pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.3, 0.4, 0)), life: 1.0 })
+  }
+
+  damageNumber(pos: THREE.Vector3, amount: number, kind: 'body' | 'head' | 'shield' | 'build'): void {
     const el = document.createElement('div')
     el.className = `dmg ${kind}`
     el.textContent = String(amount)

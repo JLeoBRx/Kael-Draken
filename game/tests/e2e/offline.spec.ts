@@ -25,7 +25,7 @@ test('partida offline: servidor no Worker, movimento, pulo, deslize, mira e paus
   const start = await state(page)
   expect(start.mode).toBe('Offline')
   expect(start.grounded).toBe(true)
-  expect(start.y).toBeCloseTo(6.15, 1)
+  expect(start.y).toBeCloseTo(8.0, 1)
 
   // Olhar com o mouse (evento sintético: o modo headless não entrega movementX sob captura)
   await page.evaluate(() => document.dispatchEvent(new MouseEvent('mousemove', { movementX: -200, movementY: -50 })))

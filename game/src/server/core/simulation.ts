@@ -1,4 +1,7 @@
-import { ITEM, NO_ITEM, damageAt, itemDef, weaponDef, type ProjectileDef } from '../../shared/config/items'
+import { EXPLOSION_STRUCTURE_MULT, PICKAXE, PROP_HEALTH } from '../../shared/config/building'
+import { ITEM, MATERIAL_MAX, Material, NO_ITEM, damageAt, itemDef, weaponDef, type ProjectileDef } from '../../shared/config/items'
+import { BuildingWorld, pieceHealth, type Piece } from '../../shared/building/buildings'
+import type { PieceSpec } from '../../shared/building/grid'
 import { muzzlePoint } from '../../shared/combat/aim'
 import { createHitbox, hitboxAt, hitboxCenter, rayHitbox, segmentHitsHitbox, type HitResult } from '../../shared/combat/hitboxes'
 import { splashDamage, stepProjectile, type ProjectileState } from '../../shared/combat/projectile'
@@ -9,8 +12,8 @@ import { Buttons, createCharacterState } from '../../shared/movement/character'
 import { Cause, TargetKind, sanitizeCommand, type GameEvent, type InputCommand, type InventoryAction, type ShotEnd } from '../../shared/net/protocol'
 import { chestInteractable, itemInteractable, pickInteractable, type Interactable } from '../../shared/player/interact'
 import { pickupItem, swapSlots, takeSlot, type WorldItem } from '../../shared/player/inventory'
-import { createPlayerState, stepPlayer, type PlayerEvent, type PlayerState } from '../../shared/player/player'
-import { createWorldHit } from '../../shared/world/collision-world'
+import { createPlayerState, stepPlayer, type BuildDelegate, type PlayerEvent, type PlayerState } from '../../shared/player/player'
+import { Surface, createWorldHit } from '../../shared/world/collision-world'
 import { rollChest, rollFloor, type LootDrop } from './loot'
 
 /**
@@ -88,6 +91,21 @@ class PoseHistory {
   }
 }
 
+interface TraceResult {
+  t: number
+  /** TargetKind (jogador/boneco) ou -1. */
+  kind: number
+  target: number
+  head: boolean
+  /** Colisor do mundo atingido (-1 = nenhum/relevo). */
+  collider: number
+  x: number
+  y: number
+  z: number
+  /** 0 = nada, 1 = mundo, 2 = personagem/boneco. */
+  hit: number
+}
+
 export interface SimPlayer {
   id: number
   name: string
@@ -160,6 +178,18 @@ export class Simulation {
   private readonly hr: HitResult = { t: 0, head: false }
   private readonly pose = { x: 0, y: 0, z: 0, flags: 0 }
   private readonly playerEvents: PlayerEvent[] = []
+  /** Construções da partida (sobre o mesmo CollisionWorld do mapa). */
+  readonly buildings: BuildingWorld
+  private nextPieceId = 1
+  private readonly damagedPieces = new Set<Piece>()
+  private readonly propHealth = new Map<number, number>()
+  /** Adereços quebrados (árvores, rochas, caixotes). */
+  readonly destroyedProps = new Set<number>()
+  private readonly boxByCollider = new Map<number, number>()
+  private readonly boxYield = new Map<number, number>()
+  /** Jogador cujo comando está sendo aplicado (para o delegado de construção). */
+  private builder: SimPlayer | null = null
+  private readonly buildDelegate: BuildDelegate
 
   constructor(map: GameMap, tickRate: number, rules: Partial<MatchRules> = {}) {
     this.map = map
@@ -169,6 +199,9 @@ export class Simulation {
     this.rng = new Rng(map.def.seed ^ (this.rules.seed * 0x9e3779b1))
     this.chestOpened = map.chests.map(() => false)
     this.dummies = map.targets.map((t, id) => ({ id, x: t.x, y: t.y, z: t.z, yaw: t.yaw, health: DUMMY_HEALTH, downUntil: -1, lastHitTick: -1000 }))
+    this.buildings = new BuildingWorld(map.world)
+    map.boxes.forEach((b, i) => this.boxByCollider.set(b.colliderId, i))
+    this.buildDelegate = { buildings: this.buildings, tryBuild: (spec, mat, seq) => this.tryBuild(spec, mat, seq) }
     this.populateLoot()
   }
 
@@ -276,6 +309,8 @@ export class Simulation {
     this.stepProjectiles()
     this.stepDummies()
     this.stepRefills()
+    for (const p of this.damagedPieces) if (this.buildings.byId.get(p.id) === p) this.emit({ type: 'pieceDamaged', id: p.id, damage: p.damage })
+    this.damagedPieces.clear()
     this.tick++
     for (const sp of this.players.values()) if (sp.p.alive) sp.history.record(this.tick, sp.p.char)
   }
@@ -284,9 +319,12 @@ export class Simulation {
     const prev = sp.p.char.prevButtons
     const evs = this.playerEvents
     evs.length = 0
-    stepPlayer(sp.p, c, this.map.world, this.dt, sp.id, evs)
+    this.builder = sp
+    stepPlayer(sp.p, c, this.map.world, this.dt, sp.id, evs, this.buildDelegate)
+    this.builder = null
     for (const e of evs) {
       if (e.type === 'shot') this.resolveShot(sp, e.item, e.rarity, e.rays, c.viewTick)
+      else if (e.type === 'swing') this.resolveSwing(sp, e, c.viewTick)
       else if (e.type === 'throw') {
         const def = itemDef(e.item)
         if (def?.kind === 'consumable' && def.throwable) this.spawnProjectile(sp, e.item, def.throwable, e.x, e.y, e.z, e.vx, e.vy, e.vz)
@@ -308,6 +346,48 @@ export class Simulation {
 
   // ---- tiros --------------------------------------------------------------
 
+  /**
+   * Traça um raio de tiro/golpe: mundo (relevo, mapa, construções), jogadores
+   * voltados no tempo (`rewind`) e bonecos; depois exige caminho livre entre a
+   * arma (peito) e o impacto.
+   */
+  private traceRay(sp: SimPlayer, r: { ox: number; oy: number; oz: number; dx: number; dy: number; dz: number }, range: number, rewind: number, muzzle: { x: number; y: number; z: number }): TraceResult {
+    const world = this.map.world
+    const out: TraceResult = { t: range, kind: -1, target: 0, head: false, collider: -1, x: 0, y: 0, z: 0, hit: 0 }
+    if (world.raycast(r.ox, r.oy, r.oz, r.dx, r.dy, r.dz, range, this.hit)) {
+      out.t = this.hit.t
+      out.collider = this.hit.colliderId
+      out.hit = 1
+    }
+    for (const q of this.players.values()) {
+      if (q === sp || !q.p.alive) continue
+      if (!q.history.sample(rewind, this.pose)) Object.assign(this.pose, { x: q.p.char.x, y: q.p.char.y, z: q.p.char.z, flags: q.p.char.flags })
+      hitboxAt(this.pose.x, this.pose.y, this.pose.z, this.pose.flags, this.hb)
+      if (rayHitbox(r.ox, r.oy, r.oz, r.dx, r.dy, r.dz, out.t, this.hb, this.hr) && this.hr.t < out.t) {
+        Object.assign(out, { t: this.hr.t, kind: TargetKind.Player, target: q.id, head: this.hr.head, collider: -1, hit: 2 })
+      }
+    }
+    for (const d of this.dummies) {
+      if (d.downUntil >= 0) continue
+      hitboxAt(d.x, d.y, d.z, 0, this.hb)
+      if (rayHitbox(r.ox, r.oy, r.oz, r.dx, r.dy, r.dz, out.t, this.hb, this.hr) && this.hr.t < out.t) {
+        Object.assign(out, { t: this.hr.t, kind: TargetKind.Dummy, target: d.id, head: this.hr.head, collider: -1, hit: 2 })
+      }
+    }
+    out.x = r.ox + r.dx * out.t
+    out.y = r.oy + r.dy * out.t
+    out.z = r.oz + r.dz * out.t
+    // Nada de atirar "pela câmera": o caminho da arma até o impacto também precisa estar livre.
+    const mx = out.x - muzzle.x
+    const my = out.y - muzzle.y
+    const mz = out.z - muzzle.z
+    const md = Math.sqrt(mx * mx + my * my + mz * mz)
+    if (md > 0.6 && world.raycast(muzzle.x, muzzle.y, muzzle.z, mx / md, my / md, mz / md, md - 0.05, this.hit2)) {
+      Object.assign(out, { x: this.hit2.x, y: this.hit2.y, z: this.hit2.z, kind: -1, collider: this.hit2.colliderId, hit: 1, head: false })
+    }
+    return out
+  }
+
   private resolveShot(sp: SimPlayer, item: number, rarity: number, rays: { ox: number; oy: number; oz: number; dx: number; dy: number; dz: number }[], viewTick: number): void {
     const w = weaponDef(item)
     if (!w || rays.length === 0) return
@@ -317,83 +397,145 @@ export class Simulation {
       this.spawnProjectile(sp, item, w.projectile, r.ox + r.dx * 0.8, r.oy + r.dy * 0.8, r.oz + r.dz * 0.8, r.dx * v, r.dy * v, r.dz * v)
       return
     }
-    const world = this.map.world
     // Compensação de latência: o servidor volta os alvos ao tick que o atirador via.
     const rewind = clamp(viewTick, this.tick - this.tickRate, this.tick)
     const muzzle = muzzlePoint(sp.p.char)
     const ends: ShotEnd[] = []
     const acc = new Map<string, { kind: number; id: number; dmg: number; head: boolean; x: number; y: number; z: number }>()
     for (const r of rays) {
-      let best = w.range
-      let kind = -1
-      let target = 0
-      let head = false
-      let hitWorld = false
-      if (world.raycast(r.ox, r.oy, r.oz, r.dx, r.dy, r.dz, w.range, this.hit)) {
-        best = this.hit.t
-        hitWorld = true
-      }
-      for (const q of this.players.values()) {
-        if (q === sp || !q.p.alive) continue
-        if (!q.history.sample(rewind, this.pose)) Object.assign(this.pose, { x: q.p.char.x, y: q.p.char.y, z: q.p.char.z, flags: q.p.char.flags })
-        hitboxAt(this.pose.x, this.pose.y, this.pose.z, this.pose.flags, this.hb)
-        if (rayHitbox(r.ox, r.oy, r.oz, r.dx, r.dy, r.dz, best, this.hb, this.hr) && this.hr.t < best) {
-          best = this.hr.t
-          kind = TargetKind.Player
-          target = q.id
-          head = this.hr.head
-        }
-      }
-      for (const d of this.dummies) {
-        if (d.downUntil >= 0) continue
-        hitboxAt(d.x, d.y, d.z, 0, this.hb)
-        if (rayHitbox(r.ox, r.oy, r.oz, r.dx, r.dy, r.dz, best, this.hb, this.hr) && this.hr.t < best) {
-          best = this.hr.t
-          kind = TargetKind.Dummy
-          target = d.id
-          head = this.hr.head
-        }
-      }
-      let ex = r.ox + r.dx * best
-      let ey = r.oy + r.dy * best
-      let ez = r.oz + r.dz * best
-      // Nada de atirar "pela câmera": o caminho da arma até o impacto também precisa estar livre.
-      const mx = ex - muzzle.x
-      const my = ey - muzzle.y
-      const mz = ez - muzzle.z
-      const md = Math.sqrt(mx * mx + my * my + mz * mz)
-      if (md > 0.6 && world.raycast(muzzle.x, muzzle.y, muzzle.z, mx / md, my / md, mz / md, md - 0.05, this.hit2)) {
-        ex = this.hit2.x
-        ey = this.hit2.y
-        ez = this.hit2.z
-        kind = -1
-        hitWorld = true
-      }
-      ends.push({ x: ex, y: ey, z: ez, hit: kind >= 0 ? 2 : hitWorld ? 1 : 0 })
-      if (kind >= 0) {
-        const key = `${kind}:${target}`
-        const dmg = damageAt(w, rarity, best) * (head ? w.headshot : 1)
-        const a = acc.get(key)
-        if (a) {
-          a.dmg += dmg
-          a.head ||= head
-        } else acc.set(key, { kind, id: target, dmg, head, x: ex, y: ey, z: ez })
-      }
+      const res = this.traceRay(sp, r, w.range, rewind, muzzle)
+      ends.push({ x: res.x, y: res.y, z: res.z, hit: res.hit })
+      let kind = res.kind
+      let target = res.target
+      let dmg = damageAt(w, rarity, res.t) * (res.head ? w.headshot : 1)
+      if (kind < 0 && res.collider >= 0) {
+        const piece = this.buildings.pieceOfCollider(res.collider)
+        if (!piece) continue
+        kind = TargetKind.Structure
+        target = piece.id
+        dmg = damageAt(w, rarity, res.t)
+      } else if (kind < 0) continue
+      const key = `${kind}:${target}`
+      const a = acc.get(key)
+      if (a) {
+        a.dmg += dmg
+        a.head ||= res.head
+      } else acc.set(key, { kind, id: target, dmg, head: res.head, x: res.x, y: res.y, z: res.z })
     }
     const r0 = rays[0]
     this.emit({ type: 'shot', shooter: sp.id, item, ox: r0.ox, oy: r0.oy, oz: r0.oz, ends }, { except: sp.id })
-    for (const a of acc.values()) {
-      const amount = Math.max(1, Math.round(a.dmg))
-      if (a.kind === TargetKind.Player) {
-        const q = this.players.get(a.id)
-        if (!q) continue
-        const res = this.applyDamage(q, amount, sp, item, muzzle.x, muzzle.z)
-        if (res) this.emit({ type: 'hit', targetKind: a.kind, target: a.id, damage: amount, head: a.head, ...res, x: a.x, y: a.y, z: a.z }, { to: sp.id })
-      } else {
-        const res = this.damageDummy(this.dummies[a.id], amount)
-        this.emit({ type: 'hit', targetKind: a.kind, target: a.id, damage: amount, head: a.head, shield: false, broke: false, eliminated: res, x: a.x, y: a.y, z: a.z }, { to: sp.id })
-      }
+    for (const a of acc.values()) this.applyHit(sp, a.kind, a.id, Math.max(1, Math.round(a.dmg)), a.head, item, muzzle, a.x, a.y, a.z)
+  }
+
+  /** Aplica um acerto confirmado e avisa o autor. */
+  private applyHit(sp: SimPlayer, kind: number, id: number, amount: number, head: boolean, cause: number, from: { x: number; z: number }, x: number, y: number, z: number): void {
+    if (kind === TargetKind.Player) {
+      const q = this.players.get(id)
+      if (!q) return
+      const res = this.applyDamage(q, amount, sp, cause, from.x, from.z)
+      if (res) this.emit({ type: 'hit', targetKind: kind, target: id, damage: amount, head, ...res, x, y, z }, { to: sp.id })
+    } else if (kind === TargetKind.Dummy) {
+      const down = this.damageDummy(this.dummies[id], amount)
+      this.emit({ type: 'hit', targetKind: kind, target: id, damage: amount, head, shield: false, broke: false, eliminated: down, x, y, z }, { to: sp.id })
+    } else {
+      const piece = this.buildings.byId.get(id)
+      if (!piece) return
+      const destroyed = this.damagePiece(piece, amount)
+      this.emit({ type: 'hit', targetKind: kind, target: id, damage: amount, head: false, shield: false, broke: false, eliminated: destroyed, x, y, z }, { to: sp.id })
     }
+  }
+
+  /** Golpe de picareta: dano curto em jogadores e construções, coleta de material no resto. */
+  private resolveSwing(sp: SimPlayer, e: { ox: number; oy: number; oz: number; dx: number; dy: number; dz: number }, viewTick: number): void {
+    const rewind = clamp(viewTick, this.tick - this.tickRate, this.tick)
+    const muzzle = muzzlePoint(sp.p.char)
+    const res = this.traceRay(sp, e, PICKAXE.reach, rewind, muzzle)
+    // Os outros veem o golpe (animação e lascas) pelo mesmo evento de disparo
+    this.emit({ type: 'shot', shooter: sp.id, item: ITEM.Pickaxe, ox: e.ox, oy: e.oy, oz: e.oz, ends: [{ x: res.x, y: res.y, z: res.z, hit: res.hit }] }, { except: sp.id })
+    if (res.kind === TargetKind.Player || res.kind === TargetKind.Dummy) {
+      this.applyHit(sp, res.kind, res.target, PICKAXE.damagePlayer, false, ITEM.Pickaxe, muzzle, res.x, res.y, res.z)
+      return
+    }
+    if (res.collider < 0) return
+    const piece = this.buildings.pieceOfCollider(res.collider)
+    if (piece) {
+      this.applyHit(sp, TargetKind.Structure, piece.id, PICKAXE.damageStructure, false, ITEM.Pickaxe, muzzle, res.x, res.y, res.z)
+      return
+    }
+    this.harvest(sp, res.collider, res.x, res.y, res.z)
+  }
+
+  // ---- construção ---------------------------------------------------------
+
+  /** Coloca a peça para o jogador que está executando o comando (validação oficial). */
+  private tryBuild(spec: PieceSpec, material: number, seq: number): boolean {
+    const sp = this.builder
+    if (!sp || this.buildings.canPlace(spec) !== null) return false
+    let id = this.nextPieceId
+    while (this.buildings.byId.has(id)) id = id >= 0xfffe ? 1 : id + 1
+    this.nextPieceId = id >= 0xfffe ? 1 : id + 1
+    this.buildings.add(spec, id, material, { builtAt: this.tick, builder: sp.id, seq })
+    this.emit({ type: 'piecePlaced', id, ...spec, material, builder: sp.id, seq, age: 0, damage: 0 })
+    return true
+  }
+
+  /** Dano em uma peça; devolve true se ela foi destruída. */
+  damagePiece(p: Piece, amount: number): boolean {
+    if (this.buildings.byId.get(p.id) !== p) return false
+    p.damage += amount
+    if (pieceHealth(p, this.tick, this.tickRate) <= 0) {
+      this.destroyPiece(p)
+      return true
+    }
+    this.damagedPieces.add(p)
+    return false
+  }
+
+  /** Remove a peça e derruba o que ficou sem ligação com o chão. */
+  private destroyPiece(p: Piece): void {
+    const near = this.buildings.neighbors(p)
+    this.buildings.remove(p)
+    this.damagedPieces.delete(p)
+    this.emit({ type: 'pieceRemoved', id: p.id, collapse: false })
+    for (const f of this.buildings.unsupported(near)) {
+      this.buildings.remove(f)
+      this.damagedPieces.delete(f)
+      this.emit({ type: 'pieceRemoved', id: f.id, collapse: true })
+    }
+  }
+
+  private harvest(sp: SimPlayer, collider: number, x: number, y: number, z: number): void {
+    let material: number
+    let amount: number
+    const propIndex = this.map.propColliders.get(collider)
+    if (propIndex !== undefined) {
+      const prop = this.map.props[propIndex]
+      material = prop.kind === 'rock' ? Material.Stone : Material.Wood
+      amount = PICKAXE.harvest[material]
+      const hp = (this.propHealth.get(propIndex) ?? PROP_HEALTH[prop.kind] ?? 100) - PICKAXE.damageStructure
+      if (hp <= 0) this.destroyProp(propIndex, collider)
+      else this.propHealth.set(propIndex, hp)
+    } else {
+      const box = this.boxByCollider.get(collider)
+      if (box === undefined) return
+      const surface = this.map.world.get(collider)?.surface
+      material = surface === Surface.Wood ? Material.Wood : surface === Surface.Metal ? Material.Metal : Material.Stone
+      const left = this.boxYield.get(box) ?? PICKAXE.staticYield
+      amount = Math.min(left, PICKAXE.harvest[material])
+      this.boxYield.set(box, left - amount)
+    }
+    const got = Math.min(amount, MATERIAL_MAX - sp.p.materials[material])
+    if (got <= 0) return
+    sp.p.materials[material] += got
+    this.emit({ type: 'harvest', material, amount: got, x, y, z }, { to: sp.id })
+  }
+
+  private destroyProp(index: number, collider: number): void {
+    this.map.world.remove(collider)
+    this.map.propColliders.delete(collider)
+    this.propHealth.delete(index)
+    this.destroyedProps.add(index)
+    this.emit({ type: 'propDestroyed', prop: index })
   }
 
   /** Aplica dano (escudo primeiro). Devolve os detalhes ou null se o alvo já estava fora. */
@@ -637,6 +779,20 @@ export class Simulation {
       const res = this.applyDamage(q, amount, owner, pr.item, x, z)
       if (res && owner) this.emit({ type: 'hit', targetKind: TargetKind.Player, target: q.id, damage: amount, head: false, ...res, x: c.x, y: c.y, z: c.z }, { to: owner.id })
     }
+    // Construções no raio (dano multiplicado: explosivos derrubam paredes)
+    const near = new Set<Piece>()
+    const r = def.splashRadius
+    for (const c of world.queryAabb(x - r, y - r, z - r, x + r, y + r, z + r, [])) {
+      const p = this.buildings.pieceOfCollider(c.id)
+      if (p) near.add(p)
+    }
+    for (const p of near) {
+      const dx = Math.max(p.minX - x, 0, x - p.maxX)
+      const dy = Math.max(p.minY - y, 0, y - p.maxY)
+      const dz = Math.max(p.minZ - z, 0, z - p.maxZ)
+      const dist = Math.hypot(dx, dy, dz)
+      if (dist < r) this.damagePiece(p, Math.round(splashDamage(def, dist) * EXPLOSION_STRUCTURE_MULT))
+    }
     for (const d of this.dummies) {
       if (d.downUntil >= 0) continue
       const c = hitboxCenter(hitboxAt(d.x, d.y, d.z, 0, this.hb))
@@ -657,6 +813,10 @@ export class Simulation {
     this.chestOpened.forEach((open, chest) => { if (open) out.push({ type: 'chestOpen', chest, by: 0 }) })
     for (const d of this.dummies) if (d.downUntil >= 0) out.push({ type: 'target', id: d.id, health: 0, down: true })
     for (const pr of this.projectiles.values()) out.push({ type: 'projSpawn', id: pr.id, item: pr.item, owner: pr.owner, x: pr.s.x, y: pr.s.y, z: pr.s.z, vx: pr.s.vx, vy: pr.s.vy, vz: pr.s.vz })
+    for (const p of this.buildings.byId.values()) {
+      out.push({ type: 'piecePlaced', id: p.id, ...p.spec, material: p.material, builder: p.builder, seq: 0, age: this.tick - p.builtAt, damage: p.damage })
+    }
+    for (const prop of this.destroyedProps) out.push({ type: 'propDestroyed', prop })
     return out
   }
 }

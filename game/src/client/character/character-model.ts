@@ -1,8 +1,8 @@
 import * as THREE from 'three'
-import { clamp, damp, dampAngle, wrapAngle } from '../../shared/math/scalar'
+import { clamp, damp, dampAngle, lerp, wrapAngle } from '../../shared/math/scalar'
 import { CharFlag } from '../../shared/movement/character'
-import { itemDef } from '../../shared/config/items'
-import { buildItemModel, buildWeaponModel } from '../render/item-models'
+import { ITEM, itemDef } from '../../shared/config/items'
+import { buildItemModel, buildPickaxeModel, buildWeaponModel } from '../render/item-models'
 import { textTexture } from '../render/textures'
 
 /**
@@ -25,6 +25,9 @@ export interface CharacterSkin {
 }
 
 /** Boneco de treino do estande de tiro. */
+/** Duração da animação do golpe de picareta (s). */
+const SWING_TIME = 0.42
+
 export const DUMMY_SKIN: CharacterSkin = { name: 'Boneco', suit: 0xd9d4c7, armor: 0xd8572f, accent: 0xffffff, visor: 0x2a2a2a, dark: 0x5b4636 }
 
 export const SKINS: readonly CharacterSkin[] = [
@@ -80,7 +83,11 @@ export class CharacterModel {
   private held: THREE.Object3D | null = null
   private heldKey = ''
   private heldIsWeapon = false
+  private heldIsTool = false
   private holdW = 0
+  private toolW = 0
+  /** Progresso do golpe de picareta (0–1; ≥ 1 = parado). */
+  private swingT = 1
 
   // estado da animação
   private phase = 0
@@ -234,6 +241,8 @@ export class CharacterModel {
     this.airW = damp(this.airW, !grounded && !swimming ? 1 : 0, 10, dt)
     this.aimW = damp(this.aimW, aiming ? 1 : 0, 14, dt)
     this.holdW = damp(this.holdW, this.heldIsWeapon ? 1 : 0, 10, dt)
+    this.toolW = damp(this.toolW, this.heldIsTool ? 1 : 0, 10, dt)
+    if (this.swingT < 1) this.swingT = Math.min(1, this.swingT + dt / SWING_TIME)
     this.swimW = damp(this.swimW, swimming ? 1 : 0, 6, dt)
 
     // Orientação: o corpo acompanha a mira; parado, só gira quando a diferença é grande
@@ -320,6 +329,34 @@ export class CharacterModel {
     elbowX[1] = elbowX[1] * (1 - hw) + 1.0 * hw
     elbowX[0] = elbowX[0] * (1 - hw) + 1.1 * hw
 
+    // ---- picareta: apoiada no ombro; golpe = ergue, desce em arco e volta
+    const tw = this.toolW * (1 - ww)
+    if (tw > 0.001) {
+      let sx = 0.55
+      let ex = 1.25
+      const u = this.swingT
+      if (u < 1) {
+        const pitchArm = clamp(p.pitch, -0.8, 0.8)
+        if (u < 0.3) {
+          const k = u / 0.3
+          sx = lerp(0.55, 2.7, k)
+          ex = lerp(1.25, 1.5, k)
+        } else if (u < 0.55) {
+          const k = (u - 0.3) / 0.25
+          sx = lerp(2.7, 0.75 + pitchArm, k * k)
+          ex = lerp(1.5, 0.15, k)
+        } else {
+          const k = (u - 0.55) / 0.45
+          sx = lerp(0.75 + pitchArm, 0.55, k)
+          ex = lerp(0.15, 1.25, k)
+        }
+        spineX -= Math.sin(Math.PI * Math.min(1, u / 0.6)) * 0.25 * tw
+      }
+      armX[1] = armX[1] * (1 - tw) + sx * tw
+      armZ[1] = armZ[1] * (1 - tw) + 0.12 * tw
+      elbowX[1] = elbowX[1] * (1 - tw) + ex * tw
+    }
+
     // ---- mirando: braços à frente, acompanhando o pitch
     const mw = this.aimW * (1 - ww)
     const pitchArm = clamp(p.pitch, -1.1, 1.1)
@@ -346,7 +383,11 @@ export class CharacterModel {
       this.shoulder[k].rotation.z = armZ[k]
       this.elbow[k].rotation.x = elbowX[k]
     }
-    if (this.held) {
+    if (this.held && this.heldIsTool) {
+      // na mão direita: o cabo sai do punho para a frente
+      this.held.position.set(0, -0.27, 0)
+      this.held.rotation.set(-0.25, 0, 0)
+    } else if (this.held) {
       // transporte: apontada para a frente e um pouco para baixo; mirando: na linha da mira
       const a = this.aimW
       this.held.position.set(0.17 + 0.03 * (1 - a), -0.12 * (1 - a) + 0.07 * a, -0.24 - 0.06 * a)
@@ -360,17 +401,28 @@ export class CharacterModel {
     if (key === this.heldKey) return
     this.heldKey = key
     if (this.held) {
-      this.chest.remove(this.held)
+      this.held.removeFromParent()
       this.held.traverse((o) => (o as THREE.Mesh).geometry?.dispose())
       this.held = null
     }
     const def = itemDef(item)
     this.heldIsWeapon = def?.kind === 'weapon'
+    this.heldIsTool = item === ITEM.Pickaxe
+    if (this.heldIsTool) {
+      this.held = buildPickaxeModel()
+      this.elbow[1].add(this.held)
+      return
+    }
     if (!def) return
     const obj = def.kind === 'weapon' ? buildWeaponModel(item, rarity) : buildItemModel(item, rarity)
     if (def.kind !== 'weapon') obj.scale.setScalar(0.7)
     this.held = obj
     this.chest.add(obj)
+  }
+
+  /** Golpe de picareta (animação; o efeito vem da simulação). */
+  swing(): void {
+    this.swingT = 0
   }
 
   /** Posição da boca do cano no mundo (ou do peito, sem arma). */

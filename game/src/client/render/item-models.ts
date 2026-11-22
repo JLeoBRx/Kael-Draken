@@ -41,6 +41,29 @@ function cyl(r: number, len: number, m: THREE.Material, x: number, y: number, z:
   return mesh
 }
 
+/**
+ * Picareta: cabo ao longo de −Z a partir da empunhadura (origem), cabeça
+ * dupla perpendicular na ponta (lâmina para cima, ponta para baixo).
+ */
+export function buildPickaxeModel(): THREE.Group {
+  const g = new THREE.Group()
+  const steel = mat('pick-steel', () => new THREE.MeshStandardMaterial({ color: 0xb9c3cc, roughness: 0.35, metalness: 0.75 }))
+  const ember = mat('pick-ember', () => new THREE.MeshStandardMaterial({ color: 0xff7a2f, roughness: 0.4, metalness: 0.2, emissive: 0xff5a10, emissiveIntensity: 0.35 }))
+  const grip = mat('pick-grip', () => new THREE.MeshStandardMaterial({ color: 0x2a2320, roughness: 0.9 }))
+  g.add(cyl(0.022, 0.78, woodMat(), 0, 0, -0.3))
+  g.add(cyl(0.027, 0.18, grip, 0, 0, 0.02))
+  g.add(box(0.07, 0.07, 0.09, ember, 0, 0, -0.66))
+  const blade = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.32, 4).translate(0, 0.16, 0), steel)
+  blade.position.set(0, 0.03, -0.66)
+  blade.rotation.x = -0.35
+  const spike = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.24, 4).translate(0, -0.12, 0), steel)
+  spike.position.set(0, -0.03, -0.66)
+  spike.rotation.x = 0.35
+  g.add(blade, spike)
+  g.traverse((o) => { o.castShadow = true })
+  return g
+}
+
 /** Arma na mão ou no chão. A ponta do cano fica em `userData.muzzle` (local). */
 export function buildWeaponModel(item: number, rarity: number): THREE.Group {
   const g = new THREE.Group()

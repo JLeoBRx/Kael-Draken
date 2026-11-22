@@ -76,6 +76,15 @@ export interface CombatState extends MatchState {
   prompt: string | null
   items: number
   mapId: string
+  pieces: number
+  predictedPieces: number
+  rejectedPieces: number
+  drawnPieces: number
+  build: { kind: number; rot: number; material: number; ghost: { kind: number; i: number; j: number; k: number; dir: number } | null; blocked: string | null } | null
+  materials: number[]
+  destroyedProps: number
+  harvested: number
+  target: { name: string; health: number; max: number } | null
 }
 
 export async function combat(page: Page): Promise<CombatState> {

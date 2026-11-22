@@ -10,6 +10,8 @@ import { Rng } from '../../src/shared/math/rng'
 import { Buttons, createCharacterState } from '../../src/shared/movement/character'
 import { createPlayerState } from '../../src/shared/player/player'
 import { ITEM } from '../../src/shared/config/items'
+import { BUILD, BuildKind, decodeBuild, encodeBuild } from '../../src/shared/config/building'
+import { testMap } from './sim-helpers'
 import {
   PROTOCOL_VERSION,
   beginSnapshot,
@@ -54,8 +56,12 @@ function join(host: GameHost, id: number, name = 'Teste'): FakeConn {
 describe('protocolo', () => {
   it('comandos ida e volta preservam a quantização', () => {
     const cmds: InputCommand[] = [
-      { seq: 1, forward: 1, right: -0.5, yaw: 1.234, pitch: -0.3, buttons: Buttons.Jump | Buttons.Sprint, slot: 2, viewTick: 1234.37 },
-      { seq: 2, forward: -0.25, right: 0, yaw: -2.9, pitch: 1.4, buttons: Buttons.Crouch | 0xff00, slot: 9, viewTick: 0 },
+      { seq: 1, forward: 1, right: -0.5, yaw: 1.234, pitch: -0.3, buttons: Buttons.Jump | Buttons.Sprint, slot: 2, viewTick: 1234.37, build: 0 },
+      { seq: 2, forward: -0.25, right: 0, yaw: -2.9, pitch: 1.4, buttons: Buttons.Crouch | 0xff00, slot: 9, viewTick: 0, build: 0 },
+      { seq: 3, forward: 0, right: 0, yaw: 0, pitch: 0, buttons: Buttons.Fire, slot: 5, viewTick: 0, build: encodeBuild(BuildKind.Ramp, 3, 2) },
+      // peça 7 não existe (fora do modo construção); material 3 é limitado ao último (metal)
+      { seq: 4, forward: 0, right: 0, yaw: 0, pitch: 0, buttons: Buttons.Fire, slot: 5, viewTick: 0, build: 7 | (3 << 5) },
+      { seq: 5, forward: 0, right: 0, yaw: 0, pitch: 0, buttons: Buttons.Fire, slot: 5, viewTick: 0, build: encodeBuild(BuildKind.Wall, 0, 0) | (3 << 5) },
     ]
     const msg = decodeClientMessage(encodeInputs(cmds))
     expect(msg.type).toBe('input')
@@ -63,7 +69,10 @@ describe('protocolo', () => {
     expect(msg.commands).toEqual(cmds.map(quantizeCommand))
     expect(msg.commands[1].buttons).toBe(Buttons.Crouch)
     expect(msg.commands[0].viewTick).toBe(1234.375)
-    expect(msg.commands[1].slot).toBe(4)
+    expect(msg.commands[1].slot).toBe(5)
+    expect(decodeBuild(msg.commands[2].build)).toEqual({ kind: BuildKind.Ramp, rot: 3, material: 2 })
+    expect(msg.commands[3].build).toBe(0)
+    expect(decodeBuild(msg.commands[4].build)).toEqual({ kind: BuildKind.Wall, rot: 0, material: 2 })
   })
 
   it('snapshot com estado próprio completo e entidades', () => {
@@ -76,9 +85,10 @@ describe('protocolo', () => {
     self.ammo[1] = 120
     self.materials[2] = 45
     self.reloadTimer = 0.75
-    const other = createPlayerState(createCharacterState(10, 6.15, 20, 1))
+    const other = createPlayerState(createCharacterState(10, 8.0, 20, 1))
     other.char.vz = -7.4
     other.slots[0] = { item: ITEM.Shotgun, rarity: 2, count: 1, ammo: 5 }
+    other.selected = 0
     const w = beginSnapshot(99, 42, 3, 12, 4, self, 1)
     writeEntity(w, 7, other)
     const msg = decodeServerMessage(w.finish())
@@ -158,7 +168,7 @@ describe('GameHost', () => {
     let seq = 1
     for (let m = 0; m < 20; m++) {
       const cmds: InputCommand[] = []
-      for (let k = 0; k < 16; k++) cmds.push({ seq: seq++, forward: 1, right: 0, yaw: 0, pitch: 0, buttons: Buttons.Sprint, slot: 0, viewTick: 0 })
+      for (let k = 0; k < 16; k++) cmds.push({ seq: seq++, forward: 1, right: 0, yaw: 0, pitch: 0, buttons: Buttons.Sprint, slot: 0, viewTick: 0, build: 0 })
       host.receive(1, encodeInputs(cmds))
     }
     host.tick()
@@ -209,6 +219,7 @@ describe('predição + reconciliação contra o servidor real', () => {
         const cmd = predictor.predict({
           viewTick: 0,
           slot: 0,
+          build: 0,
           forward: tick % 90 < 70 ? 1 : 0,
           right: rng.range(-1, 1) * 0.3,
           yaw,
@@ -229,12 +240,95 @@ describe('predição + reconciliação contra o servidor real', () => {
     expect(Math.hypot(server.x, server.z)).toBeGreaterThan(5)
   })
 
+  it('corrida de rampas prevista: peças confirmadas sem nenhuma correção', () => {
+    // mapas separados: cliente e servidor têm cada um o seu mundo de colisão
+    const serverMap = testMap(() => {})
+    const clientMap = testMap(() => {})
+    const host = new GameHost({ mapId: serverMap.def.id, map: serverMap })
+    const conn = new FakeConn(1)
+    host.connect(conn)
+    host.receive(1, encodeHello('Construtor'))
+    host.tick()
+    const sp = [...host.sim.players.values()][0]
+    sp.p.materials[0] = 100
+    const predictor = new Predictor(clientMap.world, 1 / 30, sp.id)
+    const LAT = 3
+    const toServer: { at: number; data: Uint8Array }[] = []
+    const toClient: { at: number; msg: ServerMessage }[] = []
+    // o cliente começa pelo primeiro snapshot que já tem os materiais
+    let delivered = conn.inbox.length
+    let built = 0
+    let peak = 0
+    for (let tick = 0; tick < 200; tick++) {
+      while (delivered < conn.inbox.length) toClient.push({ at: tick + LAT, msg: conn.inbox[delivered++] })
+      while (toClient.length && toClient[0].at <= tick) {
+        const m = toClient.shift()!.msg
+        if (m.type === 'events') for (const e of m.events) predictor.builds.apply(e)
+        if (m.type === 'snapshot' && m.snapshot.self) {
+          predictor.builds.serverTick = m.snapshot.tick
+          predictor.reconcile(m.snapshot.self, m.snapshot.ackSeq)
+        }
+      }
+      if (predictor.initialized) {
+        const ramp = tick < 140 && predictor.builds.buildings.count < 3
+        const cmd = predictor.predict({
+          viewTick: 0, slot: 5, forward: 1, right: 0, yaw: 0, pitch: 0,
+          build: ramp ? encodeBuild(BuildKind.Ramp, 0, 0) : 0,
+          buttons: ramp ? Buttons.Fire : 0,
+        })
+        built += predictor.events.filter((e) => e.type === 'build').length
+        toServer.push({ at: tick + LAT, data: encodeInputs([cmd]) })
+      }
+      while (toServer.length && toServer[0].at <= tick) host.receive(1, toServer.shift()!.data)
+      host.tick()
+      peak = Math.max(peak, sp.p.char.y)
+    }
+    expect(built).toBe(3)
+    expect(predictor.corrections).toBe(0)
+    expect(host.sim.buildings.count).toBe(3)
+    const client = [...predictor.builds.buildings.byId.values()]
+    expect(client.every((p) => !p.predicted && p.id > 0)).toBe(true)
+    expect(client.map((p) => p.key).sort()).toEqual([...host.sim.buildings.byId.values()].map((p) => p.key).sort())
+    expect(predictor.builds.rejected).toBe(0)
+    expect(sp.p.materials[0]).toBe(100 - 3 * BUILD.cost)
+    // no servidor o jogador subiu as três rampas (12 m)
+    expect(peak).toBeGreaterThan(11.5)
+  })
+
+  it('previsão recusada pelo servidor some na reconciliação', () => {
+    const serverMap = testMap(() => {})
+    const clientMap = testMap(() => {})
+    const host = new GameHost({ mapId: serverMap.def.id, map: serverMap })
+    const conn = new FakeConn(1)
+    host.connect(conn)
+    host.receive(1, encodeHello('Construtor'))
+    host.tick()
+    const sp = [...host.sim.players.values()][0]
+    sp.p.materials[0] = 100
+    host.tick()
+    const predictor = new Predictor(clientMap.world, 1 / 30, sp.id)
+    const snap = () => conn.last('snapshot')!.snapshot
+    predictor.reconcile(snap().self!, snap().ackSeq)
+    // Outro jogador ocupa o lugar no servidor antes do comando chegar
+    host.sim.buildings.add({ kind: BuildKind.Wall, i: 0, j: -1, k: 0, dir: 0 }, 900, 0)
+    const cmd = predictor.predict({ viewTick: 0, slot: 5, forward: 0, right: 0, yaw: 0, pitch: 0, build: encodeBuild(BuildKind.Wall, 0, 0), buttons: Buttons.Fire })
+    expect(predictor.builds.buildings.count).toBe(1)
+    expect(predictor.state.materials[0]).toBe(90)
+    host.receive(1, encodeInputs([cmd]))
+    host.tick()
+    host.tick()
+    predictor.reconcile(snap().self!, snap().ackSeq)
+    expect(predictor.builds.buildings.count).toBe(0)
+    expect(predictor.builds.rejected).toBe(1)
+    expect(predictor.state.materials[0]).toBe(100)
+  })
+
   it('corrige e suaviza quando o servidor diverge', () => {
     const predictor = new Predictor(map.world, 1 / 30)
-    const s = createPlayerState(createCharacterState(0, 6.15, 20))
+    const s = createPlayerState(createCharacterState(0, 8.0, 20))
     predictor.init(s)
-    for (let k = 0; k < 5; k++) predictor.predict({ forward: 1, right: 0, yaw: 0, pitch: 0, buttons: 0, slot: 0, viewTick: 0 })
-    const moved = createPlayerState(createCharacterState(1, 6.15, 20))
+    for (let k = 0; k < 5; k++) predictor.predict({ forward: 1, right: 0, yaw: 0, pitch: 0, buttons: 0, slot: 0, viewTick: 0, build: 0 })
+    const moved = createPlayerState(createCharacterState(1, 8.0, 20))
     predictor.reconcile(moved, 5)
     expect(predictor.corrections).toBe(1)
     expect(Math.hypot(predictor.offset.x, predictor.offset.z)).toBeGreaterThan(0.5)
@@ -311,7 +405,7 @@ describe('servidor WebSocket (Node)', () => {
     await until(() => lastEntity() !== undefined)
     const before = lastEntity()!
     const cmds: InputCommand[] = []
-    for (let k = 1; k <= 30; k++) cmds.push({ seq: k, forward: 1, right: 0, yaw: 0, pitch: 0, buttons: 0, slot: 0, viewTick: 0 })
+    for (let k = 1; k <= 30; k++) cmds.push({ seq: k, forward: 1, right: 0, yaw: 0, pitch: 0, buttons: 0, slot: 0, viewTick: 0, build: 0 })
     for (let k = 0; k < 30; k += 10) a.ws.send(encodeInputs(cmds.slice(k, k + 10)))
     await until(() => before.z - (lastEntity()?.z ?? before.z) > 4)
     const res = await fetch(`http://127.0.0.1:${server.port}/api/info`)

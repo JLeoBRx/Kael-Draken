@@ -35,7 +35,7 @@ describe('Campo de Provas', () => {
       const s = createCharacterState(sp.x, 8, sp.z, sp.yaw)
       for (let k = 0; k < 30; k++) stepCharacter(s, cmd({ yaw: sp.yaw }), map.world, DT)
       expect(s.flags & CharFlag.Grounded).toBeTruthy()
-      expect(s.y).toBeCloseTo(6.15, 2)
+      expect(s.y).toBeCloseTo(8.0, 2)
     }
   })
 
@@ -47,7 +47,7 @@ describe('Campo de Provas', () => {
         stepCharacter(s, cmd({ forward: 1 }), map.world, DT)
         top = Math.max(top, s.y)
       }
-      return top - 6.15
+      return top - 8.0
     }
     expect(climb(-28)).toBeGreaterThan(2.95)
     expect(climb(-20)).toBeLessThan(1)
@@ -68,7 +68,7 @@ describe('Campo de Provas', () => {
       stepCharacter(s, cmd({ forward: 1, yaw }), map.world, DT)
       top = Math.max(top, s.y)
     }
-    expect(top - 6.15).toBeGreaterThan(15.9)
+    expect(top - 8.0).toBeGreaterThan(15.9)
   })
 
   it('o píer fica acima da água e dá para nadar ao lado dele', () => {

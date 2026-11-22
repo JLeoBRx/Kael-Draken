@@ -156,6 +156,8 @@ export const ITEM = {
   Wood: 30,
   Stone: 31,
   Metal: 32,
+  /** Ferramenta fixa (não é item de inventário; usado para o modelo na mão). */
+  Pickaxe: 40,
 } as const
 
 export const NO_ITEM = 255

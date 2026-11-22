@@ -83,12 +83,17 @@ por modelos GLTF e texturas reais.
 *intenções* (comandos de entrada); o servidor executa a simulação e publica o
 estado oficial.
 
-### Comando de entrada (cliente → servidor, 17 bytes)
+### Comando de entrada (cliente → servidor, 18 bytes)
 
 `seq` (u32) · `forward`/`right` (i8, −1..1) · `yaw` (u16) · `pitch` (i16) ·
 `buttons` (u16: pular, correr, agachar, mirar, caminhar, atirar, recarregar,
-interagir) · `slot` (u8: espaço desejado) · `viewTick` (u32: tick que o cliente
-estava vendo, base da compensação de latência)
+interagir) · `slot` (u8: espaço desejado; 5 = picareta) · `viewTick` (u32: tick
+que o cliente estava vendo, base da compensação de latência) · `build` (u8:
+peça, rotação e material do modo construção; 0 = fora dele)
+
+O cliente **não envia onde construir**: o servidor calcula a célula da grade a
+partir da posição oficial, do yaw e do pitch do comando — a mesma função que
+desenha o fantasma no cliente (`building/grid.ts › buildTarget`).
 
 Ações de inventário (soltar, reorganizar) vão em mensagens próprias; o servidor
 as aplica e o resultado volta no snapshot.
@@ -111,8 +116,13 @@ posição, yaw, pitch, flags, velocidade, arma na mão e raridade).
 Tiros de outros jogadores (com os pontos de impacto), acertos (só para quem
 atirou: dano, cabeça, escudo quebrado, eliminação), dano recebido (só para a
 vítima, com a direção), eliminações, itens que surgem/somem, baús abertos,
-projéteis lançados, explosões, bonecos derrubados e renascimentos. Quem entra
-recebe o estado atual do mundo (itens, baús, projéteis) como eventos.
+projéteis lançados, explosões, bonecos derrubados e renascimentos. Construção:
+peça colocada (com autor e `seq` do comando, para confirmar a previsão), dano
+em peça (agregado por tick), peça removida (destruída ou desabada), adereço
+quebrado (árvore, rocha, caixote) e material coletado (só para quem coletou).
+Golpes de picareta de outros jogadores chegam como "tiro" da picareta, para a
+animação e as lascas. Quem entra recebe o estado atual do mundo (itens, baús,
+projéteis, peças com idade e dano, adereços quebrados) como eventos.
 
 ### Predição e reconciliação (jogador local)
 
@@ -124,8 +134,19 @@ recebe o estado atual do mundo (itens, baús, projéteis) como eventos.
 Como a simulação é determinística, em mundo estático o número de correções é
 **zero** — verificado em teste com 100 ms de latência em cada sentido
 (`tests/unit/net.test.ts`) e nos testes de navegador. Correções passam a ocorrer
-quando outro jogador altera o mundo (construções, Fase 3) — é o caso para o qual
-a suavização existe.
+quando outro jogador altera o mundo (constrói ou derruba algo perto) — é o caso
+para o qual a suavização existe.
+
+**Construção prevista** (`client/net/predicted-buildings.ts`): a peça erguida
+pelo próprio jogador entra no mundo de colisão local no mesmo tick (id
+provisório = −seq), então dá para subir na rampa sem esperar a rede. O evento
+`piecePlaced` com o mesmo `seq` (que sempre chega antes do snapshot que
+confirma o comando) troca o id pelo oficial. Na reconciliação, **todas** as
+peças previstas saem do mundo antes de reaplicar os comandos e voltam quando o
+próprio comando é reaplicado — assim um comando anterior nunca "vê" uma peça
+que no servidor ainda não existia; as de `seq ≤ ackSeq` sem confirmação foram
+recusadas e somem. Teste: corrida de 3 rampas com 100 ms de latência em cada
+sentido termina com zero correções e as mesmas peças dos dois lados.
 
 ### Interpolação (jogadores remotos)
 
@@ -149,10 +170,14 @@ extrapola no máximo 150 ms e para.
 | Inundação | > 240 mensagens por segundo de jogo = expulsão |
 | Protocolo diferente | handshake com versão; incompatível = recusado com motivo |
 | Nome abusivo | sem caracteres de controle/HTML, máx. 16 caracteres |
+| Construir onde quiser / de longe | o cliente não envia a posição da peça; o servidor deriva a célula do próprio estado (alcance de 3,2 m à frente) |
+| Construir sem material, rápido demais ou no ar | custo (10), intervalo de 0,12 s, apoio no chão ou em outra peça, lugar livre e limite de altura — tudo na simulação oficial |
+| Coleta/golpe à distância | o servidor traça o golpe (3 m, a cada 0,55 s) e decide material e quantidade; o cliente só vê o resultado |
+| Peça "indestrutível" | vida, dano e desabamento existem só no servidor; o cliente recebe eventos |
 
 Limitação conhecida: o coice da câmera é aplicado no cliente (como na maioria
 dos jogos de tiro); detecção estatística de mira automática entra na Fase 6.
-Construções e resultado da partida seguirão a mesma regra nas fases seguintes.
+O resultado da partida seguirá a mesma regra na Fase 4.
 
 ### Combate
 
@@ -175,6 +200,23 @@ Construções e resultado da partida seguirão a mesma regra nas fases seguintes
 6. **Eliminação.** Tudo o que o jogador carregava cai em volta do corpo; o
    autor recebe o crédito (ou quem causou dano nos últimos 10 s, em quedas).
 
+### Construção
+
+| Item | Regra |
+| --- | --- |
+| Grade | células de 4 × 4 m e níveis de 4 m, alinhadas ao mundo (as rampas têm 45°) |
+| Peças | parede (borda de célula), piso (topo do nível), rampa (4 direções), telhado de duas águas (2 eixos) — cada uma é 1–2 caixas orientadas, as MESMAS na colisão e no desenho |
+| Alvo | ponto a 3,2 m à frente do olho; parede: primeira linha da grade à frente que não atravessa o jogador; nível: o do corpo, +1 ao olhar ~34° para cima; rampa continua a rampa anterior (corrida de rampas) |
+| Materiais | madeira 150 de vida / 3 s · pedra 300 / 6 s · metal 450 / 9 s; custo 10; a peça nasce com 10% da vida e cresce até o máximo |
+| Apoio | só se constrói tocando o relevo, a geometria fixa do mapa ou outra peça |
+| Desabamento | ao remover peças, as vizinhas são agrupadas; grupos sem contato com o chão caem juntos (`BuildingWorld.unsupported`) |
+| Dano | balas: dano da arma (sem cabeça); picareta: 50; explosões: dano de área × 3 |
+| Picareta | sempre disponível (tecla 1); 20 de dano em jogadores; coleta 8 de madeira (árvores, caixotes, madeira do mapa), 8 de pedra (rochas, concreto, tijolo) ou 6 de metal (carros, contêineres, galpões); estruturas fixas rendem até 60 cada; árvores, rochas e caixotes quebram |
+
+O código vive em `shared/building/` (grade e `BuildingWorld` sobre o
+`CollisionWorld`), usado pelo servidor (cópia oficial) e pelo cliente (cópia
+com previsões).
+
 ### Desempenho medido
 
 - **Simulação (Fase 1): 3,3 ms por tick com 100 jogadores** correndo e pulando no
@@ -182,6 +224,9 @@ Construções e resultado da partida seguirão a mesma regra nas fases seguintes
 - **Simulação (Fase 2): 2,5 ms por tick com 100 jogadores armados atirando sem
   parar na Ilha de Brasa** (8 mil colisores, 263 itens no chão) — orçamento a
   30 Hz: 33 ms.
+- **Construção (Fase 3): 1,6 ms por tick com 100 jogadores construindo sem
+  parar** na Ilha de Brasa (1.363 peças em 20 s); destruir todas, uma a uma,
+  com a verificação de desabamento: 69 ms no total (~0,05 ms por peça).
 - **Geração do mapa principal: ~240 ms** (relevo de 160 mil amostras, 4.900
   caixas, 4.600 adereços, 252 pontos de loot, 100 baús), igual no cliente e no servidor.
 - **Banda: o gargalo real.** Com 100 jogadores atirando, snapshots completos e
@@ -248,8 +293,9 @@ navegador, entra-se pelo endereço mostrado no terminal do host (já funciona).
   - subpassos de até 20 cm (sem atravessar paredes de 20 cm mesmo a 55 m/s);
   - degraus de até 45 cm com auxílio de subida; rampas até 50° (as de construção têm 45°);
   - "colar no chão" em descidas e degraus para baixo.
-- Construções da Fase 3 entram no `CollisionWorld` (adicionar/remover em O(1)
-  pela grade espacial), com o mesmo código no cliente e no servidor.
+- Construções entram no `CollisionWorld` (adicionar/remover em O(1) pela grade
+  espacial), com o mesmo código no cliente e no servidor; adereços quebrados
+  saem dele da mesma forma.
 
 ## 7. Estrutura de pastas
 
@@ -262,12 +308,13 @@ game/
 ├── docs/                      ARQUITETURA.md (este), ROADMAP.md
 ├── src/
 │   ├── shared/                código comum cliente/servidor
-│   │   ├── config/            game.ts (identidade), movement.ts, items.ts (catálogo)
+│   │   ├── config/            game.ts (identidade), movement.ts, items.ts (catálogo), building.ts
 │   │   ├── math/              scalar, rng, noise
 │   │   ├── world/             heightfield, obb, spatial-grid, collision-world
 │   │   ├── movement/          character.ts (controlador)
 │   │   ├── player/            player.ts (estado + stepPlayer), inventory.ts, interact.ts
 │   │   ├── combat/            aim.ts, hitboxes.ts, projectile.ts
+│   │   ├── building/          grid.ts (peças, alvo), buildings.ts (BuildingWorld: apoio, desabamento)
 │   │   ├── maps/              types, builder, structures, ember-island, proving-grounds, index
 │   │   └── net/               binary, protocol
 │   ├── server/
@@ -276,9 +323,9 @@ game/
 │   └── client/
 │       ├── app.ts, main.ts    casca e estados
 │       ├── game/              match.ts (laço da partida), world-items.ts, effects.ts
-│       ├── net/               transport, session, prediction, interpolation
+│       ├── net/               transport, session, prediction, predicted-buildings, interpolation
 │       ├── worker/            servidor local (offline)
-│       ├── render/            world-view, sky, terrain-mesh, static-geometry, props, item-models, materials, textures
+│       ├── render/            world-view, sky, terrain-mesh, static-geometry, props, item-models, buildings-view, materials, textures
 │       ├── character/         character-model.ts
 │       ├── camera/            third-person-camera.ts
 │       ├── input/             input.ts
@@ -286,8 +333,8 @@ game/
 │       ├── ui/                screens, hud, minimap, inventory-screen, icons, dom, styles.css
 │       └── settings.ts
 └── tests/
-    ├── unit/                  Vitest: colisão, movimento, mapas, combate, servidor, rede, cliente
-    └── e2e/                   Playwright: offline, combate e multijogador no navegador
+    ├── unit/                  Vitest: colisão, movimento, mapas, combate, construção, servidor, rede, cliente
+    └── e2e/                   Playwright: offline, combate, construção e multijogador no navegador
 ```
 
 ## 8. Assets: placeholders organizados e substituíveis
@@ -297,6 +344,8 @@ game/
 | Texturas de estruturas | geradas em canvas (`render/textures.ts`) | `render/materials.ts` — trocar a fábrica por `TextureLoader` com o arquivo em `public/assets/textures/` |
 | Relevo | cores por altura/inclinação + textura de detalhe | `render/terrain-mesh.ts` + material do relevo (splatmap na Fase 7) |
 | Vegetação, rochas, caixotes | malhas low-poly geradas em código, instanciadas | `PART_FACTORIES` em `render/props.ts` — trocar por GLTF |
+| Peças de construção | cubo instanciado com painéis gerados em canvas por material (`buildPanelTexture`) | `render/buildings-view.ts` — trocar por modelos GLTF por peça mantendo as caixas de colisão |
+| Picareta | modelo procedural (`buildPickaxeModel`) e golpe procedural | `render/item-models.ts` + `character/character-model.ts › swing()` |
 | Personagem | humanoide procedural com animação procedural, 8 visuais | `character/character-model.ts` — um modelo GLTF com esqueleto implementa a mesma interface (`update`, `setName`, `setHeld`, `muzzleWorld`, `dispose`) |
 | Armas, itens e baús | modelos procedurais com cores de raridade | `render/item-models.ts` — trocar por GLTF mantendo a orientação (cano para −Z, empunhadura na origem) |
 | Ícones do HUD | silhuetas SVG originais | `ui/icons.ts` |

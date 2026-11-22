@@ -1,4 +1,6 @@
+import { BuildKind } from '../../shared/config/building'
 import { Buttons } from '../../shared/movement/character'
+import { PICKAXE_SLOT } from '../../shared/player/player'
 import type { Settings } from '../settings'
 
 /**
@@ -18,10 +20,16 @@ export interface InputFrame {
   lookYaw: number
   /** Radianos a somar ao pitch (positivo = cima). */
   lookPitch: number
-  /** Espaço escolhido diretamente (teclas 1–5) ou null. */
+  /** Espaço escolhido diretamente (1 = picareta, 2–6 = espaços 0–4) ou null. */
   slot: number | null
   /** Passos de troca de espaço (roda do mouse, LB/RB). */
   slotStep: number
+  /** Peça escolhida neste quadro (Q/Z/V/T; -1 = próxima, no controle) ou null. */
+  build: number | null
+  /** Girar a peça (R no modo construção). */
+  rotate: boolean
+  /** Trocar o material (G; botão direito no modo construção). */
+  cycleMaterial: boolean
 }
 
 export const KEYBINDINGS = {
@@ -35,9 +43,21 @@ export const KEYBINDINGS = {
   walk: ['AltLeft', 'KeyX'],
   reload: ['KeyR'],
   use: ['KeyE', 'KeyF'],
+  buildWall: ['KeyQ'],
+  buildFloor: ['KeyZ'],
+  buildRamp: ['KeyV'],
+  buildRoof: ['KeyT'],
+  material: ['KeyG'],
 } as const
 
-const SLOT_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5']
+/** Tecla 1 = picareta; 2–6 = espaços do inventário. */
+const SLOT_KEYS: Record<string, number> = { Digit1: PICKAXE_SLOT, Digit2: 0, Digit3: 1, Digit4: 2, Digit5: 3, Digit6: 4 }
+const BUILD_KEYS: Record<string, number> = {
+  KeyQ: BuildKind.Wall,
+  KeyZ: BuildKind.Floor,
+  KeyV: BuildKind.Ramp,
+  KeyT: BuildKind.Roof,
+}
 
 /** Radianos por pixel de mouse com sensibilidade 1. */
 const MOUSE_RAD_PER_PX = 0.0022
@@ -61,6 +81,10 @@ export interface GamepadReading {
   next: boolean
   prev: boolean
   inventory: boolean
+  /** Direcional: cima = próxima peça (entra no modo construção), esquerda = girar, direita = material. */
+  build: boolean
+  rotate: boolean
+  material: boolean
 }
 
 function deadzone(x: number, y: number): [number, number] {
@@ -96,6 +120,9 @@ export function readGamepad(gp: GamepadLike): GamepadReading {
     next: btn(5),
     prev: btn(4),
     inventory: btn(8),
+    build: btn(12),
+    rotate: btn(14),
+    material: btn(15),
   }
 }
 
@@ -124,8 +151,14 @@ export class InputManager {
   private padNextPrev = false
   private padPrevPrev = false
   private padInvPrev = false
+  private padBuildPrev = false
+  private padRotatePrev = false
+  private padMaterialPrev = false
   private slotDirect: number | null = null
   private slotSteps = 0
+  private buildDirect: number | null = null
+  private rotateLatch = false
+  private materialLatch = false
   private readonly listeners: [EventTarget, string, EventListener, AddEventListenerOptions?][] = []
 
   constructor(private readonly canvas: HTMLCanvasElement, private settings: Settings) {}
@@ -204,6 +237,9 @@ export class InputManager {
     this.tickLatch = 0
     this.slotDirect = null
     this.slotSteps = 0
+    this.buildDirect = null
+    this.rotateLatch = false
+    this.materialLatch = false
   }
 
   /** Chamar depois que um tick usou o quadro de entrada. */
@@ -233,8 +269,14 @@ export class InputManager {
     if (!this.enabled) return
     if (e.code === 'KeyH') this.onToggleHelp?.()
     if (e.code === 'KeyM' && !e.repeat) this.onToggleMap?.()
-    const slot = SLOT_KEYS.indexOf(e.code)
-    if (slot >= 0) this.slotDirect = slot
+    const slot = SLOT_KEYS[e.code]
+    if (slot !== undefined) this.slotDirect = slot
+    if (!e.repeat) {
+      const build = BUILD_KEYS[e.code]
+      if (build !== undefined) this.buildDirect = build
+      if ((KEYBINDINGS.reload as readonly string[]).includes(e.code)) this.rotateLatch = true
+      if ((KEYBINDINGS.material as readonly string[]).includes(e.code)) this.materialLatch = true
+    }
     if (!e.repeat && (KEYBINDINGS.use as readonly string[]).includes(e.code)) this.tickLatch |= Buttons.Use
     if (!e.repeat && (KEYBINDINGS.reload as readonly string[]).includes(e.code)) this.tickLatch |= Buttons.Reload
     // Evita rolagem da página, menu do Alt e afins durante o jogo.
@@ -250,9 +292,16 @@ export class InputManager {
 
   /** Lê o estado atual e consome os deltas de olhar acumulados. */
   sample(frameDt: number, aiming: boolean): InputFrame {
-    const out: InputFrame = { forward: 0, right: 0, buttons: 0, lookYaw: 0, lookPitch: 0, slot: this.slotDirect, slotStep: this.slotSteps }
+    const out: InputFrame = {
+      forward: 0, right: 0, buttons: 0, lookYaw: 0, lookPitch: 0,
+      slot: this.slotDirect, slotStep: this.slotSteps,
+      build: this.buildDirect, rotate: this.rotateLatch, cycleMaterial: this.materialLatch,
+    }
     this.slotDirect = null
     this.slotSteps = 0
+    this.buildDirect = null
+    this.rotateLatch = false
+    this.materialLatch = false
     const sens = this.settings.sensitivity * (aiming ? this.settings.aimSensitivity : 1)
     const invert = this.settings.invertY ? -1 : 1
     out.lookYaw = -this.mouseDX * MOUSE_RAD_PER_PX * sens
@@ -307,6 +356,12 @@ export class InputManager {
       if (pad.prev && !this.padPrevPrev) out.slotStep -= 1
       this.padNextPrev = pad.next
       this.padPrevPrev = pad.prev
+      if (pad.build && !this.padBuildPrev) out.build = -1
+      if (pad.rotate && !this.padRotatePrev) out.rotate = true
+      if (pad.material && !this.padMaterialPrev) out.cycleMaterial = true
+      this.padBuildPrev = pad.build
+      this.padRotatePrev = pad.rotate
+      this.padMaterialPrev = pad.material
     }
     const pressed = buttons & ~this.prevButtons
     this.prevButtons = buttons

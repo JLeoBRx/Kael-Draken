@@ -3,7 +3,7 @@ import { DEG } from '../../shared/math/scalar'
 import type { GameMap } from '../../shared/maps/types'
 import type { QualityPreset } from '../settings'
 import { MaterialLibrary } from './materials'
-import { buildPropMeshes } from './props'
+import { buildPropMeshes, type PropMeshes } from './props'
 import { createSky } from './sky'
 import { buildStaticMeshes } from './static-geometry'
 import { buildTerrainMeshes } from './terrain-mesh'
@@ -24,6 +24,7 @@ export class WorldView {
   private readonly disposables: { dispose(): void }[] = []
   private readonly envTarget: THREE.WebGLRenderTarget
   private readonly shadowRange: number
+  private readonly props: PropMeshes
 
   constructor(readonly map: GameMap, renderer: THREE.WebGLRenderer, quality: QualityPreset) {
     const atm = map.def.atmosphere
@@ -72,7 +73,8 @@ export class WorldView {
 
     for (const mesh of buildTerrainMeshes(map.terrain, map.def.biome, map.def.waterLevel, this.materials.terrain())) this.add(mesh)
     for (const mesh of buildStaticMeshes(map.boxes, this.materials)) this.add(mesh)
-    for (const mesh of buildPropMeshes(map.props, this.materials)) this.add(mesh)
+    this.props = buildPropMeshes(map.props, this.materials)
+    for (const mesh of this.props.meshes) this.add(mesh)
 
     // Água: plano extenso até o horizonte com normais animadas
     this.waterNormal = waterNormalTexture()
@@ -124,6 +126,11 @@ export class WorldView {
         this.disposables.push(post.geometry)
       }
     }
+  }
+
+  /** Adereço quebrado (árvore cortada, rocha minerada, caixote destruído). */
+  hideProp(index: number): void {
+    this.props.hide(index)
   }
 
   /** Chamar a cada quadro com a posição do jogador e da câmera. */

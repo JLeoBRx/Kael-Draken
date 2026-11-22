@@ -2,6 +2,7 @@ import { copyCharacterState, createCharacterState, type CharacterState } from '.
 import { quantizeCommand, type InputCommand } from '../../shared/net/protocol'
 import { copyPlayerState, createPlayerState, stepPlayer, type PlayerEvent, type PlayerState } from '../../shared/player/player'
 import type { CollisionWorld } from '../../shared/world/collision-world'
+import { PredictedBuildings } from './predicted-buildings'
 
 /**
  * Predição do jogador local com reconciliação.
@@ -12,6 +13,9 @@ import type { CollisionWorld } from '../../shared/world/collision-world'
  * confirmados são reaplicados. Como a simulação é determinística, em mundo
  * estático a correção é zero; divergências (dano recebido, item pego por
  * outro) são corrigidas e o erro de posição é suavizado na tela.
+ *
+ * Construções também são previstas (ver PredictedBuildings): a peça aparece
+ * e colide no mesmo tick em que o jogador a ergue.
  */
 
 const MAX_PENDING = 128
@@ -28,13 +32,17 @@ export class Predictor {
   initialized = false
   corrections = 0
   lastError = 0
+  readonly builds: PredictedBuildings
   private pending: InputCommand[] = []
   private nextSeq = 1
 
-  constructor(private readonly world: CollisionWorld, private readonly dt: number, private playerId = 0) {}
+  constructor(private readonly world: CollisionWorld, private readonly dt: number, private playerId = 0) {
+    this.builds = new PredictedBuildings(world, playerId)
+  }
 
   setPlayerId(id: number): void {
     this.playerId = id
+    this.builds.setPlayerId(id)
   }
 
   get pendingCount(): number {
@@ -53,7 +61,7 @@ export class Predictor {
     const cmd = quantizeCommand({ ...input, seq: this.nextSeq++ })
     copyCharacterState(this.state.char, this.prev)
     this.events.length = 0
-    stepPlayer(this.state, cmd, this.world, this.dt, this.playerId, this.events)
+    stepPlayer(this.state, cmd, this.world, this.dt, this.playerId, this.events, this.builds)
     this.pending.push(cmd)
     if (this.pending.length > MAX_PENDING) this.pending.shift()
     return cmd
@@ -72,7 +80,8 @@ export class Predictor {
     const by = this.state.char.y
     const bz = this.state.char.z
     copyPlayerState(server, this.state)
-    for (const c of this.pending) stepPlayer(this.state, c, this.world, this.dt, this.playerId, null)
+    this.builds.beginReplay(ackSeq)
+    for (const c of this.pending) stepPlayer(this.state, c, this.world, this.dt, this.playerId, null, this.builds)
 
     const ex = bx - this.state.char.x
     const ey = by - this.state.char.y
