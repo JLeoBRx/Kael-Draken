@@ -5,7 +5,10 @@ import {
   encodeHello,
   encodeInputs,
   encodePing,
+  type GameEvent,
   type InputCommand,
+  encodeInventoryAction,
+  type InventoryAction,
   type ServerMessage,
   type Snapshot,
   type WelcomeMessage,
@@ -16,6 +19,7 @@ export interface SessionHandlers {
   onSnapshot(snapshot: Snapshot, receivedAt: number): void
   onPlayerInfo(id: number, name: string, skin: number): void
   onPlayerLeft(id: number): void
+  onEvents(events: GameEvent[]): void
   onClosed(reason: string): void
 }
 
@@ -66,6 +70,10 @@ export class NetSession {
 
   sendInputs(cmds: InputCommand[]): void {
     for (let k = 0; k < cmds.length; k += MAX_COMMANDS_PER_MESSAGE) this.send(encodeInputs(cmds.slice(k, k + MAX_COMMANDS_PER_MESSAGE)))
+  }
+
+  sendInventory(op: InventoryAction): void {
+    this.send(encodeInventoryAction(op))
   }
 
   startPing(intervalMs = 1000): void {
@@ -140,6 +148,9 @@ export class NetSession {
         break
       case 'playerLeft':
         h.onPlayerLeft(msg.id)
+        break
+      case 'events':
+        h.onEvents(msg.events)
         break
       default:
         break

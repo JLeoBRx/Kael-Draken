@@ -2,22 +2,27 @@
 
 Battle royale 3D em terceira pessoa, com partidas **offline**, em **rede local
 (LAN)** e **online**, sobre um servidor autoritativo. Identidade, personagens,
-mapa e interface originais. *(Título provisório — definido em
+armas, mapas e interface originais. *(Título provisório — definido em
 `src/shared/config/game.ts`.)*
 
-> **Estado: Fase 1 concluída (Fundação).** Já dá para jogar: movimentação
-> completa no mapa de testes, sozinho (offline) ou com outras pessoas no mesmo
-> servidor. Armas, construção, bots e zona chegam nas próximas fases — veja o
-> [roteiro](docs/ROADMAP.md) e a [arquitetura](docs/ARQUITETURA.md).
+> **Estado: Fase 2 concluída (Gameplay).** Armas com raridade, tiro com
+> compensação de latência, vida e escudo, inventário, loot no chão e em baús,
+> explosivos, eliminações e o mapa principal **Ilha de Brasa** — offline ou com
+> outras pessoas no mesmo servidor, em modo treino (quem é eliminado renasce).
+> Construção, bots, zona segura e a partida completa de battle royale vêm nas
+> próximas fases — veja o [roteiro](docs/ROADMAP.md) e a
+> [arquitetura](docs/ARQUITETURA.md).
 
-![Pátio de Treino do Campo de Provas](docs/imagens/patio-de-treino.webp)
+![Estande de tiro: acerto na cabeça do boneco a 10 m](docs/imagens/combate.webp)
 
-| Multijogador (dois navegadores no mesmo servidor) | Deslize |
+| Ilha de Brasa — Cidade Esquecida | Arsenal do Campo de Provas |
 | --- | --- |
-| ![Outro jogador visto com o nome acima da cabeça](docs/imagens/multijogador.webp) | ![Personagem deslizando](docs/imagens/deslize.webp) |
+| ![Ruas da cidade com prédios e minimapa](docs/imagens/ilha-cidade.webp) | ![Mesas do arsenal com armas e o aviso "Pegar"](docs/imagens/arsenal.webp) |
+| **Mapa (M)** | **Inventário (Tab)** |
+| ![Mapa completo com grade e regiões](docs/imagens/mapa.webp) | ![Inventário com espaços, munições e materiais](docs/imagens/inventario.webp) |
 
-*Capturas feitas em navegador sem GPU (renderização por software). Os assets
-são placeholders procedurais — veja "Limitações conhecidas".*
+*Capturas feitas em navegador sem GPU (renderização por software). Modelos,
+texturas e sons são placeholders procedurais — veja "Limitações conhecidas".*
 
 ## Requisitos
 
@@ -40,9 +45,15 @@ npm install
 npm run host
 ```
 
-Abra `http://localhost:7350` e clique em **Jogar offline**. O servidor da
-partida roda dentro do próprio navegador (Web Worker); depois de aberta, a
-página não precisa de rede.
+Abra `http://localhost:7350`, clique em **Jogar offline** e escolha o mapa:
+
+- **Ilha de Brasa** — mapa principal (1,6 km): cidade, floresta, montanhas,
+  distrito industrial, vilarejo, lago, base militar, farol, mansão e torre.
+- **Campo de Provas** — treino: arsenal com todas as armas (repõe a cada 8 s),
+  estande de tiro com bonecos a 10/25/50/75 m e pista de movimentação.
+
+O servidor da partida roda dentro do próprio navegador (Web Worker); depois de
+aberta, a página não precisa de rede.
 
 Para desenvolvimento com recarga automática: `npm run dev` e abra
 `http://localhost:5173`.
@@ -52,7 +63,8 @@ Para desenvolvimento com recarga automática: `npm run dev` e abra
 No computador anfitrião:
 
 ```bash
-npm run host
+npm run host                               # Ilha de Brasa
+npm run host -- --map campo-de-provas      # ou o mapa de treino
 ```
 
 O terminal mostra os endereços, por exemplo:
@@ -87,16 +99,37 @@ Opções do servidor: `npm run server -- --help`.
 | --- | --- | --- |
 | Mover | W A S D | analógico esquerdo |
 | Olhar | mouse | analógico direito |
+| Atirar / usar item | botão esquerdo | RT |
+| Mirar | botão direito | LT |
+| Recarregar | R | Y |
+| Pegar item / abrir baú | E | X |
+| Escolher espaço | 1–5, roda do mouse | LB / RB |
+| Inventário | Tab | View/Back |
+| Mapa | M | — |
 | Correr (sprint) | Shift | L3 |
 | Caminhar devagar | Alt ou X | — |
 | Pular | Espaço | A |
 | Agachar / deslizar (correndo) | C | B |
-| Mirar | botão direito | LT |
 | Pausa / liberar o mouse | Esc | Start |
 | Painel técnico | F3 | — |
 | Mostrar/ocultar ajuda | H | — |
 
 O agachar usa **C** (e não Ctrl) porque Ctrl+W fecha a aba no navegador.
+
+## O que há no jogo (Fase 2)
+
+| Sistema | Detalhes |
+| --- | --- |
+| Armas | Vespa P9 (pistola), Enxame M7 (submetralhadora), Tormenta AR-4 (fuzil), Trovão 12 (escopeta, 9 bagos), Falcão de Ferrolho (sniper com luneta), Rojão RL (lança-foguetes) — dano, cadência, dispersão, coice, pente, recarga, alcance e queda de dano por distância |
+| Raridade | Comum, Incomum, Raro, Épico, Lendário (mais dano e recarga mais rápida) |
+| Explosivos | foguete (explode no impacto) e granada (quica, pavio de 2,4 s), dano em área com linha de visão |
+| Cura e escudo | Bandagem (até 75), Kit Médico (até 100), Célula de Escudo (até 50), Bateria de Escudo (até 100) |
+| Inventário | 5 espaços, empilhamento, troca quando cheio, soltar e reorganizar; munição por tipo; madeira, pedra e metal |
+| Loot | 250+ pontos no mapa principal e 100 baús; raridade maior em baús e áreas de risco |
+| Combate | servidor decide acertos com compensação de latência (até 1 s); escudo absorve primeiro; cabeça vale mais; dano de queda |
+| Eliminação | o corpo solta tudo; feed de eliminações; tela de eliminado e espectador do autor; renascimento em 5 s (modo treino) |
+| HUD | vida, escudo, munição, espaços, recursos, minimapa, tempo, vivos, eliminações, posição na grade, bússola, mira dinâmica, marcador de acerto, indicador de dano, números de dano |
+| Áudio | sons sintetizados e posicionais (tiros, explosões, recarga, coleta, baús, acertos) |
 
 ## Scripts
 
@@ -107,30 +140,34 @@ O agachar usa **C** (e não Ctrl) porque Ctrl+W fecha a aba no navegador.
 | `npm run host` | compila o cliente e sobe o servidor servindo o jogo |
 | `npm run build` | verificação de tipos + build do cliente em `dist/client` |
 | `npm test` | testes unitários e de integração (Vitest) |
-| `npm run test:e2e` | testes no navegador (Playwright): offline e dois jogadores |
+| `npm run test:e2e` | testes no navegador (Playwright) |
 | `npm run check` | tipos + testes unitários |
 
 Para os testes de navegador em uma máquina nova: `npx playwright install chromium`.
 
 ## Testes
 
-- **Unitários e integração (58)**: colisão, movimentação (rampas, degraus,
-  túnel, deslize, nado, queda de 150 m sem atravessar o piso, determinismo bit a
-  bit), geração do mapa, protocolo, servidor (handshake, expulsões, anti-speed
-  hack, inundação), predição contra o servidor real com 100 ms de latência
-  (zero correções) e servidor WebSocket real com dois clientes.
-- **Navegador (3)**: menu e configurações; partida offline completa (olhar,
-  andar, pular, sprint, deslize, mira, pausa); dois navegadores no mesmo
-  servidor se vendo, com nomes, movimento e saída.
+- **Unitários e integração (91)**: colisão, movimentação, mapas (geração
+  determinística, todos os pontos de surgimento seguros, subida da escada de
+  um prédio de 4 andares até a laje), catálogo de itens, armas (cadência,
+  recarga, dispersão determinística), consumíveis, inventário, caixas de
+  acerto, projéteis, protocolo, servidor (acertos com compensação de latência,
+  cobertura bloqueando tiros, eliminação com loot do corpo e renascimento,
+  baús, foguetes e granadas, bonecos de treino, anti-speed hack), predição sem
+  correções com 100 ms de latência e servidor WebSocket real.
+- **Navegador (5)**: menu e configurações; partida offline (movimento, pulo,
+  deslize, mira, pausa); arsenal → acerto no boneco → inventário → soltar;
+  dois jogadores se vendo no servidor dedicado; **combate entre dois
+  navegadores** (A pega o fuzil e atira em B; o servidor aplica o dano).
 
 ## Estrutura
 
 ```
-src/shared   simulação determinística compartilhada (movimento, colisão, mapas, protocolo)
-src/server   GameHost/Simulation (autoridade) e o servidor Node (HTTP + WebSocket)
-src/client   renderização (three.js), personagem, câmera, entrada, rede, interface
+src/shared   simulação determinística compartilhada (movimento, combate, itens, mapas, protocolo)
+src/server   Simulation/GameHost (autoridade, loot, dano) e o servidor Node (HTTP + WebSocket)
+src/client   renderização (three.js), personagem, armas, efeitos, áudio, câmera, entrada, rede, HUD
 tests        unit (Vitest) e e2e (Playwright)
-docs         ARQUITETURA.md, ROADMAP.md
+docs         ARQUITETURA.md, ROADMAP.md, imagens/
 ```
 
 Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
@@ -147,14 +184,20 @@ Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 | `typescript`, `@types/*` (dev) | tipos |
 
 Variáveis de ambiente do servidor: `PORT` e `HOST` (equivalem a `--port` e
-`--host`). Configurações do jogador ficam no navegador (`localStorage`).
+`--host`). Configurações do jogador ficam no navegador (`localStorage`),
+inclusive o volume.
 
-## Limitações conhecidas (Fase 1)
+## Limitações conhecidas (Fase 2)
 
-- Assets são placeholders procedurais (modelos, texturas, animações) — a troca
-  por arte final está prevista na Fase 7 e os pontos de troca estão documentados.
-- Sem sons ainda (Fase 7).
-- Snapshots enviam todos os jogadores a todos: ótimo até dezenas de jogadores;
-  para 100, a gerência de interesse e a compressão delta entram na Fase 6.
+- Modo treino: ainda não há zona segura, bots nem vencedor (Fase 4).
+- Construção e coleta de materiais com picareta chegam na Fase 3 (os
+  materiais já podem ser achados e aparecem no HUD).
+- Assets (modelos, texturas, animações e sons) são placeholders procedurais;
+  a troca por arte final está prevista na Fase 7 e os pontos de troca estão
+  documentados na arquitetura.
+- O coice da arma é aplicado no cliente (como na maioria dos jogos); o servidor
+  valida dispersão, cadência, munição e acertos.
+- Banda: com 100 jogadores atirando, eventos de tiro e snapshots completos somam
+  ~10 MB/s de saída; gerência de interesse e compressão entram na Fase 6.
 - A descoberta automática de partidas na LAN vem com o app desktop (Fases 5/8);
   hoje entra-se pelo endereço exibido no host.

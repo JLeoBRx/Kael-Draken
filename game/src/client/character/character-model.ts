@@ -1,6 +1,8 @@
 import * as THREE from 'three'
 import { clamp, damp, dampAngle, wrapAngle } from '../../shared/math/scalar'
 import { CharFlag } from '../../shared/movement/character'
+import { itemDef } from '../../shared/config/items'
+import { buildItemModel, buildWeaponModel } from '../render/item-models'
 import { textTexture } from '../render/textures'
 
 /**
@@ -21,6 +23,9 @@ export interface CharacterSkin {
   visor: number
   dark: number
 }
+
+/** Boneco de treino do estande de tiro. */
+export const DUMMY_SKIN: CharacterSkin = { name: 'Boneco', suit: 0xd9d4c7, armor: 0xd8572f, accent: 0xffffff, visor: 0x2a2a2a, dark: 0x5b4636 }
 
 export const SKINS: readonly CharacterSkin[] = [
   { name: 'Vanguarda', suit: 0x2f3b4a, armor: 0xe8743b, accent: 0x2fd3c4, visor: 0x1c2a33, dark: 0x1b1f24 },
@@ -71,6 +76,11 @@ export class CharacterModel {
   private readonly materials: THREE.Material[] = []
   private readonly geometries: THREE.BufferGeometry[] = []
   private nameplate: THREE.Sprite | null = null
+  /** Arma/item na mão (preso ao peito, apontado para a mira). */
+  private held: THREE.Object3D | null = null
+  private heldKey = ''
+  private heldIsWeapon = false
+  private holdW = 0
 
   // estado da animação
   private phase = 0
@@ -223,6 +233,7 @@ export class CharacterModel {
     this.slideW = damp(this.slideW, sliding ? 1 : 0, 16, dt)
     this.airW = damp(this.airW, !grounded && !swimming ? 1 : 0, 10, dt)
     this.aimW = damp(this.aimW, aiming ? 1 : 0, 14, dt)
+    this.holdW = damp(this.holdW, this.heldIsWeapon ? 1 : 0, 10, dt)
     this.swimW = damp(this.swimW, swimming ? 1 : 0, 6, dt)
 
     // Orientação: o corpo acompanha a mira; parado, só gira quando a diferença é grande
@@ -300,6 +311,15 @@ export class CharacterModel {
     thigh[0] += Math.sin(this.phase * 2.4) * 0.35 * ww
     thigh[1] -= Math.sin(this.phase * 2.4) * 0.35 * ww
 
+    // ---- segurando arma (sem mirar): braços na posição de transporte
+    const hw = this.holdW * (1 - ww) * (1 - sw * 0.6)
+    armX[1] = armX[1] * (1 - hw) + 0.75 * hw
+    armX[0] = armX[0] * (1 - hw) + 0.85 * hw
+    armZ[1] = armZ[1] * (1 - hw) + 0.05 * hw
+    armZ[0] = armZ[0] * (1 - hw) + 0.5 * hw
+    elbowX[1] = elbowX[1] * (1 - hw) + 1.0 * hw
+    elbowX[0] = elbowX[0] * (1 - hw) + 1.1 * hw
+
     // ---- mirando: braços à frente, acompanhando o pitch
     const mw = this.aimW * (1 - ww)
     const pitchArm = clamp(p.pitch, -1.1, 1.1)
@@ -326,9 +346,45 @@ export class CharacterModel {
       this.shoulder[k].rotation.z = armZ[k]
       this.elbow[k].rotation.x = elbowX[k]
     }
+    if (this.held) {
+      // transporte: apontada para a frente e um pouco para baixo; mirando: na linha da mira
+      const a = this.aimW
+      this.held.position.set(0.17 + 0.03 * (1 - a), -0.12 * (1 - a) + 0.07 * a, -0.24 - 0.06 * a)
+      this.held.rotation.set(-0.45 * (1 - a) + p.pitch * 0.75 * a, 0.05 * (1 - a), 0)
+    }
+  }
+
+  /** Troca o que está na mão (arma ou consumível). `item` 255 = mãos vazias. */
+  setHeld(item: number, rarity: number): void {
+    const key = `${item}:${rarity}`
+    if (key === this.heldKey) return
+    this.heldKey = key
+    if (this.held) {
+      this.chest.remove(this.held)
+      this.held.traverse((o) => (o as THREE.Mesh).geometry?.dispose())
+      this.held = null
+    }
+    const def = itemDef(item)
+    this.heldIsWeapon = def?.kind === 'weapon'
+    if (!def) return
+    const obj = def.kind === 'weapon' ? buildWeaponModel(item, rarity) : buildItemModel(item, rarity)
+    if (def.kind !== 'weapon') obj.scale.setScalar(0.7)
+    this.held = obj
+    this.chest.add(obj)
+  }
+
+  /** Posição da boca do cano no mundo (ou do peito, sem arma). */
+  muzzleWorld(out: THREE.Vector3): THREE.Vector3 {
+    if (this.held && this.heldIsWeapon && this.held.userData.muzzle) {
+      this.root.updateMatrixWorld(true)
+      return this.held.localToWorld(out.copy(this.held.userData.muzzle as THREE.Vector3))
+    }
+    this.chest.updateMatrixWorld(true)
+    return this.chest.localToWorld(out.set(0.2, 0.05, -0.3))
   }
 
   dispose(): void {
+    this.setHeld(255, 0)
     for (const g of this.geometries) g.dispose()
     for (const m of this.materials) m.dispose()
     if (this.nameplate) {

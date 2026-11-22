@@ -8,8 +8,8 @@ termina com uma entrega que pode ser jogada.
 | Fase | Entrega | Esforço estimado | Situação |
 | --- | --- | --- | --- |
 | 1 — Fundação | personagem, câmera, movimentação, mapa de testes, servidor autoritativo e rede básica | 1 semana | **concluída** |
-| 2 — Gameplay | armas, tiros, vida/escudo, inventário, coleta, baús, mapa principal (1ª versão), HUD completa | 2–3 semanas | próxima |
-| 3 — Construção | paredes, rampas, pisos, telhados; pré-visualização, recursos, vida e destruição sincronizadas | 2 semanas | |
+| 2 — Gameplay | armas, tiros, vida/escudo, inventário, coleta, baús, mapa principal (1ª versão), HUD completa | 2–3 semanas | **concluída** |
+| 3 — Construção | paredes, rampas, pisos, telhados; pré-visualização, recursos, vida e destruição sincronizadas | 2 semanas | próxima |
 | 4 — IA | bots com navegação, loot, combate, fuga, abrigo, construção e zona; níveis de dificuldade; zona segura; partida BR completa offline | 2–3 semanas | |
 | 5 — Multijogador local | lobby LAN, equipes, descoberta na rede, reconexão, tela dividida, testes com vários jogadores | 1–2 semanas | |
 | 6 — Online | plataforma (contas, amigos, convites, grupos, matchmaking, salas públicas/privadas, código de convite), alocação de servidores, segurança, gerência de interesse e compressão | 3–4 semanas | |
@@ -50,31 +50,47 @@ Entregue:
   postura, conexão, ajuda, painel técnico F3).
 - Testes: 58 unitários/integração + 3 de navegador (offline e 2 jogadores reais).
 
-## Fase 2 — Gameplay
+## Fase 2 — Gameplay ✅
 
-Sistemas (todos decididos no servidor; cliente só prevê o próprio movimento e
-mostra efeitos):
+Entregue (tudo decidido no servidor; o cliente prevê o próprio movimento, a
+arma e os consumíveis e mostra efeitos):
 
-- **Armas** em dados (`shared/config/weapons.ts`): pistola, rifle de assalto,
-  escopeta, submetralhadora, sniper, explosivos — dano, cadência, precisão
-  (dispersão por movimento/mira), recuo, munição/pente, recarga, raridade
-  (comum → lendária).
-- **Tiro com compensação de latência**: o servidor guarda o histórico de
-  posições (~1 s) e verifica o acerto no instante que o atirador viu; hitscan
-  para a maioria, projétil simulado para explosivos/sniper.
-- **Vida (100) e escudo (100)**; itens de cura e escudo com tempo de uso.
-- **Inventário** de 5 espaços + munições + materiais; troca de arma; descarte.
-- **Coleta** de itens no chão e baús (abrir com tempo); tabelas de loot por raridade.
-- **Eliminação, queda e espectador**.
-- **Mapa principal v1** (~1,5–2 km): cidade abandonada, floresta, montanhas,
-  região industrial, vilarejo, lago, área militar e construções especiais, com
-  pontos de interesse e locais de loot.
-- HUD: vida, escudo, munição, armas equipadas, recursos, minimapa, tempo,
-  jogadores restantes, posição.
-- Sons e efeitos básicos de disparo e impacto.
+- **Catálogo de itens** em dados (`shared/config/items.ts`): 6 armas
+  (pistola, submetralhadora, fuzil, escopeta, sniper, lança-foguetes) com dano,
+  cadência, precisão (dispersão por postura/movimento/"bloom"), coice, pente,
+  recarga, alcance, queda de dano e 5 raridades; granada; 4 itens de cura e
+  escudo; 5 tipos de munição; madeira, pedra e metal.
+- **Tiro com compensação de latência** (até 1 s), mira pelo ombro, dispersão
+  determinística (o traçado previsto é o validado), obstrução entre arma e
+  alvo, cabeça × corpo, escopeta com 9 bagos.
+- **Explosivos simulados**: foguete (impacto) e granada (quica, pavio), dano em
+  área com linha de visão.
+- **Vida (100) e escudo (100)**, dano de queda, curas com tempo de uso e limites.
+- **Inventário** de 5 espaços, empilhamento, troca quando cheio, soltar e
+  reorganizar (tela Tab), munição por tipo e materiais.
+- **Loot**: tabelas por raridade e nível; pontos no chão, baús, arsenal com
+  reposição no campo de treino; o corpo eliminado solta tudo.
+- **Eliminação**, feed, tela de eliminado, espectador do autor e renascimento
+  (modo treino — a partida sem renascimento já existe nas regras do servidor).
+- **Mapa principal Ilha de Brasa** (1,6 km): Cidade Esquecida (prédios de até
+  7 andares com escada e telhado acessíveis, ruínas, carros), Mata Fechada,
+  Picos Gélidos com a Torre do Vigia, Distrito Fabril (galpões, silos,
+  contêineres), Vila Serena, Lago Azul (píer e ilhota), Base Sentinela (muralha,
+  hangar, alojamentos, bunkers, torres de vigia), Farol do Fim e Solar dos Ventos.
+- **Campo de Provas** ampliado: arsenal e estande de tiro com bonecos.
+- **HUD completo**: vida, escudo, munição, armas equipadas, recursos,
+  minimapa, tempo, jogadores vivos, eliminações, posição na grade, mira
+  dinâmica, marcador de acerto, números de dano, indicador de direção do dano,
+  luneta, feed e avisos; mapa completo (M) e seleção de mapa.
+- **Áudio** sintetizado e posicional; efeitos de traçante, clarão, impacto,
+  explosão.
+- Testes: 91 unitários/integração + 5 de navegador (incluindo combate real
+  entre dois navegadores no servidor dedicado).
 
-Critérios: testes de balística, dano, inventário e loot no servidor; teste de
-navegador com dois jogadores trocando tiros; nenhum valor de dano vindo do cliente.
+Decisão de projeto: a sniper é *hitscan* com compensação de latência (como as
+demais armas de bala); só explosivos são projéteis simulados. Projéteis com
+compensação exigem retroceder o mundo a cada tick de voo, com ganho pequeno
+para o jogador — pode ser revisto no polimento.
 
 ## Fase 3 — Construção
 

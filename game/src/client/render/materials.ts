@@ -29,6 +29,9 @@ const SPECS: Record<MaterialId, MaterialSpec> = {
   'wood-dark': { make: () => woodTexture(0x6b4a30), tile: 2, roughness: 0.85, metalness: 0 },
   metal: { make: () => metalTexture(0x9ea5ab), tile: 2, roughness: 0.45, metalness: 0.6 },
   'metal-red': { make: () => metalTexture(0x9c3b2e), tile: 2, roughness: 0.55, metalness: 0.35 },
+  'metal-blue': { make: () => metalTexture(0x2f5f9e), tile: 2, roughness: 0.55, metalness: 0.35 },
+  'metal-green': { make: () => metalTexture(0x3f7a4a), tile: 2, roughness: 0.55, metalness: 0.35 },
+  asphalt: { make: () => concreteTexture(0x4a4d52), tile: 6, roughness: 0.95, metalness: 0 },
 }
 
 export class MaterialLibrary {

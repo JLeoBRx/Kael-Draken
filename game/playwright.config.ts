@@ -26,7 +26,7 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 960, height: 540 } } }],
   webServer: {
-    command: `npx vite build && npx tsx src/server/node/main.ts --port ${PORT} --host 127.0.0.1 --name "Servidor de testes"`,
+    command: `npx vite build && npx tsx src/server/node/main.ts --port ${PORT} --host 127.0.0.1 --map campo-de-provas --name "Servidor de testes"`,
     url: `http://127.0.0.1:${PORT}/api/info`,
     timeout: 120_000,
     reuseExistingServer: false,

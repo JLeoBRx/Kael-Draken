@@ -13,6 +13,7 @@ import type { MapBuilder } from './builder'
 export type MaterialId =
   | 'grid-orange' | 'grid-gray' | 'grid-blue' | 'grid-dark'
   | 'concrete' | 'plaster' | 'plaster-warm' | 'brick' | 'wood' | 'wood-dark' | 'metal' | 'metal-red'
+  | 'metal-blue' | 'metal-green' | 'asphalt'
 
 export interface StaticBox {
   obb: Obb
@@ -40,6 +41,42 @@ export interface MapLabel {
   yaw: number
   /** Altura da placa em metros. */
   size: number
+}
+
+/** Baú: abre com "Interagir" e solta itens. `tier` 0–2 controla a raridade. */
+export interface Chest {
+  x: number
+  y: number
+  z: number
+  yaw: number
+  tier: number
+}
+
+/** Item fixo de um ponto de loot (arsenal do campo de provas). */
+export interface FixedLoot {
+  item: number
+  rarity: number
+  count: number
+}
+
+/** Ponto de loot no chão. */
+export interface LootSpot {
+  x: number
+  y: number
+  z: number
+  tier: number
+  /** Se definido, sempre este item (senão, sorteado pela tabela de loot). */
+  fixed?: FixedLoot
+  /** Segundos para repor depois de pego (0 = não repõe). */
+  refill?: number
+}
+
+/** Boneco de treino (alvo de tiro). */
+export interface TargetDummy {
+  x: number
+  y: number
+  z: number
+  yaw: number
 }
 
 export interface Region {
@@ -103,4 +140,7 @@ export interface GameMap {
   labels: MapLabel[]
   regions: Region[]
   spawns: SpawnPoint[]
+  chests: Chest[]
+  lootSpots: LootSpot[]
+  targets: TargetDummy[]
 }

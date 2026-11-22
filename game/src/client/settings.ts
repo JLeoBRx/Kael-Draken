@@ -18,6 +18,8 @@ export interface Settings {
   crouchToggle: boolean
   showFps: boolean
   serverAddress: string
+  /** Volume geral (0–1). */
+  volume: number
 }
 
 export interface QualityPreset {
@@ -48,6 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
   crouchToggle: true,
   showFps: false,
   serverAddress: '',
+  volume: 0.7,
 }
 
 const KEY = 'ultima-chama:configuracoes:v1'
@@ -75,6 +78,7 @@ export function loadSettings(): Settings {
     crouchToggle: typeof raw.crouchToggle === 'boolean' ? raw.crouchToggle : d.crouchToggle,
     showFps: typeof raw.showFps === 'boolean' ? raw.showFps : d.showFps,
     serverAddress: typeof raw.serverAddress === 'string' ? raw.serverAddress.slice(0, 200) : d.serverAddress,
+    volume: num(raw.volume, 0, 1, d.volume),
   }
 }
 

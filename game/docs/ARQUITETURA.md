@@ -54,21 +54,27 @@ por modelos GLTF e texturas reais.
 │ math/      escalares, RNG com semente, ruído de gradiente sem trigonometria               │
 │ world/     Heightfield, OBB (cápsula×caixa, raio×caixa), SpatialGrid, CollisionWorld      │
 │ movement/  stepCharacter(): andar, correr, sprint, pular, agachar, deslizar, nadar        │
-│ maps/      formato de mapa + builder + "Campo de Provas"                                   │
-│ net/       serialização binária e protocolo                                                │
+│ player/    PlayerState + stepPlayer(): armas, recarga, consumíveis, granadas, queda;       │
+│            regras de inventário; escolha do que "Interagir" pega                          │
+│ combat/    mira pelo ombro, caixas de acerto (cabeça/corpo), projéteis                     │
+│ config/    movimento, catálogo de itens (armas, raridades, consumíveis, munições)          │
+│ maps/      formato + builder + estruturas + "Ilha de Brasa" e "Campo de Provas"            │
+│ net/       serialização binária e protocolo (comandos, snapshots, eventos)                 │
 └───────────────────────────────────────────────────────────────────────────────────────────┘
             ▲ usado por                                   ▲ usado por
 ┌───────────┴──────────── src/server ──────────┐  ┌───────┴──────────── src/client ──────────────┐
-│ core/  Simulation (autoridade, anti-speedhack)│  │ net/     transportes, sessão, predição,       │
-│        GameHost (conexões, handshake, snapshots│  │          interpolação                          │
-│        limites, expulsões) — sem Node/DOM     │  │ render/  céu, relevo, estruturas, vegetação,   │
-│ node/  HTTP + WebSocket, CLI do servidor      │  │          água, materiais (registro substituível)│
-└───────────────────────────────────────────────┘  │ character/ personagem procedural + animação    │
-            ▲ mesma classe                         │ camera/  terceira pessoa com colisão           │
-┌───────────┴─────── src/client/worker ─────────┐  │ input/   teclado, mouse, controle              │
-│ GameHost dentro de um Web Worker (offline)    │  │ ui/      menu, telas, HUD                       │
-└───────────────────────────────────────────────┘  │ game/    Match: o laço da partida              │
-                                                   └───────────────────────────────────────────────┘
+│ core/  Simulation (autoridade: acertos com    │  │ net/     transportes, sessão, predição,       │
+│        compensação de latência, dano, loot,   │  │          interpolação                          │
+│        baús, projéteis, eliminações, bonecos) │  │ render/  céu, relevo, estruturas, vegetação,   │
+│        loot.ts (tabelas por raridade)         │  │          água, armas/itens/baús (substituíveis)│
+│        GameHost (conexões, eventos, snapshots,│  │ character/ personagem procedural + animação    │
+│        limites, expulsões) — sem Node/DOM     │  │ camera/  terceira pessoa com colisão e luneta  │
+│ node/  HTTP + WebSocket, CLI do servidor      │  │ input/   teclado, mouse, controle              │
+└───────────────────────────────────────────────┘  │ audio/   sons sintetizados e posicionais       │
+            ▲ mesma classe                         │ game/    Match, itens do mundo, efeitos        │
+┌───────────┴─────── src/client/worker ─────────┐  │ ui/      menu, mapas, HUD, minimapa,           │
+│ GameHost dentro de um Web Worker (offline)    │  │          inventário, telas                     │
+└───────────────────────────────────────────────┘  └───────────────────────────────────────────────┘
 ```
 
 ## 3. Modelo de rede: servidor autoritativo
@@ -77,9 +83,15 @@ por modelos GLTF e texturas reais.
 *intenções* (comandos de entrada); o servidor executa a simulação e publica o
 estado oficial.
 
-### Comando de entrada (cliente → servidor, 12 bytes)
+### Comando de entrada (cliente → servidor, 17 bytes)
 
-`seq` (u32) · `forward`/`right` (i8, −1..1) · `yaw` (u16) · `pitch` (i16) · `buttons` (u16)
+`seq` (u32) · `forward`/`right` (i8, −1..1) · `yaw` (u16) · `pitch` (i16) ·
+`buttons` (u16: pular, correr, agachar, mirar, caminhar, atirar, recarregar,
+interagir) · `slot` (u8: espaço desejado) · `viewTick` (u32: tick que o cliente
+estava vendo, base da compensação de latência)
+
+Ações de inventário (soltar, reorganizar) vão em mensagens próprias; o servidor
+as aplica e o resultado volta no snapshot.
 
 - O cliente gera **um comando por tick** (30 por segundo), aplica-o imediatamente
   ao próprio personagem (predição) e o envia.
@@ -89,8 +101,18 @@ estado oficial.
 ### Snapshot (servidor → cliente)
 
 `tick` · `ackSeq` (último comando aplicado) · `queued` (fila no servidor) ·
-estado completo do próprio jogador (f64, para reconciliação exata) · lista de
-entidades (26 bytes cada: id, posição f32, yaw, pitch, flags, velocidade).
+vivos · eliminações do destinatário · estado COMPLETO do próprio jogador
+(movimento, vida, escudo, inventário, munições, materiais e temporizadores da
+arma — para reconciliação exata) · lista de entidades (28 bytes cada: id,
+posição, yaw, pitch, flags, velocidade, arma na mão e raridade).
+
+### Eventos (servidor → cliente, confiáveis e em ordem)
+
+Tiros de outros jogadores (com os pontos de impacto), acertos (só para quem
+atirou: dano, cabeça, escudo quebrado, eliminação), dano recebido (só para a
+vítima, com a direção), eliminações, itens que surgem/somem, baús abertos,
+projéteis lançados, explosões, bonecos derrubados e renascimentos. Quem entra
+recebe o estado atual do mundo (itens, baús, projéteis) como eventos.
 
 ### Predição e reconciliação (jogador local)
 
@@ -111,29 +133,61 @@ Outros jogadores são desenhados ~100 ms no passado, entre dois snapshots. O
 relógio do servidor é estimado pelo menor atraso observado. Sem dados novos,
 extrapola no máximo 150 ms e para.
 
-### Validações no servidor (Fase 1)
+### Validações no servidor
 
 | Ameaça | Defesa |
 | --- | --- |
 | Speed hack (enviar comandos demais) | balde de fichas: 1 comando por tick do servidor, rajada máx. de 8; fila máx. de 64 |
 | Teleporte / posição falsa | o cliente nunca envia posição; só intenções |
-| Valores inválidos (NaN, eixos > 1, pitch extremo, bits extras) | `sanitizeCommand` limita tudo |
+| Valores inválidos (NaN, eixos > 1, pitch extremo, bits extras, espaço inexistente) | `sanitizeCommand` limita tudo |
+| Dano falso, tiro rápido demais, munição infinita | o cliente não informa dano nem acertos; cadência, pente, recarga e dispersão são simulados pelo servidor (`stepPlayer`) |
+| Tiro "pela câmera" (atrás de uma quina) | além do raio da mira, o caminho da arma até o impacto precisa estar livre |
+| Abusar da compensação de latência | volta no tempo limitada a 1 s; o tick informado é limitado ao intervalo válido |
+| Pegar item longe / através de parede | o servidor escolhe o alvo de "Interagir" (alcance de 2,6 m, na direção do olhar) |
+| Inventário adulterado | inventário só muda no servidor (coleta, uso, soltar, trocar); o cliente recebe o estado oficial |
 | Mensagens malformadas | leitor binário com verificação de limites; mensagem inválida = expulsão |
 | Inundação | > 240 mensagens por segundo de jogo = expulsão |
 | Protocolo diferente | handshake com versão; incompatível = recusado com motivo |
 | Nome abusivo | sem caracteres de controle/HTML, máx. 16 caracteres |
 
-Dano, eliminações, inventário, recursos, construções e resultado da partida
-seguirão a mesma regra (calculados só no servidor) nas fases seguintes; o
-protocolo já é versionado para isso.
+Limitação conhecida: o coice da câmera é aplicado no cliente (como na maioria
+dos jogos de tiro); detecção estatística de mira automática entra na Fase 6.
+Construções e resultado da partida seguirão a mesma regra nas fases seguintes.
+
+### Combate
+
+1. **Mira pelo ombro.** A câmera fica sobre a reta que sai do ombro na
+   direção da mira, então o raio do tiro parte do ombro (`combat/aim.ts`) e
+   passa exatamente pelo centro da tela — o servidor reconstrói a mira só com
+   yaw, pitch e postura.
+2. **Dispersão determinística.** O desvio de cada bala vem de um hash de
+   (jogador, comando, bala): cliente e servidor calculam o mesmo, então o
+   traçado previsto na tela é o que o servidor valida.
+3. **Compensação de latência.** O servidor guarda ~1,5 s de posições de cada
+   jogador e, para cada tiro, volta os alvos ao tick que o atirador via
+   (`viewTick`), interpolando entre ticks. Testado: acerta onde o atirador via o
+   alvo e erra onde ele não estava.
+4. **Obstrução.** O mundo bloqueia o raio; além disso, a linha da arma (peito)
+   até o impacto precisa estar livre.
+5. **Dano.** Por bala: base × raridade × queda por distância × cabeça. O escudo
+   absorve primeiro. Escopeta soma os bagos por alvo. Explosões: dano decresce
+   com a distância e exige linha de visão; sem dano em si mesmo.
+6. **Eliminação.** Tudo o que o jogador carregava cai em volta do corpo; o
+   autor recebe o crédito (ou quem causou dano nos últimos 10 s, em quedas).
 
 ### Desempenho medido
 
-- **Simulação: 3,3 ms por tick com 100 jogadores** correndo e pulando (orçamento
-  a 30 Hz: 33 ms) — 10% de um núcleo.
-- **Banda: o gargalo real.** Snapshots completos para 100 jogadores somam ~8 MB/s
-  de saída. A Fase 6 traz gerência de interesse (só quem está por perto em taxa
-  cheia), compressão delta e taxa adaptativa (alvo: < 1,5 MB/s por partida cheia).
+- **Simulação (Fase 1): 3,3 ms por tick com 100 jogadores** correndo e pulando no
+  Campo de Provas.
+- **Simulação (Fase 2): 2,5 ms por tick com 100 jogadores armados atirando sem
+  parar na Ilha de Brasa** (8 mil colisores, 263 itens no chão) — orçamento a
+  30 Hz: 33 ms.
+- **Geração do mapa principal: ~240 ms** (relevo de 160 mil amostras, 4.900
+  caixas, 4.600 adereços, 252 pontos de loot, 100 baús), igual no cliente e no servidor.
+- **Banda: o gargalo real.** Com 100 jogadores atirando, snapshots completos e
+  eventos de tiro para todos somam ~10 MB/s de saída. A Fase 6 traz gerência de
+  interesse (só quem está por perto, em taxa cheia), compressão delta e taxa
+  adaptativa (alvo: < 1,5 MB/s por partida cheia).
 
 ## 4. Os três modos
 
@@ -208,29 +262,32 @@ game/
 ├── docs/                      ARQUITETURA.md (este), ROADMAP.md
 ├── src/
 │   ├── shared/                código comum cliente/servidor
-│   │   ├── config/            game.ts (identidade), movement.ts (ajustes de movimento)
+│   │   ├── config/            game.ts (identidade), movement.ts, items.ts (catálogo)
 │   │   ├── math/              scalar, rng, noise
 │   │   ├── world/             heightfield, obb, spatial-grid, collision-world
 │   │   ├── movement/          character.ts (controlador)
-│   │   ├── maps/              types, builder, proving-grounds, index (registro)
+│   │   ├── player/            player.ts (estado + stepPlayer), inventory.ts, interact.ts
+│   │   ├── combat/            aim.ts, hitboxes.ts, projectile.ts
+│   │   ├── maps/              types, builder, structures, ember-island, proving-grounds, index
 │   │   └── net/               binary, protocol
 │   ├── server/
-│   │   ├── core/              simulation.ts, game-host.ts (sem dependências de ambiente)
+│   │   ├── core/              simulation.ts, game-host.ts, loot.ts (sem dependências de ambiente)
 │   │   └── node/              server.ts (HTTP + WebSocket), main.ts (CLI)
 │   └── client/
 │       ├── app.ts, main.ts    casca e estados
-│       ├── game/match.ts      laço da partida
+│       ├── game/              match.ts (laço da partida), world-items.ts, effects.ts
 │       ├── net/               transport, session, prediction, interpolation
 │       ├── worker/            servidor local (offline)
-│       ├── render/            world-view, sky, terrain-mesh, static-geometry, props, materials, textures
+│       ├── render/            world-view, sky, terrain-mesh, static-geometry, props, item-models, materials, textures
 │       ├── character/         character-model.ts
 │       ├── camera/            third-person-camera.ts
 │       ├── input/             input.ts
-│       ├── ui/                screens, hud, dom, styles.css
+│       ├── audio/             audio.ts
+│       ├── ui/                screens, hud, minimap, inventory-screen, icons, dom, styles.css
 │       └── settings.ts
 └── tests/
-    ├── unit/                  Vitest: colisão, movimento, mapa, rede, cliente
-    └── e2e/                   Playwright: offline e multijogador no navegador
+    ├── unit/                  Vitest: colisão, movimento, mapas, combate, servidor, rede, cliente
+    └── e2e/                   Playwright: offline, combate e multijogador no navegador
 ```
 
 ## 8. Assets: placeholders organizados e substituíveis
@@ -240,9 +297,11 @@ game/
 | Texturas de estruturas | geradas em canvas (`render/textures.ts`) | `render/materials.ts` — trocar a fábrica por `TextureLoader` com o arquivo em `public/assets/textures/` |
 | Relevo | cores por altura/inclinação + textura de detalhe | `render/terrain-mesh.ts` + material do relevo (splatmap na Fase 7) |
 | Vegetação, rochas, caixotes | malhas low-poly geradas em código, instanciadas | `PART_FACTORIES` em `render/props.ts` — trocar por GLTF |
-| Personagem | humanoide procedural com animação procedural, 8 visuais | `character/character-model.ts` — um modelo GLTF com esqueleto implementa a mesma interface (`update`, `setName`, `dispose`) |
+| Personagem | humanoide procedural com animação procedural, 8 visuais | `character/character-model.ts` — um modelo GLTF com esqueleto implementa a mesma interface (`update`, `setName`, `setHeld`, `muzzleWorld`, `dispose`) |
+| Armas, itens e baús | modelos procedurais com cores de raridade | `render/item-models.ts` — trocar por GLTF mantendo a orientação (cano para −Z, empunhadura na origem) |
+| Ícones do HUD | silhuetas SVG originais | `ui/icons.ts` |
 | Interface | CSS próprio, emblema SVG original | `ui/` |
-| Sons | — | Fase 7 (Web Audio; registro de sons no mesmo padrão) |
+| Sons | sintetizados por receita (Web Audio), posicionais | `audio/audio.ts` — trocar a receita por um arquivo decodificado com o mesmo nome |
 
 Nada usa nomes, personagens, arte ou sons de outros jogos.
 

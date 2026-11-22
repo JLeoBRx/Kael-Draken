@@ -18,6 +18,10 @@ export interface InputFrame {
   lookYaw: number
   /** Radianos a somar ao pitch (positivo = cima). */
   lookPitch: number
+  /** Espaço escolhido diretamente (teclas 1–5) ou null. */
+  slot: number | null
+  /** Passos de troca de espaço (roda do mouse, LB/RB). */
+  slotStep: number
 }
 
 export const KEYBINDINGS = {
@@ -29,7 +33,11 @@ export const KEYBINDINGS = {
   sprint: ['ShiftLeft', 'ShiftRight'],
   crouch: ['KeyC'],
   walk: ['AltLeft', 'KeyX'],
+  reload: ['KeyR'],
+  use: ['KeyE', 'KeyF'],
 } as const
+
+const SLOT_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5']
 
 /** Radianos por pixel de mouse com sensibilidade 1. */
 const MOUSE_RAD_PER_PX = 0.0022
@@ -50,6 +58,9 @@ export interface GamepadReading {
   buttons: number
   crouchPressed: boolean
   pause: boolean
+  next: boolean
+  prev: boolean
+  inventory: boolean
 }
 
 function deadzone(x: number, y: number): [number, number] {
@@ -71,6 +82,9 @@ export function readGamepad(gp: GamepadLike): GamepadReading {
   if (btn(0)) buttons |= Buttons.Jump
   if (btn(10)) buttons |= Buttons.Sprint
   if ((gp.buttons[6]?.value ?? 0) > 0.4) buttons |= Buttons.Aim
+  if ((gp.buttons[7]?.value ?? 0) > 0.4) buttons |= Buttons.Fire
+  if (btn(2)) buttons |= Buttons.Use
+  if (btn(3)) buttons |= Buttons.Reload
   return {
     forward: -my || 0,
     right: mx,
@@ -79,6 +93,9 @@ export function readGamepad(gp: GamepadLike): GamepadReading {
     buttons,
     crouchPressed: btn(1),
     pause: btn(9),
+    next: btn(5),
+    prev: btn(4),
+    inventory: btn(8),
   }
 }
 
@@ -90,6 +107,8 @@ export class InputManager {
   onToggleDebug: (() => void) | null = null
   onToggleHelp: (() => void) | null = null
   onPointerLockLost: (() => void) | null = null
+  onToggleInventory: (() => void) | null = null
+  onToggleMap: (() => void) | null = null
 
   private readonly keys = new Set<string>()
   private mouseButtons = 0
@@ -102,6 +121,11 @@ export class InputManager {
   private prevButtons = 0
   private padCrouchPrev = false
   private padPausePrev = false
+  private padNextPrev = false
+  private padPrevPrev = false
+  private padInvPrev = false
+  private slotDirect: number | null = null
+  private slotSteps = 0
   private readonly listeners: [EventTarget, string, EventListener, AddEventListenerOptions?][] = []
 
   constructor(private readonly canvas: HTMLCanvasElement, private settings: Settings) {}
@@ -127,8 +151,17 @@ export class InputManager {
       this.mouseDY += m.movementY
     })
     on(this.canvas, 'mousedown', (e) => {
-      this.mouseButtons |= 1 << (e as MouseEvent).button
+      // Sem o ponteiro capturado, o clique serve só para capturá-lo (não atira).
+      if (!this.pointerLocked || !this.enabled) return
+      const b = (e as MouseEvent).button
+      this.mouseButtons |= 1 << b
+      if (b === 0) this.tickLatch |= Buttons.Fire
     })
+    on(this.canvas, 'wheel', (e) => {
+      if (!this.pointerLocked || !this.enabled) return
+      e.preventDefault()
+      this.slotSteps += Math.sign((e as WheelEvent).deltaY)
+    }, { passive: false })
     on(window, 'mouseup', (e) => {
       this.mouseButtons &= ~(1 << (e as MouseEvent).button)
     })
@@ -169,6 +202,8 @@ export class InputManager {
     this.mouseDY = 0
     this.crouchHeldPrev = false
     this.tickLatch = 0
+    this.slotDirect = null
+    this.slotSteps = 0
   }
 
   /** Chamar depois que um tick usou o quadro de entrada. */
@@ -190,8 +225,18 @@ export class InputManager {
       this.onPauseRequest?.()
       return
     }
+    if (e.code === 'Tab') {
+      e.preventDefault()
+      if (!e.repeat) this.onToggleInventory?.()
+      return
+    }
     if (!this.enabled) return
     if (e.code === 'KeyH') this.onToggleHelp?.()
+    if (e.code === 'KeyM' && !e.repeat) this.onToggleMap?.()
+    const slot = SLOT_KEYS.indexOf(e.code)
+    if (slot >= 0) this.slotDirect = slot
+    if (!e.repeat && (KEYBINDINGS.use as readonly string[]).includes(e.code)) this.tickLatch |= Buttons.Use
+    if (!e.repeat && (KEYBINDINGS.reload as readonly string[]).includes(e.code)) this.tickLatch |= Buttons.Reload
     // Evita rolagem da página, menu do Alt e afins durante o jogo.
     if (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'AltLeft' || e.code === 'Tab') e.preventDefault()
     if (!e.repeat && (KEYBINDINGS.jump as readonly string[]).includes(e.code)) this.tickLatch |= Buttons.Jump
@@ -205,7 +250,9 @@ export class InputManager {
 
   /** Lê o estado atual e consome os deltas de olhar acumulados. */
   sample(frameDt: number, aiming: boolean): InputFrame {
-    const out: InputFrame = { forward: 0, right: 0, buttons: 0, lookYaw: 0, lookPitch: 0 }
+    const out: InputFrame = { forward: 0, right: 0, buttons: 0, lookYaw: 0, lookPitch: 0, slot: this.slotDirect, slotStep: this.slotSteps }
+    this.slotDirect = null
+    this.slotSteps = 0
     const sens = this.settings.sensitivity * (aiming ? this.settings.aimSensitivity : 1)
     const invert = this.settings.invertY ? -1 : 1
     out.lookYaw = -this.mouseDX * MOUSE_RAD_PER_PX * sens
@@ -223,7 +270,9 @@ export class InputManager {
     }
     if (pad) {
       if (pad.pause && !this.padPausePrev) this.onPauseRequest?.()
+      if (pad.inventory && !this.padInvPrev) this.onToggleInventory?.()
       this.padPausePrev = pad.pause
+      this.padInvPrev = pad.inventory
     }
     if (!this.enabled) {
       this.padCrouchPrev = pad?.crouchPressed ?? false
@@ -238,6 +287,9 @@ export class InputManager {
     if (this.any(KEYBINDINGS.sprint)) buttons |= Buttons.Sprint
     if (this.any(KEYBINDINGS.walk)) buttons |= Buttons.Walk
     if (this.mouseButtons & (1 << 2)) buttons |= Buttons.Aim
+    if (this.mouseButtons & 1) buttons |= Buttons.Fire
+    if (this.any(KEYBINDINGS.reload)) buttons |= Buttons.Reload
+    if (this.any(KEYBINDINGS.use)) buttons |= Buttons.Use
 
     let crouchHeld = this.any(KEYBINDINGS.crouch)
     let crouchEdge = crouchHeld && !this.crouchHeldPrev
@@ -251,6 +303,10 @@ export class InputManager {
       if (pad.crouchPressed && !this.padCrouchPrev) crouchEdge = true
       crouchHeld = crouchHeld || pad.crouchPressed
       this.padCrouchPrev = pad.crouchPressed
+      if (pad.next && !this.padNextPrev) out.slotStep += 1
+      if (pad.prev && !this.padPrevPrev) out.slotStep -= 1
+      this.padNextPrev = pad.next
+      this.padPrevPrev = pad.prev
     }
     const pressed = buttons & ~this.prevButtons
     this.prevButtons = buttons

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { enterGame, holdUntil, prepare, screen, state } from './helpers'
+import { holdUntil, mouseButton, prepare, screen, startOffline, state } from './helpers'
 
 test('menu, configurações persistentes e controles', async ({ page }) => {
   const errors = await prepare(page, 'Menu')
@@ -20,9 +20,7 @@ test('menu, configurações persistentes e controles', async ({ page }) => {
 
 test('partida offline: servidor no Worker, movimento, pulo, deslize, mira e pausa', async ({ page }) => {
   const errors = await prepare(page, 'Solo')
-  await page.goto('/')
-  await page.click('[data-action="offline"]')
-  await enterGame(page)
+  await startOffline(page, 'campo-de-provas')
 
   const start = await state(page)
   expect(start.mode).toBe('Offline')
@@ -58,10 +56,9 @@ test('partida offline: servidor no Worker, movimento, pulo, deslize, mira e paus
   await expect.poll(async () => (await state(page)).flags & 2).toBe(0)
 
   // Mira (botão direito)
-  await page.mouse.move(480, 270)
-  await page.mouse.down({ button: 'right' })
+  await mouseButton(page, 2, true)
   await expect.poll(async () => (await state(page)).flags & 16).toBe(16)
-  await page.mouse.up({ button: 'right' })
+  await mouseButton(page, 2, false)
 
   // Pausa ao perder a captura do mouse, e volta
   await page.evaluate(() => document.exitPointerLock())

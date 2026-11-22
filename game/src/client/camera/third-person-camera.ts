@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { clamp, damp } from '../../shared/math/scalar'
-import { CharFlag, eyeHeightFor } from '../../shared/movement/character'
+import { AIM_RIG, CharFlag, aimEyeHeight } from '../../shared/movement/character'
 import { createWorldHit, type CollisionWorld } from '../../shared/world/collision-world'
 
 /**
@@ -12,8 +12,8 @@ import { createWorldHit, type CollisionWorld } from '../../shared/world/collisio
  * - Suaviza a altura (degraus, agachar) sem atrasar a horizontal.
  */
 
-const SHOULDER = 0.62
-const HEIGHT_OFFSET = 0.22
+const SHOULDER = AIM_RIG.shoulder
+const HEIGHT_OFFSET = AIM_RIG.heightOffset
 const DIST_NORMAL = 3.1
 const DIST_SPRINT = 3.5
 const DIST_AIM = 1.55
@@ -39,8 +39,15 @@ export class ThirdPersonCamera {
     this.camera.rotation.order = 'YXZ'
   }
 
+  private aimFov: number | null = null
+
   setBaseFov(fov: number): void {
     this.baseFov = fov
+  }
+
+  /** FOV ao mirar com a arma atual (null = padrão: base − 16°). */
+  setAimFov(fov: number | null): void {
+    this.aimFov = fov
   }
 
   setAspect(aspect: number): void {
@@ -54,7 +61,7 @@ export class ThirdPersonCamera {
     const sliding = (flags & CharFlag.Sliding) !== 0
     const swimming = (flags & CharFlag.Swimming) !== 0
 
-    const eyeTarget = sliding ? 0.95 : eyeHeightFor(flags)
+    const eyeTarget = aimEyeHeight(flags)
     if (!this.initialized) {
       this.eye = eyeTarget
       this.pivotY = target.y
@@ -74,7 +81,7 @@ export class ThirdPersonCamera {
     this.dist = damp(this.dist, wantDist, aiming ? 16 : 7, dt)
 
     // ombro: garante que o próprio ombro não está dentro de uma parede
-    let shoulderDist = SHOULDER * (aiming ? 0.9 : 1)
+    let shoulderDist = SHOULDER * (aiming ? AIM_RIG.aimShoulderFactor : 1)
     if (world.raycast(this.pivot.x, this.pivot.y, this.pivot.z, this.right.x, 0, this.right.z, shoulderDist + CAMERA_RADIUS, this.hit)) {
       shoulderDist = Math.max(0, this.hit.t - CAMERA_RADIUS)
     }
@@ -95,9 +102,10 @@ export class ThirdPersonCamera {
     if (cam.position.y < ground) cam.position.y = ground
     cam.rotation.set(pitch, yaw, 0, 'YXZ')
 
-    const fovTarget = (aiming ? -16 : 0) + (sprinting ? 6 : 0) + (sliding ? 8 : 0)
-    this.fovOffset = damp(this.fovOffset, fovTarget, 9, dt)
-    const fov = clamp(this.baseFov + this.fovOffset, 40, 110)
+    const aimOffset = this.aimFov !== null ? Math.min(this.aimFov - this.baseFov, -8) : -16
+    const fovTarget = (aiming ? aimOffset : 0) + (sprinting ? 6 : 0) + (sliding ? 8 : 0)
+    this.fovOffset = damp(this.fovOffset, fovTarget, aiming ? 14 : 9, dt)
+    const fov = clamp(this.baseFov + this.fovOffset, 15, 110)
     if (Math.abs(cam.fov - fov) > 0.01) {
       cam.fov = fov
       cam.updateProjectionMatrix()

@@ -67,7 +67,7 @@ export class Screens {
     const emblem = h('div', { html: EMBLEM_SVG })
     const playBtn = h('button', { class: 'btn primary', 'data-action': 'offline', onclick: () => a.playOffline() },
       h('span', { class: 'label' }, 'Jogar offline'),
-      h('span', { class: 'sub' }, 'Campo de Provas · servidor local no navegador, sem internet'))
+      h('span', { class: 'sub' }, 'Ilha de Brasa ou Campo de Provas · servidor local no navegador, sem internet'))
     const joinBtn = h('button', { class: 'btn', 'data-action': 'join', onclick: () => a.join() },
       h('span', { class: 'label' }, 'Entrar em servidor'),
       h('span', { class: 'sub' }, 'Rede local (LAN) ou servidor dedicado online'))
@@ -81,7 +81,7 @@ export class Screens {
           emblem,
           h('h1', { class: 'title' }, GAME.title),
           h('p', { class: 'tagline' }, GAME.tagline),
-          h('span', { class: 'badge' }, h('span', { class: 'dot' }), `${GAME.phase} · movimentação, câmera e rede autoritativa`),
+          h('span', { class: 'badge' }, h('span', { class: 'dot' }), `${GAME.phase} · armas, loot, combate e mapa principal`),
           webglError ? h('p', { class: 'status error' }, webglError) : null),
         h('div', { class: 'actions' },
           playBtn,
@@ -91,7 +91,7 @@ export class Screens {
             h('button', { class: 'btn small', 'data-action': 'controls', onclick: () => a.controls() }, h('span', { class: 'label' }, 'Controles'))))),
       h('div', { class: 'footer' },
         h('span', {}, `v${GAME.version} · protocolo ${PROTOCOL_VERSION}`),
-        h('span', {}, 'Próximas fases: armas, construção, bots, lobby e matchmaking'))))
+        h('span', {}, 'Próximas fases: construção, bots e zona, lobby e matchmaking'))))
     playBtn.focus()
   }
 
@@ -130,6 +130,9 @@ export class Screens {
       'Corra (Shift) e aperte C para deslizar; pule no fim do deslize para ganhar distância.',
       'O servidor é a autoridade: o seu cliente só envia intenções de movimento.',
       'O vão de 6,5 m do Pátio de Treino só é vencido com deslize + pulo.',
+      'Mirar (botão direito) reduz muito a dispersão; correr e pular aumentam.',
+      'Escudo absorve o dano antes da vida. Bandagens curam só até 75.',
+      'Baús e a base militar têm armas de raridade maior.',
       'F3 mostra o painel técnico: ping, tick, correções de predição e posição.',
     ]
     this.show(h('div', { class: 'screen', 'data-screen': 'loading' },
@@ -139,6 +142,20 @@ export class Screens {
         step,
         h('p', { class: 'tip' }, tips[Math.floor(Math.random() * tips.length)]))))
     return { step: (text) => { step.textContent = text } }
+  }
+
+  /** Seleção de mapa (modo offline). */
+  mapSelect(maps: { id: string; name: string; description: string; tag: string }[], onPick: (id: string) => void, onBack: () => void): void {
+    this.show(h('div', { class: 'screen', 'data-screen': 'map-select' },
+      h('div', { class: 'panel', style: 'width:min(720px,100%)' },
+        h('h2', {}, 'Escolha o mapa'),
+        h('p', { class: 'hint' }, 'Partida offline: o servidor roda no seu navegador. Modo treino livre — quem é eliminado renasce em 5 s. A partida completa de battle royale (zona, bots e vencedor) chega na Fase 4.'),
+        h('div', { class: 'map-cards' }, ...maps.map((m) => h('button', { class: 'btn map-card', 'data-map': m.id, onclick: () => onPick(m.id) },
+          h('span', { class: 'tag' }, m.tag),
+          h('span', { class: 'label' }, m.name),
+          h('span', { class: 'sub' }, m.description)))),
+        h('div', { class: 'row', style: 'margin-top:16px' },
+          h('button', { class: 'btn small', onclick: onBack }, h('span', { class: 'label' }, 'Voltar'))))))
   }
 
   clickToPlay(onClick: () => void): void {
@@ -172,7 +189,7 @@ export class Screens {
   settings(s: Settings, onChange: (s: Settings) => void, onClose: () => void): void {
     const next = { ...s }
     const commit = () => onChange({ ...next })
-    const range = (key: 'sensitivity' | 'aimSensitivity' | 'fov', label: string, min: number, max: number, step: number, fmt: (v: number) => string, hint?: string) => {
+    const range = (key: 'sensitivity' | 'aimSensitivity' | 'fov' | 'volume', label: string, min: number, max: number, step: number, fmt: (v: number) => string, hint?: string) => {
       const out = h('output', {}, fmt(next[key]))
       const input = h('input', { type: 'range', min, max, step, value: next[key], 'aria-label': label })
       input.addEventListener('input', () => {
@@ -213,6 +230,7 @@ export class Screens {
         range('sensitivity', 'Sensibilidade', 0.1, 3, 0.05, (v) => v.toFixed(2)),
         range('aimSensitivity', 'Sensibilidade ao mirar', 0.2, 1.5, 0.05, (v) => `${Math.round(v * 100)}%`),
         range('fov', 'Campo de visão', 60, 100, 1, (v) => `${v}°`),
+        range('volume', 'Volume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`),
         check('invertY', 'Inverter eixo vertical'),
         check('crouchToggle', 'Agachar alterna (C)', 'Desligado: segure C para agachar.'),
         check('showFps', 'Mostrar quadros por segundo'),
@@ -231,6 +249,12 @@ export class Screens {
         h('table', { class: 'keys' },
           row('Mover', 'W', 'A', 'S', 'D'),
           row('Olhar / mirar', 'Mouse', 'Botão direito'),
+          row('Atirar / usar item', 'Botão esquerdo'),
+          row('Recarregar', 'R'),
+          row('Pegar item / abrir baú', 'E'),
+          row('Escolher espaço', '1', '2', '3', '4', '5', 'Roda'),
+          row('Inventário', 'Tab'),
+          row('Mapa', 'M'),
           row('Correr (sprint)', 'Shift'),
           row('Caminhar devagar', 'Alt', 'X'),
           row('Pular', 'Espaço'),
@@ -239,7 +263,8 @@ export class Screens {
           row('Painel técnico', 'F3'),
           row('Mostrar/ocultar ajuda', 'H'),
           row('Controle: mover / olhar', 'Analógico esq.', 'Analógico dir.'),
-          row('Controle: pular / agachar / correr / mirar', 'A', 'B', 'L3', 'LT')),
+          row('Controle: pular / agachar / correr / mirar', 'A', 'B', 'L3', 'LT'),
+          row('Controle: atirar / pegar / recarregar / espaços', 'RT', 'X', 'Y', 'LB/RB')),
         h('div', { class: 'row', style: 'margin-top:18px' },
           h('button', { class: 'btn primary small', onclick: onClose }, h('span', { class: 'label' }, 'Fechar'))))))
   }

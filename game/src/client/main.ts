@@ -9,7 +9,7 @@ app.start()
 declare global {
   interface Window {
     /** Gancho de diagnóstico (usado pelos testes de ponta a ponta). */
-    __ULTIMA__?: { state: App['debugState']; playOffline: () => Promise<void> }
+    __ULTIMA__?: { state: App['debugState']; playOffline: (mapId?: string) => Promise<void> }
   }
 }
-window.__ULTIMA__ = { state: () => app.debugState(), playOffline: () => app.playOffline() }
+window.__ULTIMA__ = { state: () => app.debugState(), playOffline: (mapId?: string) => app.playOffline(mapId) }

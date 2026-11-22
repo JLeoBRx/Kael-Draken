@@ -8,6 +8,8 @@ import { startServer, type RunningServer } from '../../src/server/node/server'
 import { loadMap } from '../../src/shared/maps'
 import { Rng } from '../../src/shared/math/rng'
 import { Buttons, createCharacterState } from '../../src/shared/movement/character'
+import { createPlayerState } from '../../src/shared/player/player'
+import { ITEM } from '../../src/shared/config/items'
 import {
   PROTOCOL_VERSION,
   beginSnapshot,
@@ -52,23 +54,32 @@ function join(host: GameHost, id: number, name = 'Teste'): FakeConn {
 describe('protocolo', () => {
   it('comandos ida e volta preservam a quantização', () => {
     const cmds: InputCommand[] = [
-      { seq: 1, forward: 1, right: -0.5, yaw: 1.234, pitch: -0.3, buttons: Buttons.Jump | Buttons.Sprint },
-      { seq: 2, forward: -0.25, right: 0, yaw: -2.9, pitch: 1.4, buttons: Buttons.Crouch | 0xff00 },
+      { seq: 1, forward: 1, right: -0.5, yaw: 1.234, pitch: -0.3, buttons: Buttons.Jump | Buttons.Sprint, slot: 2, viewTick: 1234.37 },
+      { seq: 2, forward: -0.25, right: 0, yaw: -2.9, pitch: 1.4, buttons: Buttons.Crouch | 0xff00, slot: 9, viewTick: 0 },
     ]
     const msg = decodeClientMessage(encodeInputs(cmds))
     expect(msg.type).toBe('input')
     if (msg.type !== 'input') return
     expect(msg.commands).toEqual(cmds.map(quantizeCommand))
     expect(msg.commands[1].buttons).toBe(Buttons.Crouch)
+    expect(msg.commands[0].viewTick).toBe(1234.375)
+    expect(msg.commands[1].slot).toBe(4)
   })
 
   it('snapshot com estado próprio completo e entidades', () => {
-    const self = createCharacterState(1.5, 2.25, -3.125, 0.5)
-    self.vx = 3.3
-    self.flags = 5
-    const other = createCharacterState(10, 6.15, 20, 1)
-    other.vz = -7.4
-    const w = beginSnapshot(99, 42, 3, self, 1)
+    const self = createPlayerState(createCharacterState(1.5, 2.25, -3.125, 0.5))
+    self.char.vx = 3.3
+    self.char.flags = 5
+    self.health = 63.5
+    self.shield = 25
+    self.slots[2] = { item: ITEM.Rifle, rarity: 3, count: 1, ammo: 17 }
+    self.ammo[1] = 120
+    self.materials[2] = 45
+    self.reloadTimer = 0.75
+    const other = createPlayerState(createCharacterState(10, 6.15, 20, 1))
+    other.char.vz = -7.4
+    other.slots[0] = { item: ITEM.Shotgun, rarity: 2, count: 1, ammo: 5 }
+    const w = beginSnapshot(99, 42, 3, 12, 4, self, 1)
     writeEntity(w, 7, other)
     const msg = decodeServerMessage(w.finish())
     expect(msg.type).toBe('snapshot')
@@ -77,7 +88,11 @@ describe('protocolo', () => {
     expect(s.tick).toBe(99)
     expect(s.ackSeq).toBe(42)
     expect(s.queued).toBe(3)
+    expect(s.alive).toBe(12)
+    expect(s.kills).toBe(4)
     expect(s.self).toEqual(self)
+    expect(s.entities[0].weapon).toBe(ITEM.Shotgun)
+    expect(s.entities[0].rarity).toBe(2)
     expect(s.entities[0].id).toBe(7)
     expect(s.entities[0].z).toBe(20)
     expect(s.entities[0].vz).toBeCloseTo(-7.4, 2)
@@ -143,7 +158,7 @@ describe('GameHost', () => {
     let seq = 1
     for (let m = 0; m < 20; m++) {
       const cmds: InputCommand[] = []
-      for (let k = 0; k < 16; k++) cmds.push({ seq: seq++, forward: 1, right: 0, yaw: 0, pitch: 0, buttons: Buttons.Sprint })
+      for (let k = 0; k < 16; k++) cmds.push({ seq: seq++, forward: 1, right: 0, yaw: 0, pitch: 0, buttons: Buttons.Sprint, slot: 0, viewTick: 0 })
       host.receive(1, encodeInputs(cmds))
     }
     host.tick()
@@ -153,7 +168,7 @@ describe('GameHost', () => {
     expect(player.droppedCommands).toBe(320 - MAX_QUEUE)
     expect(snap.queued).toBe(MAX_QUEUE - MAX_TOKENS)
     // no máximo MAX_TOKENS ticks de sprint (~0,25 m cada)
-    expect(Math.hypot(snap.self!.x - start.x, snap.self!.z - start.z)).toBeLessThan(MAX_TOKENS * 0.25 + 0.01)
+    expect(Math.hypot(snap.self!.char.x - start.char.x, snap.self!.char.z - start.char.z)).toBeLessThan(MAX_TOKENS * 0.25 + 0.01)
   })
 
   it('remove o jogador e avisa os demais ao desconectar', () => {
@@ -192,6 +207,8 @@ describe('predição + reconciliação contra o servidor real', () => {
       if (predictor.initialized) {
         yaw += rng.range(-0.15, 0.15)
         const cmd = predictor.predict({
+          viewTick: 0,
+          slot: 0,
           forward: tick % 90 < 70 ? 1 : 0,
           right: rng.range(-1, 1) * 0.3,
           yaw,
@@ -205,19 +222,19 @@ describe('predição + reconciliação contra o servidor real', () => {
     }
     expect(predictor.initialized).toBe(true)
     expect(predictor.corrections).toBe(0)
-    const server = [...host.sim.players.values()][0].state
+    const server = [...host.sim.players.values()][0].p.char
     // o estado previsto está à frente do servidor só pelos comandos em trânsito
     expect(predictor.pendingCount).toBeLessThanOrEqual(2 * LAT + 2)
-    expect(Math.hypot(predictor.state.x - server.x, predictor.state.z - server.z)).toBeLessThan(3)
+    expect(Math.hypot(predictor.state.char.x - server.x, predictor.state.char.z - server.z)).toBeLessThan(3)
     expect(Math.hypot(server.x, server.z)).toBeGreaterThan(5)
   })
 
   it('corrige e suaviza quando o servidor diverge', () => {
     const predictor = new Predictor(map.world, 1 / 30)
-    const s = createCharacterState(0, 6.15, 20)
+    const s = createPlayerState(createCharacterState(0, 6.15, 20))
     predictor.init(s)
-    for (let k = 0; k < 5; k++) predictor.predict({ forward: 1, right: 0, yaw: 0, pitch: 0, buttons: 0 })
-    const moved = createCharacterState(1, 6.15, 20)
+    for (let k = 0; k < 5; k++) predictor.predict({ forward: 1, right: 0, yaw: 0, pitch: 0, buttons: 0, slot: 0, viewTick: 0 })
+    const moved = createPlayerState(createCharacterState(1, 6.15, 20))
     predictor.reconcile(moved, 5)
     expect(predictor.corrections).toBe(1)
     expect(Math.hypot(predictor.offset.x, predictor.offset.z)).toBeGreaterThan(0.5)
@@ -229,7 +246,7 @@ describe('predição + reconciliação contra o servidor real', () => {
 describe('interpolação', () => {
   it('interpola entre snapshots e extrapola pouco além do último', () => {
     const e = new RemoteEntity(1)
-    const base = { id: 1, y: 0, z: 0, yaw: 0, pitch: 0, flags: 0, vy: 0, vz: 0 }
+    const base = { id: 1, y: 0, z: 0, yaw: 0, pitch: 0, flags: 0, vy: 0, vz: 0, weapon: 255, rarity: 0 }
     e.push(1000, { ...base, x: 0, vx: 10 })
     e.push(1100, { ...base, x: 1, vx: 10 })
     const out = { ...base, x: 0, vx: 0 }
@@ -294,7 +311,7 @@ describe('servidor WebSocket (Node)', () => {
     await until(() => lastEntity() !== undefined)
     const before = lastEntity()!
     const cmds: InputCommand[] = []
-    for (let k = 1; k <= 30; k++) cmds.push({ seq: k, forward: 1, right: 0, yaw: 0, pitch: 0, buttons: 0 })
+    for (let k = 1; k <= 30; k++) cmds.push({ seq: k, forward: 1, right: 0, yaw: 0, pitch: 0, buttons: 0, slot: 0, viewTick: 0 })
     for (let k = 0; k < 30; k += 10) a.ws.send(encodeInputs(cmds.slice(k, k + 10)))
     await until(() => before.z - (lastEntity()?.z ?? before.z) > 4)
     const res = await fetch(`http://127.0.0.1:${server.port}/api/info`)

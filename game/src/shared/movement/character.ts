@@ -23,8 +23,12 @@ export const Buttons = {
   Crouch: 4,
   Aim: 8,
   Walk: 16,
+  Fire: 32,
+  Reload: 64,
+  /** Interagir: pegar item, abrir baú. */
+  Use: 128,
 } as const
-export const BUTTONS_MASK = 31
+export const BUTTONS_MASK = 255
 
 /** Estado de movimento (bitmask), também usado pelas animações. */
 export const CharFlag = {
@@ -103,6 +107,25 @@ export function capsuleHeightFor(flags: number): number {
 export function eyeHeightFor(flags: number): number {
   return flags & CharFlag.Crouched ? MOVE.eyeCrouch : MOVE.eyeStand
 }
+
+/**
+ * Altura do olho usada pela câmera e pela mira (deslizando fica mais baixa
+ * que agachado). Câmera e servidor precisam concordar para o tiro sair na mira.
+ */
+export function aimEyeHeight(flags: number): number {
+  return flags & CharFlag.Sliding ? AIM_RIG.slideEye : eyeHeightFor(flags)
+}
+
+/** Geometria da câmera de ombro, compartilhada com o cálculo do tiro no servidor. */
+export const AIM_RIG = {
+  /** Deslocamento lateral do ombro direito (m). */
+  shoulder: 0.62,
+  /** Fator do ombro ao mirar. */
+  aimShoulderFactor: 0.9,
+  /** Altura acima do olho. */
+  heightOffset: 0.22,
+  slideEye: 0.95,
+} as const
 
 // ---------------------------------------------------------------------------
 // Colisão

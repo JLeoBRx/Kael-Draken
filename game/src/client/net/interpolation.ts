@@ -87,6 +87,8 @@ export class RemoteEntity {
     out.vy = lerp(a.s.vy, b.s.vy, t)
     out.vz = lerp(a.s.vz, b.s.vz, t)
     out.flags = t < 0.5 ? a.s.flags : b.s.flags
+    out.weapon = b.s.weapon
+    out.rarity = b.s.rarity
     return true
   }
 }

@@ -3,7 +3,7 @@ import { smoothstep } from '../math/scalar'
 import { CollisionWorld, Surface, type SurfaceId } from '../world/collision-world'
 import { Heightfield } from '../world/heightfield'
 import { makeObb } from '../world/obb'
-import type { GameMap, MapDefinition, MapLabel, MaterialId, Prop, PropKind, Region, SpawnPoint, StaticBox } from './types'
+import type { Chest, FixedLoot, GameMap, LootSpot, MapDefinition, MapLabel, MaterialId, Prop, PropKind, Region, SpawnPoint, StaticBox, TargetDummy } from './types'
 
 const SURFACE_OF: Record<MaterialId, SurfaceId> = {
   'grid-orange': Surface.Concrete,
@@ -18,6 +18,9 @@ const SURFACE_OF: Record<MaterialId, SurfaceId> = {
   'wood-dark': Surface.Wood,
   metal: Surface.Metal,
   'metal-red': Surface.Metal,
+  'metal-blue': Surface.Metal,
+  'metal-green': Surface.Metal,
+  asphalt: Surface.Concrete,
 }
 
 /** Abertura em uma parede: distância ao longo da parede a partir do início, largura, base e topo. */
@@ -28,9 +31,10 @@ export interface Opening {
   top: number
 }
 
-export interface HouseOptions {
+export interface BuildingOptions {
   yaw?: number
-  floors?: 1 | 2
+  /** Andares (1–8). */
+  floors?: number
   floorHeight?: number
   wall?: MaterialId
   trim?: MaterialId
@@ -38,7 +42,18 @@ export interface HouseOptions {
   /** Altura da base; padrão: maior altura do relevo sob a planta. */
   baseY?: number
   windows?: boolean
+  /** Escada até a laje do telhado. */
+  roofAccess?: boolean
+  /** Nível de loot (null = sem loot). */
+  loot?: number | null
+  /** Chance de baú por andar. */
+  chestChance?: number
+  /** 0–1: ruína (paredes do último andar quebradas, telhado faltando). */
+  ruin?: number
 }
+
+/** Compatibilidade com a Fase 1. */
+export type HouseOptions = BuildingOptions
 
 const WALL_T = 0.25
 
@@ -55,6 +70,9 @@ export class MapBuilder {
   readonly labels: MapLabel[] = []
   readonly regions: Region[] = []
   readonly spawns: SpawnPoint[] = []
+  readonly chests: Chest[] = []
+  readonly lootSpots: LootSpot[] = []
+  readonly targets: TargetDummy[] = []
   private world: CollisionWorld | null = null
 
   constructor(def: MapDefinition) {
@@ -207,20 +225,26 @@ export class MapBuilder {
   }
 
   /**
-   * Casa de um ou dois andares com porta na frente (lado +Z local), janelas,
-   * laje de cobertura com platibanda e, no sobrado, escada interna.
+   * Prédio de N andares com porta na frente (lado +Z local), janelas em todos
+   * os andares, escada em "vai e volta" ao longo da parede esquerda (duas
+   * faixas: os lances alternam de faixa e o vão da laje alterna junto),
+   * laje de cobertura com platibanda e, opcionalmente, acesso ao telhado.
+   * Cria pontos de loot e baús por andar.
    */
-  house(cx: number, cz: number, width: number, depth: number, opts: HouseOptions = {}): void {
+  building(cx: number, cz: number, width: number, depth: number, opts: BuildingOptions = {}): { floorY: number; roofY: number } {
     const yaw = opts.yaw ?? 0
-    const floors = opts.floors ?? 1
+    const floors = Math.max(1, Math.min(8, Math.round(opts.floors ?? 1)))
     const fh = opts.floorHeight ?? 3.2
     const wallMat = opts.wall ?? 'plaster'
     const trim = opts.trim ?? 'concrete'
     const floorMat = opts.floor ?? 'wood'
     const windows = opts.windows ?? true
+    const roofAccess = opts.roofAccess ?? floors >= 2
+    const lootTier = opts.loot === undefined ? 0 : opts.loot
+    const chestChance = opts.chestChance ?? 0.3
+    const ruin = opts.ruin ?? 0
     const c = Math.cos(yaw)
     const s = Math.sin(yaw)
-    // local (lx, lz) → mundo, com a mesma rotação de makeObb (Ry)
     const wx = (lx: number, lz: number) => cx + c * lx + s * lz
     const wz = (lx: number, lz: number) => cz - s * lx + c * lz
     const base = opts.baseY ?? this.maxHeightIn(cx, cz, width / 2 + 0.5, depth / 2 + 0.5)
@@ -228,69 +252,113 @@ export class MapBuilder {
     const hd = depth / 2
     const t = WALL_T
     const totalH = fh * floors
+    const slabT = 0.25
 
     // Fundação e piso térreo
     this.block(cx, cz, base, width + 0.4, 0.15, depth + 0.4, trim, yaw, 1.5)
     const floorY = base + 0.15
 
-    const win = (at: number, floorIndex: number): Opening => ({ at, width: 1.2, bottom: floorIndex * fh + 1.0, top: floorIndex * fh + 2.2 })
-    const door: Opening = { at: width / 2 - 0.7, width: 1.4, bottom: 0, top: 2.4 }
-    const frontOpen: Opening[] = [door]
+    // Paredes com porta e janelas por andar
+    const win = (at: number, f: number): Opening => ({ at, width: 1.2, bottom: f * fh + 1.0, top: f * fh + 2.2 })
+    const frontOpen: Opening[] = [{ at: width / 2 - 0.7, width: 1.4, bottom: 0, top: 2.4 }]
     const backOpen: Opening[] = []
     const sideOpen: Opening[] = []
     for (let f = 0; f < floors; f++) {
       if (windows && width >= 7) {
         frontOpen.push(win(1.0, f), win(width - 2.2, f))
-        backOpen.push(win(width / 2 - 0.6, f))
+        if (f > 0) frontOpen.push({ at: width / 2 - 0.6, width: 1.2, bottom: f * fh + 1.0, top: f * fh + 2.2 })
+        backOpen.push(win(width / 2 + 0.8, f))
       }
       if (windows && depth >= 6) sideOpen.push(win(depth / 2 - 0.6, f))
     }
-    if (floors === 2 && windows && width >= 7) {
-      // janela central do andar de cima, acima da porta
-      frontOpen.push({ at: width / 2 - 0.6, width: 1.2, bottom: fh + 1.0, top: fh + 2.2 })
-    }
-    const fix = (list: Opening[], wallLen: number) => list.map((o) => ({ ...o, bottom: Math.max(o.bottom, 0) })).filter((o) => o.at >= 0.3 && o.at + o.width <= wallLen - 0.3)
-    // Frente (+Z local), da esquerda para a direita
-    this.wall(wx(-hw, hd - t / 2), wz(-hw, hd - t / 2), wx(hw, hd - t / 2), wz(hw, hd - t / 2), floorY, totalH, wallMat, fix(frontOpen, width))
-    // Fundos
-    this.wall(wx(hw, -hd + t / 2), wz(hw, -hd + t / 2), wx(-hw, -hd + t / 2), wz(-hw, -hd + t / 2), floorY, totalH, wallMat, fix(backOpen, width))
-    // Laterais (entre frente e fundos)
-    this.wall(wx(-hw + t / 2, -hd + t), wz(-hw + t / 2, -hd + t), wx(-hw + t / 2, hd - t), wz(-hw + t / 2, hd - t), floorY, totalH, wallMat, fix(sideOpen.map((o) => ({ ...o, at: o.at - t })), depth - 2 * t))
-    this.wall(wx(hw - t / 2, hd - t), wz(hw - t / 2, hd - t), wx(hw - t / 2, -hd + t), wz(hw - t / 2, -hd + t), floorY, totalH, wallMat, fix(sideOpen.map((o) => ({ ...o, at: o.at - t })), depth - 2 * t))
+    const fix = (list: Opening[], wallLen: number) => list.filter((o) => o.at >= 0.3 && o.at + o.width <= wallLen - 0.3)
+    const wallH = (k: number) => (ruin > 0 ? totalH - this.rng.range(0, ruin * fh * 1.3) * (k % 2 === 0 ? 1 : 0.6) : totalH)
+    this.wall(wx(-hw, hd - t / 2), wz(-hw, hd - t / 2), wx(hw, hd - t / 2), wz(hw, hd - t / 2), floorY, wallH(0), wallMat, fix(frontOpen, width))
+    this.wall(wx(hw, -hd + t / 2), wz(hw, -hd + t / 2), wx(-hw, -hd + t / 2), wz(-hw, -hd + t / 2), floorY, wallH(1), wallMat, fix(backOpen, width))
+    const side = fix(sideOpen.map((o) => ({ ...o, at: o.at - t })), depth - 2 * t)
+    this.wall(wx(-hw + t / 2, -hd + t), wz(-hw + t / 2, -hd + t), wx(-hw + t / 2, hd - t), wz(-hw + t / 2, hd - t), floorY, wallH(2), wallMat, side)
+    this.wall(wx(hw - t / 2, hd - t), wz(hw - t / 2, hd - t), wx(hw - t / 2, -hd + t), wz(hw - t / 2, -hd + t), floorY, wallH(3), wallMat, side)
 
-    const slabT = 0.25
-    if (floors === 2) {
-      // Escada ao longo da parede esquerda, subindo da frente para os fundos.
-      const steps = Math.round(fh / 0.32)
-      const stepH = fh / steps
-      const tread = 0.3
-      const run = steps * tread
-      const stairW = 1.2
-      const sx = -hw + t + stairW / 2
-      const zStart = -hd + t + run
-      this.stairs(wx(sx, zStart), wz(sx, zStart), floorY, stairW, stepH, tread, steps, yaw, floorMat)
-      // Laje do 2º andar com o vão da escada
-      const slabY = floorY + fh - slabT / 2
-      const innerW = width - 2 * t
-      const innerD = depth - 2 * t
-      const restW = innerW - stairW - 0.1
-      const mainX = -hw + t + stairW + 0.1 + restW / 2
-      this.box(wx(mainX, 0), slabY, wz(mainX, 0), restW, slabT, innerD, floorMat, yaw)
-      const frontD = innerD - run - 1.0
-      if (frontD > 0.3) {
-        const fzc = hd - t - frontD / 2
-        this.box(wx(sx, fzc), slabY, wz(sx, fzc), stairW + 0.1, slabT, frontD, floorMat, yaw)
+    // Escada em vai e volta: faixa A sobe para os fundos (-Z), faixa B volta para a frente (+Z)
+    const flights = floors - 1 + (roofAccess ? 1 : 0)
+    const stripW = 1.2
+    const steps = Math.round(fh / 0.32)
+    const stepH = fh / steps
+    const tread = 0.3
+    const run = steps * tread
+    // patamar nos fundos: os lances viram ali (A chega, B parte)
+    const landing = 1.2
+    const back = -hd + t
+    const turn = back + landing
+    const front = turn + run
+    const stripX = [-hw + t + stripW / 2, -hw + t + stripW * 1.5]
+    const canStairs = width >= 7 && depth >= run + landing + 2
+    for (let L = 0; L < flights && canStairs; L++) {
+      const a = L % 2
+      const sx = stripX[a]
+      const sz = a === 0 ? front : turn
+      this.stairs(wx(sx, sz), wz(sx, sz), floorY + L * fh, stripW, stepH, tread, steps, a === 0 ? yaw : yaw + Math.PI, floorMat)
+    }
+    // Lajes: inteiras, menos o vão sobre o lance que chega a este nível
+    const innerL = -hw + t
+    const innerR = hw - t
+    const rect = (x0: number, x1: number, z0: number, z1: number, top: number, mat: MaterialId) => {
+      if (x1 - x0 < 0.05 || z1 - z0 < 0.05) return
+      this.box(wx((x0 + x1) / 2, (z0 + z1) / 2), top - slabT / 2, wz((x0 + x1) / 2, (z0 + z1) / 2), x1 - x0, slabT, z1 - z0, mat, yaw)
+    }
+    const slabWithHole = (level: number, top: number, mat: MaterialId, x0: number, x1: number, z0: number, z1: number) => {
+      const holeStrip = (level - 1) % 2
+      if (!canStairs || level - 1 >= flights) {
+        rect(x0, x1, z0, z1, top, mat)
+        return
+      }
+      const stripL = innerL + holeStrip * stripW
+      const stripR = stripL + stripW
+      rect(x0, x1, front, z1, top, mat) // frente
+      rect(x0, x1, z0, turn, top, mat) // fundos + patamar
+      rect(x0, stripL, turn, front, top, mat) // à esquerda do vão
+      rect(stripR, x1, turn, front, top, mat) // à direita do vão
+    }
+    for (let L = 1; L < floors; L++) {
+      if (ruin > 0.6 && L === floors - 1 && this.rng.chance(0.5)) continue
+      slabWithHole(L, floorY + L * fh, floorMat, innerL, innerR, back, hd - t)
+    }
+    const roofY = floorY + totalH
+    if (ruin < 0.5) {
+      slabWithHole(floors, roofY + slabT, trim, -hw - 0.15, hw + 0.15, -hd - 0.15, hd + 0.15)
+      const ph = 0.6
+      const py = roofY + slabT
+      this.wall(wx(-hw - 0.15, hd + 0.05), wz(-hw - 0.15, hd + 0.05), wx(hw + 0.15, hd + 0.05), wz(hw + 0.15, hd + 0.05), py, ph, trim, [], 0.2)
+      this.wall(wx(hw + 0.15, -hd - 0.05), wz(hw + 0.15, -hd - 0.05), wx(-hw - 0.15, -hd - 0.05), wz(-hw - 0.15, -hd - 0.05), py, ph, trim, [], 0.2)
+      this.wall(wx(-hw - 0.05, -hd + 0.05), wz(-hw - 0.05, -hd + 0.05), wx(-hw - 0.05, hd - 0.05), wz(-hw - 0.05, hd - 0.05), py, ph, trim, [], 0.2)
+      this.wall(wx(hw + 0.05, hd - 0.05), wz(hw + 0.05, hd - 0.05), wx(hw + 0.05, -hd + 0.05), wz(hw + 0.05, -hd + 0.05), py, ph, trim, [], 0.2)
+    }
+
+    // Loot: um ponto por andar (fora da escada) e baús nos fundos à direita
+    if (lootTier !== null) {
+      for (let f = 0; f < floors; f++) {
+        const y = floorY + f * fh
+        const lx = hw * 0.35
+        const lz = hd * 0.25
+        this.lootSpot(wx(lx, lz), wz(lx, lz), lootTier, y)
+        if (this.rng.chance(chestChance)) {
+          const kx = hw - t - 0.7
+          const kz = -hd + t + 0.6
+          this.chest(wx(kx, kz), wz(kx, kz), yaw, lootTier + 1, y)
+        }
+      }
+      if (roofAccess && ruin < 0.5 && this.rng.chance(chestChance)) {
+        const kx = hw * 0.5
+        const kz = hd * 0.3
+        this.chest(wx(kx, kz), wz(kx, kz), yaw, lootTier + 1, roofY + slabT)
       }
     }
-    // Laje de cobertura e platibanda
-    const roofY = floorY + totalH
-    this.box(cx, roofY + slabT / 2, cz, width + 0.3, slabT, depth + 0.3, trim, yaw)
-    const ph = 0.6
-    const py = roofY + slabT
-    this.wall(wx(-hw - 0.15, hd + 0.05), wz(-hw - 0.15, hd + 0.05), wx(hw + 0.15, hd + 0.05), wz(hw + 0.15, hd + 0.05), py, ph, trim, [], 0.2)
-    this.wall(wx(hw + 0.15, -hd - 0.05), wz(hw + 0.15, -hd - 0.05), wx(-hw - 0.15, -hd - 0.05), wz(-hw - 0.15, -hd - 0.05), py, ph, trim, [], 0.2)
-    this.wall(wx(-hw - 0.05, -hd + 0.05), wz(-hw - 0.05, -hd + 0.05), wx(-hw - 0.05, hd - 0.05), wz(-hw - 0.05, hd - 0.05), py, ph, trim, [], 0.2)
-    this.wall(wx(hw + 0.05, hd - 0.05), wz(hw + 0.05, hd - 0.05), wx(hw + 0.05, -hd + 0.05), wz(hw + 0.05, -hd + 0.05), py, ph, trim, [], 0.2)
+    return { floorY, roofY }
+  }
+
+  /** Casa simples (sem acesso ao telhado por padrão). */
+  house(cx: number, cz: number, width: number, depth: number, opts: BuildingOptions = {}): { floorY: number; roofY: number } {
+    return this.building(cx, cz, width, depth, { roofAccess: false, ...opts })
   }
 
   // ---- adereços e metadados ----------------------------------------------
@@ -322,6 +390,28 @@ export class MapBuilder {
     this.spawns.push({ x, z, yaw })
   }
 
+  /** Altura da primeira superfície abaixo de (x, fromY, z). */
+  surfaceAt(x: number, z: number, fromY = 300): number {
+    const world = this.ensureWorld()
+    const hit = { t: 0, x: 0, y: 0, z: 0, nx: 0, ny: 1, nz: 0, colliderId: -1, surface: 0 as SurfaceId }
+    return world.raycast(x, fromY, z, 0, -1, 0, fromY + 100, hit) ? hit.y : this.heightAt(x, z)
+  }
+
+  /** Baú apoiado em `y` (ou na superfície abaixo). Tem colisão. */
+  chest(x: number, z: number, yaw: number, tier: number, y?: number): void {
+    const baseY = y ?? this.surfaceAt(x, z)
+    this.ensureWorld().add(makeObb(x, baseY + 0.3, z, 0.45, 0.3, 0.3, yaw), Surface.Wood)
+    this.chests.push({ x, y: baseY, z, yaw, tier })
+  }
+
+  lootSpot(x: number, z: number, tier: number, y?: number, fixed?: FixedLoot, refill = 0): void {
+    this.lootSpots.push({ x, y: y ?? this.surfaceAt(x, z), z, tier, fixed, refill })
+  }
+
+  target(x: number, z: number, yaw: number): void {
+    this.targets.push({ x, y: this.surfaceAt(x, z), z, yaw })
+  }
+
   finish(): GameMap {
     const world = this.ensureWorld()
     if (this.spawns.length === 0) this.spawns.push({ x: 0, z: 0, yaw: 0 })
@@ -334,6 +424,9 @@ export class MapBuilder {
       labels: this.labels,
       regions: this.regions,
       spawns: this.spawns,
+      chests: this.chests,
+      lootSpots: this.lootSpots,
+      targets: this.targets,
     }
   }
 }

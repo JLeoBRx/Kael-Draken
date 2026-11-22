@@ -1,13 +1,19 @@
 import { buildMap } from './builder'
+import { emberIsland } from './ember-island'
 import { provingGrounds } from './proving-grounds'
 import type { GameMap, MapDefinition } from './types'
 
-/** Registro de mapas disponíveis. O mapa principal do battle royale entra aqui na Fase 2. */
+/** Registro de mapas disponíveis. */
 export const MAPS: Record<string, MapDefinition> = {
+  [emberIsland.id]: emberIsland,
   [provingGrounds.id]: provingGrounds,
 }
 
-export const DEFAULT_MAP_ID = provingGrounds.id
+/** Mapa principal (battle royale). */
+export const MAIN_MAP_ID = emberIsland.id
+/** Mapa de testes/treino. */
+export const TRAINING_MAP_ID = provingGrounds.id
+export const DEFAULT_MAP_ID = MAIN_MAP_ID
 
 export function getMapDefinition(id: string): MapDefinition {
   const def = MAPS[id]

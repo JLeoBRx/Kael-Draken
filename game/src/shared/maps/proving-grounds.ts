@@ -1,6 +1,7 @@
 import { fbm2, ridged2 } from '../math/noise'
 import { DEG, lerp, smoothstep } from '../math/scalar'
 import type { MapBuilder } from './builder'
+import { ITEM } from '../config/items'
 import type { MapDefinition, MaterialId } from './types'
 
 /**
@@ -176,6 +177,33 @@ function buildTrainingPad(b: MapBuilder): void {
   b.block(-37, 5, y, 0.3, 4, 14, 'concrete')
   b.wall(-24, -2, -24, 10, y, 4, 'brick', [{ at: 4.5, width: 2, bottom: 0, top: 2.6 }])
   b.label('CÂMERA E PAREDES', -30, y + 4.6, 12.3, 0, 0.6)
+
+  // I — Arsenal: armas épicas/lendárias e suprimentos que se repõem a cada 8 s
+  const weapons: [number, number][] = [[ITEM.Pistol, 2], [ITEM.Smg, 3], [ITEM.Rifle, 4], [ITEM.Shotgun, 3], [ITEM.Sniper, 4], [ITEM.Launcher, 4]]
+  weapons.forEach(([item, rarity], k) => {
+    const x = -17.5 + k * 7
+    b.block(x, 16, y, 1.6, 0.9, 0.9, 'wood-dark')
+    b.lootSpot(x, 16, 0, y + 0.9, { item, rarity, count: 1 }, 8)
+  })
+  const supplies: [number, number][] = [
+    [ITEM.AmmoLight, 120], [ITEM.AmmoMedium, 120], [ITEM.AmmoHeavy, 24], [ITEM.AmmoShells, 40],
+    [ITEM.AmmoRockets, 6], [ITEM.ShieldBattery, 3], [ITEM.Medkit, 2], [ITEM.Grenade, 6],
+  ]
+  supplies.forEach(([item, count], k) => {
+    const x = -17.5 + k * 5
+    b.block(x, 11.5, y, 1.2, 0.9, 0.9, 'wood')
+    b.lootSpot(x, 11.5, 0, y + 0.9, { item, rarity: 2, count }, 8)
+  })
+  b.label('ARSENAL · REPÕE A CADA 8 s · E para pegar', -11, y + 2.4, 16.5, 0, 0.55)
+
+  // J — Estande de tiro ao sul: bonecos a 10, 25, 50 e 75 m da linha
+  b.box(0, PAD_Y + 0.02, 35, 26, 0.06, 0.4, 'grid-orange')
+  b.label('ESTANDE DE TIRO', 0, y + 2.6, 33.5, Math.PI, 0.8)
+  ;[[10, -6], [25, -2], [50, 2], [75, 6]].forEach(([dist, x]) => {
+    const z = 35 + dist
+    b.target(x, z, 0)
+    b.label(`${dist} m`, x, b.surfaceAt(x, z) + 2.5, z, Math.PI, 0.5)
+  })
 
   // Mureta de 1 m e caixotes soltos
   b.block(20, 8, y, 10, 1, 0.4, 'concrete')
