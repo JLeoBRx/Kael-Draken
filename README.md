@@ -9,6 +9,10 @@ Cidades e Locais, Manuscritos, Mistérios, a página do Livro I e o diário de
 Novidades. O painel em `/admin` permite criar, revisar, pré-visualizar, publicar e
 arquivar todo esse conteúdo.
 
+> **Jogo:** a pasta [`game/`](game/README.md) contém um projeto independente —
+> *Última Chama*, battle royale 3D (offline, LAN e online). Tem seu próprio
+> `package.json`, testes e documentação, e não interfere no site.
+
 > **Estado do projeto:** o código roda localmente e está versionado neste
 > repositório. **O site ainda não foi publicado** em nenhum endereço público —
 > veja [Publicação](#publicação).

@@ -1,0 +1,158 @@
+import {
+  MAX_COMMANDS_PER_MESSAGE,
+  PROTOCOL_VERSION,
+  decodeServerMessage,
+  encodeHello,
+  encodeInputs,
+  encodePing,
+  type InputCommand,
+  type ServerMessage,
+  type Snapshot,
+  type WelcomeMessage,
+} from '../../shared/net/protocol'
+import type { Transport } from './transport'
+
+export interface SessionHandlers {
+  onSnapshot(snapshot: Snapshot, receivedAt: number): void
+  onPlayerInfo(id: number, name: string, skin: number): void
+  onPlayerLeft(id: number): void
+  onClosed(reason: string): void
+}
+
+/**
+ * Sessão de rede: handshake, despacho de mensagens, ping e estatísticas.
+ * Mensagens que chegam enquanto a partida ainda carrega ficam guardadas
+ * (só o snapshot mais recente) até os handlers serem registrados.
+ */
+export class NetSession {
+  welcome: WelcomeMessage | null = null
+  rttMs = 0
+  bytesIn = 0
+  bytesOut = 0
+  closedReason: string | null = null
+  private handlers: SessionHandlers | null = null
+  private backlog: { msg: ServerMessage; at: number }[] = []
+  private pingTimer: ReturnType<typeof setInterval> | null = null
+  private welcomeWaiter: ((w: WelcomeMessage) => void) | null = null
+  private failWaiter: ((e: Error) => void) | null = null
+
+  constructor(readonly transport: Transport) {
+    transport.onMessage = (data) => this.receive(data)
+    transport.onClose = (reason) => this.closed(reason)
+  }
+
+  handshake(name: string, timeoutMs = 8000): Promise<WelcomeMessage> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('O servidor não respondeu ao handshake')), timeoutMs)
+      this.welcomeWaiter = (w) => {
+        clearTimeout(timer)
+        resolve(w)
+      }
+      this.failWaiter = (e) => {
+        clearTimeout(timer)
+        reject(e)
+      }
+      this.send(encodeHello(name))
+    })
+  }
+
+  setHandlers(h: SessionHandlers): void {
+    this.handlers = h
+    const pending = this.backlog
+    this.backlog = []
+    for (const { msg, at } of pending) this.dispatch(msg, at)
+    if (this.closedReason) h.onClosed(this.closedReason)
+  }
+
+  sendInputs(cmds: InputCommand[]): void {
+    for (let k = 0; k < cmds.length; k += MAX_COMMANDS_PER_MESSAGE) this.send(encodeInputs(cmds.slice(k, k + MAX_COMMANDS_PER_MESSAGE)))
+  }
+
+  startPing(intervalMs = 1000): void {
+    if (this.pingTimer) return
+    const ping = () => this.send(encodePing(performance.now()))
+    ping()
+    this.pingTimer = setInterval(ping, intervalMs)
+  }
+
+  close(): void {
+    if (this.pingTimer) clearInterval(this.pingTimer)
+    this.pingTimer = null
+    this.transport.onMessage = null
+    this.transport.onClose = null
+    this.transport.close()
+  }
+
+  private send(data: Uint8Array): void {
+    this.bytesOut += data.byteLength
+    this.transport.send(data)
+  }
+
+  private receive(data: Uint8Array): void {
+    this.bytesIn += data.byteLength
+    const at = performance.now()
+    let msg: ServerMessage
+    try {
+      msg = decodeServerMessage(data)
+    } catch (err) {
+      console.error('Mensagem inválida do servidor', err)
+      return
+    }
+    if (msg.type === 'welcome') {
+      if (msg.version !== PROTOCOL_VERSION) {
+        this.failWaiter?.(new Error(`Versão do servidor incompatível (${msg.version}; este cliente usa ${PROTOCOL_VERSION})`))
+        return
+      }
+      this.welcome = msg
+      this.welcomeWaiter?.(msg)
+      this.welcomeWaiter = null
+      return
+    }
+    if (msg.type === 'pong') {
+      const sample = at - msg.time
+      this.rttMs = this.rttMs === 0 ? sample : this.rttMs * 0.8 + sample * 0.2
+      return
+    }
+    if (msg.type === 'kick') {
+      this.closed(msg.reason)
+      return
+    }
+    if (!this.handlers) {
+      if (msg.type === 'snapshot') {
+        const idx = this.backlog.findIndex((b) => b.msg.type === 'snapshot')
+        if (idx >= 0) this.backlog.splice(idx, 1)
+      }
+      this.backlog.push({ msg, at })
+      return
+    }
+    this.dispatch(msg, at)
+  }
+
+  private dispatch(msg: ServerMessage, at: number): void {
+    const h = this.handlers
+    if (!h) return
+    switch (msg.type) {
+      case 'snapshot':
+        h.onSnapshot(msg.snapshot, at)
+        break
+      case 'playerInfo':
+        h.onPlayerInfo(msg.id, msg.name, msg.skin)
+        break
+      case 'playerLeft':
+        h.onPlayerLeft(msg.id)
+        break
+      default:
+        break
+    }
+  }
+
+  private closed(reason: string): void {
+    if (this.closedReason) return
+    this.closedReason = reason
+    if (this.pingTimer) clearInterval(this.pingTimer)
+    this.pingTimer = null
+    this.failWaiter?.(new Error(reason))
+    this.failWaiter = null
+    this.handlers?.onClosed(reason)
+  }
+}

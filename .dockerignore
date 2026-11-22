@@ -13,3 +13,5 @@ scripts/art/.preview
 .env*.local
 Dockerfile
 .dockerignore
+# projeto do jogo (independente do site)
+game
