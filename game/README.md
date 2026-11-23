@@ -200,7 +200,7 @@ Para os testes de navegador em uma máquina nova: `npx playwright install chromi
 
 ## Testes
 
-- **Unitários e integração (138)**: equipes (montagem, fogo amigo, colocação e
+- **Unitários e integração (140)**: equipes (montagem, fogo amigo, colocação e
   vitória por equipe, partida de esquadrões só de bots); sala de espera
   (prontos, permissões do anfitrião, início, volta à sala); reconexão ao mesmo
   personagem e expiração; descoberta UDP entre dois servidores; dirigível, queda livre e planador; zona

@@ -227,6 +227,21 @@ describe('equipes', () => {
     expect([a1.id, a2.id]).toContain(br.winner)
   })
 
+  it('se os últimos caem juntos, vence a equipe que saiu por último', () => {
+    const { h, br, tick } = brHarness(0.1)
+    const a = h.add('A')
+    const b = h.add('B')
+    tick(5)
+    tick(br.route!.endTick - h.sim.tick + 30)
+    h.sim.applyDamage(a, 500, null, Cause.Zone, 0, 0, true)
+    h.sim.applyDamage(b, 500, null, Cause.Zone, 0, 0, true)
+    tick(1)
+    expect(h.events('teamOut').map((e) => e.place)).toEqual([2, 1])
+    expect(br.phase).toBe(MatchPhase.Ended)
+    expect(br.winner).toBe(b.id)
+    expect(h.events('matchEnd')[0]).toMatchObject({ winner: b.id, team: b.team })
+  })
+
   it('partida de esquadrões só com bots: ninguém fere a própria equipe e há uma equipe vencedora', () => {
     const map = loadMap('campo-de-provas')
     const sim = new Simulation(map, 30, { seed: 5, teamSize: 4 })

@@ -158,7 +158,8 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         }
         host.receive(conn.id, toBytes(data))
       })
-      ws.on('close', () => host.disconnect(conn.id))
+      // 1000 = o cliente saiu pelo menu; outros códigos (queda, aba fechada) esperam a reconexão
+      ws.on('close', (code) => host.disconnect(conn.id, code === 1000))
       ws.on('error', (err) => log.warn(`conexão ${conn.id}: ${err.message}`))
     })
   })

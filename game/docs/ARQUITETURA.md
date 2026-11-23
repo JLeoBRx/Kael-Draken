@@ -319,8 +319,10 @@ anfitrião — configuração e início). No início, o servidor monta mapa,
 simulação, regras e bots e manda `Welcome` a todos; no fim, volta a mandar o
 estado da sala pela mesma conexão.
 
-**Reconexão**: o `Welcome` traz um token. Se a conexão cair sem expulsão, o
-`SimPlayer` fica no mundo por `reconnectSeconds` (padrão 60); um `Hello` com o
+**Reconexão**: o `Welcome` traz um token. Quem sai pelo menu fecha o
+WebSocket com o código 1000 e sai na hora. Se a conexão cair de outro jeito
+(rede, aba fechada), o `SimPlayer` fica no mundo por `reconnectSeconds`
+(padrão 60), podendo ser atingido; um `Hello` com o
 token devolve o mesmo personagem (posição, vida, inventário) e zera a
 numeração dos comandos. O cliente guarda o token por aba e por servidor
 (`sessionStorage`) e tenta voltar sozinho até 15 vezes.

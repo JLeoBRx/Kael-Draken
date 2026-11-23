@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { aimAt, combat, enterGame, holdUntil, look, mouseButton, prepare, state, walkTo } from './helpers'
+import { aimAt, combat, enterGame, holdUntil, look, mouseButton, prepare, screen, state, walkTo } from './helpers'
 
 /**
  * Dois navegadores independentes conectam ao MESMO servidor dedicado (o
@@ -44,9 +44,13 @@ test('dois jogadores reais no servidor dedicado se veem e se movem', async ({ br
   const seenAfter = (await state(b)).remotePositions[0]
   expect(aStart.z - seenAfter.z).toBeGreaterThan(4)
 
-  // Quando A sai, B deixa de vê-lo
-  await ctxA.close()
+  // Quando A sai pelo menu, B deixa de vê-lo (uma queda de rede, ao contrário,
+  // deixaria o personagem esperando a reconexão)
+  await a.evaluate(() => document.exitPointerLock())
+  await expect.poll(() => screen(a)).toBe('paused')
+  await a.click('[data-action="quit"]')
   await expect.poll(async () => (await state(b)).remotes).toBe(0)
+  await ctxA.close()
   expect((await state(b)).corrections).toBe(0)
   await ctxB.close()
   expect(errA).toEqual([])

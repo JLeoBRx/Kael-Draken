@@ -492,7 +492,7 @@ export class Match {
               spectating: e.killer && e.killer !== this.playerId ? this.nameOf(e.killer) : null,
             })
             audio.play('eliminated')
-            if (e.place > 0) this.finish(false, e.place)
+            if (e.place > 0) this.finish(e.place === 1, e.place)
             else if (this.gameMode === GameMode.BattleRoyale && this.teamMode) {
               // a equipe continua: assiste um colega
               const mate = [...this.remotes.keys()].find((id) => this.isMate(id))
@@ -546,7 +546,7 @@ export class Match {
           else if (e.winner) hud.banner(this.teamMode ? `A equipe de ${this.nameOf(e.winner)} venceu` : `${this.nameOf(e.winner)} venceu`, 'kill')
           break
         case 'teamOut':
-          if (e.team === this.myTeam) this.finish(false, e.place)
+          if (e.team === this.myTeam) this.finish(e.place === 1, e.place)
           break
         case 'respawn':
           if (e.player === this.playerId) {

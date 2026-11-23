@@ -11,6 +11,8 @@ export interface Transport {
   readonly label: string
   send(data: Uint8Array): void
   close(): void
+  /** Para testes: derruba a conexão como uma queda de rede (o servidor guarda o personagem). */
+  drop?(): void
   onMessage: ((data: Uint8Array) => void) | null
   onClose: ((reason: string) => void) | null
 }
@@ -54,6 +56,9 @@ export function connectWebSocket(url: string, timeoutMs = 8000): Promise<Transpo
       },
       close() {
         ws.close(1000, 'cliente saiu')
+      },
+      drop() {
+        ws.close(4000, 'queda simulada')
       },
       onMessage: null,
       onClose: null,

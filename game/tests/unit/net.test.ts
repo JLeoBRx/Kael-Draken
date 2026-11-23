@@ -563,6 +563,15 @@ describe('reconexão', () => {
     expect(a3.last('welcome')!.playerId).not.toBe(w.playerId)
   })
 
+  it('quem sai pelo menu (fechamento limpo) sai na hora', () => {
+    const map = testMap(() => {})
+    const host = new GameHost({ mapId: map.def.id, map, reconnectSeconds: 60 })
+    const a = join(host, 1, 'Ana')
+    const b = join(host, 2, 'Bia')
+    host.disconnect(1, true)
+    expect(b.last('playerLeft')?.id).toBe(a.last('welcome')!.playerId)
+  })
+
   it('quem não volta a tempo sai da partida', () => {
     const map = testMap(() => {})
     const host = new GameHost({ mapId: map.def.id, map, reconnectSeconds: 1 })

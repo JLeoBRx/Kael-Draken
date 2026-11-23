@@ -266,14 +266,18 @@ export class GameHost {
     ;(timer as { unref?: () => void }).unref?.()
   }
 
-  disconnect(connId: number): void {
+  /**
+   * `left`: o jogador saiu de propósito (fechou pelo menu) — sai na hora.
+   * Sem isso (queda de rede, aba fechada), o personagem espera a volta.
+   */
+  disconnect(connId: number, left = false): void {
     const slot = this.clients.get(connId)
     if (!slot) return
     this.clients.delete(connId)
     const p = slot.player
     if (p) {
       const rs = this.opts.reconnectSeconds ?? 60
-      if (this.active && p.p.alive && !p.spectator && rs > 0 && slot.token && !slot.kicked) {
+      if (this.active && p.p.alive && !p.spectator && rs > 0 && slot.token && !slot.kicked && !left) {
         // o personagem fica no mundo esperando a volta (pode ser atingido)
         this.orphans.set(slot.token, { player: p, until: this.sim.tick + Math.round(rs * this.tickRate) })
         this.log.info(`${p.name} (#${p.id}) caiu; aguardando reconexão por ${rs} s`)

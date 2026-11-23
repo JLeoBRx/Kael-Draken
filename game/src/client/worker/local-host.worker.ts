@@ -56,7 +56,7 @@ self.onmessage = (ev: MessageEvent<WorkerRequest>) => {
         host?.receive(m.cid, new Uint8Array(m.buf))
         break
       case 'disconnect':
-        host?.disconnect(m.cid)
+        host?.disconnect(m.cid, true)
         break
     }
   } catch (err) {

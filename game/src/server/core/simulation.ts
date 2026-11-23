@@ -298,6 +298,9 @@ export class Simulation {
 
   /** Aumenta quando as equipes mudam (o anfitrião reenvia os nomes/equipes). */
   rosterVersion = 0
+  /** Última equipe a sair e o último eliminado dela (vencem se todos caírem juntos). */
+  lastOutTeam = -1
+  lastOutPlayer = 0
 
   /**
    * Monta as equipes do tamanho das regras: primeiro quem escolheu equipe na
@@ -690,7 +693,11 @@ export class Simulation {
     const wiped = !this.rules.respawn && !alive.has(victim.team)
     const place = wiped ? alive.size + 1 : 0
     this.emit({ type: 'eliminated', victim: victim.id, killer: killer && killer !== victim ? killer.id : 0, cause, respawnIn: this.rules.respawn ? this.rules.respawnDelay : 0, place })
-    if (wiped) this.emit({ type: 'teamOut', team: victim.team, place })
+    if (wiped) {
+      this.lastOutTeam = victim.team
+      this.lastOutPlayer = victim.id
+      this.emit({ type: 'teamOut', team: victim.team, place })
+    }
   }
 
   private respawn(sp: SimPlayer): void {

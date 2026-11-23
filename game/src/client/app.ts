@@ -621,7 +621,9 @@ export class App {
 
   /** Para testes: derruba a conexão como se a rede tivesse caído (sem aviso ao servidor). */
   debugDropConnection(): void {
-    this.session?.transport.close()
+    const t = this.session?.transport
+    if (t?.drop) t.drop()
+    else t?.close()
   }
 
   /** Estado resumido para testes automatizados e diagnóstico. */

@@ -191,6 +191,10 @@ export class BattleRoyale {
     if (teams.size === 1) {
       winnerTeam = [...teams][0]
       for (const sp of this.sim.players.values()) if (sp.p.alive && !sp.spectator && !winner) winner = sp.id
+    } else if (this.sim.lastOutTeam >= 0) {
+      // caíram todos no mesmo instante (zona): vence quem saiu por último (colocação 1)
+      winnerTeam = this.sim.lastOutTeam
+      winner = this.sim.lastOutPlayer
     }
     this.winner = winner
     this.winnerTeam = winnerTeam
