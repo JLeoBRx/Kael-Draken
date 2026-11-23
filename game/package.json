@@ -11,7 +11,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "server": "tsx src/server/node/main.ts",
-    "host": "vite build && tsx src/server/node/main.ts --static dist/client",
+    "host": "vite build && tsx src/server/node/main.ts --lobby --static dist/client",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",

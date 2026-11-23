@@ -114,7 +114,7 @@ describe('partida battle royale', () => {
     expect(h.events('eliminated').at(-1)).toMatchObject({ victim: b.id, place: 2 })
     expect(br.phase).toBe(MatchPhase.Ended)
     expect(br.winner).toBe(a.id)
-    expect(h.events('matchEnd')).toEqual([{ type: 'matchEnd', winner: a.id }])
+    expect(h.events('matchEnd')).toEqual([{ type: 'matchEnd', winner: a.id, team: a.team }])
     // ninguém morre depois do fim; sem renascimento
     expect(h.sim.applyDamage(a, 500, null, Cause.Zone, 0, 0)).toBeNull()
     tick(31)
@@ -160,4 +160,90 @@ describe('partida completa só com bots', () => {
     // ~1 ms por tick com 24 bots seria folgado (orçamento de 33 ms)
     expect(ms / ticks).toBeLessThan(5)
   }, 120_000)
+})
+
+describe('equipes', () => {
+  it('monta equipes respeitando a escolha e completando com pessoas e depois bots', () => {
+    const h = new Harness(testMap(() => {}), { teamSize: 2 })
+    const a = h.sim.addPlayer('A', 0, { team: 3 })
+    const b = h.sim.addPlayer('B')
+    const c = h.sim.addPlayer('C', 0, { team: 3 })
+    const d = h.sim.addPlayer('D', 0, { team: 3 }) // equipe 3 cheia: vai para outra
+    const bot = h.sim.addPlayer('Bot', 0, { bot: true })
+    h.sim.assignTeams()
+    expect(a.team).toBe(3)
+    expect(c.team).toBe(3)
+    expect(d.team).not.toBe(3)
+    expect(b.team).toBe(d.team) // pessoas completam antes dos bots
+    expect(bot.team).not.toBe(3)
+    expect(bot.team).not.toBe(b.team)
+    expect(h.sim.teammates(a).map((p) => p.id)).toEqual([c.id])
+  })
+
+  it('sem fogo amigo, colegas não se ferem; com fogo amigo, sim', () => {
+    for (const ff of [false, true]) {
+      const h = new Harness(testMap(() => {}), { teamSize: 2, friendlyFire: ff })
+      const a = h.add('A')
+      const b = h.add('B')
+      h.sim.assignTeams()
+      expect(a.team).toBe(b.team)
+      h.run(10)
+      give(a, ITEM.Rifle, 0)
+      h.tick(new Map([[a, { ...aimAt(a, b.p.char.x, CHEST, b.p.char.z), buttons: 32 | 8 }]]))
+      expect(b.p.health < 100).toBe(ff)
+    }
+  })
+
+  it('a equipe só sai quando o último cai; vence a última equipe de pé', () => {
+    const h = new Harness(testMap(() => {}), { teamSize: 2 })
+    const br = new BattleRoyale(h.sim, { warmup: 0.1, zoneSpeed: 1, endDelay: 1 })
+    const a1 = h.sim.addPlayer('A1', 0, { team: 0 })
+    const a2 = h.sim.addPlayer('A2', 0, { team: 0 })
+    const b1 = h.sim.addPlayer('B1', 0, { team: 1 })
+    const b2 = h.sim.addPlayer('B2', 0, { team: 1 })
+    const tick = (n = 1) => {
+      for (let k = 0; k < n; k++) {
+        h.sim.step()
+        br.update()
+        h.log.push(...h.sim.events)
+        h.sim.events = []
+      }
+    }
+    tick(5)
+    expect(br.phase).toBe(MatchPhase.Airship)
+    expect(br.teams).toBe(2)
+    tick(br.route!.endTick - h.sim.tick + 30)
+    h.sim.applyDamage(b1, 500, a1, ITEM.Rifle, 0, 0)
+    tick(1)
+    expect(h.events('eliminated').at(-1)).toMatchObject({ victim: b1.id, place: 0 })
+    expect(h.events('teamOut')).toHaveLength(0)
+    expect(br.phase).not.toBe(MatchPhase.Ended)
+    h.sim.applyDamage(b2, 500, a2, ITEM.Rifle, 0, 0)
+    tick(1)
+    expect(h.events('teamOut')).toEqual([{ type: 'teamOut', team: 1, place: 2 }])
+    expect(br.phase).toBe(MatchPhase.Ended)
+    expect(br.winnerTeam).toBe(0)
+    expect(h.events('matchEnd')[0]).toMatchObject({ team: 0 })
+    expect([a1.id, a2.id]).toContain(br.winner)
+  })
+
+  it('partida de esquadrões só com bots: ninguém fere a própria equipe e há uma equipe vencedora', () => {
+    const map = loadMap('campo-de-provas')
+    const sim = new Simulation(map, 30, { seed: 5, teamSize: 4 })
+    const br = new BattleRoyale(sim, { warmup: 1, zoneSpeed: 4, endDelay: 1, seed: 5 })
+    const bots = new BotManager(sim, br, { count: 12, difficulty: 'dificil', seed: 5 })
+    br.startNow()
+    const teamOf = new Map([...sim.players.values()].map((p) => [p.id, p.team]))
+    const kills: Extract<GameEvent, { type: 'eliminated' }>[] = []
+    for (let t = 0; t < 30 * 60 * 6 && br.phase !== MatchPhase.Ended; t++) {
+      bots.update()
+      sim.step()
+      br.update()
+      for (const r of sim.events) if (r.ev.type === 'eliminated') kills.push(r.ev)
+      sim.events = []
+    }
+    expect(br.teams).toBe(3)
+    expect(br.phase).toBe(MatchPhase.Ended)
+    for (const k of kills) if (k.killer && k.cause < 250) expect(teamOf.get(k.killer)).not.toBe(teamOf.get(k.victim))
+  }, 60_000)
 })

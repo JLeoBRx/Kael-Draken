@@ -234,14 +234,15 @@ export class CharacterModel {
   }
 
   /** Placa com o nome acima da cabeça (jogadores remotos). */
-  setName(name: string): void {
+  /** Placa de nome; colegas de equipe aparecem em verde e por cima das paredes. */
+  setName(name: string, teammate = false): void {
     if (this.nameplate) {
       this.root.remove(this.nameplate)
       this.nameplate.material.map?.dispose()
       this.nameplate.material.dispose()
     }
-    const { texture, aspect } = textTexture(name, { height: 64, bg: 'rgba(10,12,16,0.6)' })
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthWrite: false, toneMapped: false }))
+    const { texture, aspect } = textTexture(teammate ? `◆ ${name}` : name, { height: 64, bg: teammate ? 'rgba(20,90,50,0.75)' : 'rgba(10,12,16,0.6)', fg: teammate ? '#c9ffd9' : undefined })
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthWrite: false, depthTest: !teammate, toneMapped: false }))
     sprite.scale.set(0.32 * aspect, 0.32, 1)
     sprite.position.set(0, 2.25, 0)
     sprite.renderOrder = 10

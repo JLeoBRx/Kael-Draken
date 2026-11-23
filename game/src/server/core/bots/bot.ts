@@ -345,7 +345,7 @@ export class Bot {
     let bestD = Infinity
     const attacker = sim.tick - me.lastAttackTick < sim.tickRate * 2 ? sim.players.get(me.lastAttacker) ?? null : null
     for (const q of sim.players.values()) {
-      if (q === me || !q.p.alive || q.spectator || q.p.char.flags & CharFlag.Riding) continue
+      if (q === me || !q.p.alive || q.spectator || q.team === me.team || q.p.char.flags & CharFlag.Riding) continue
       const dx = q.p.char.x - c.x
       const dz = q.p.char.z - c.z
       const d = Math.hypot(dx, dz, q.p.char.y - c.y)

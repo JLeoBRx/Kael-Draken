@@ -107,34 +107,50 @@ export interface LocalMatchOptions {
   bots: number
   difficulty: BotDifficulty
   zoneSpeed: number
+  /** Jogadores por equipe (os jogadores deste computador ficam juntos). */
+  teamSize: number
 }
 
-export const TRAINING_MATCH: LocalMatchOptions = { mode: GameMode.Training, bots: 0, difficulty: 'normal', zoneSpeed: 1 }
+export const TRAINING_MATCH: LocalMatchOptions = { mode: GameMode.Training, bots: 0, difficulty: 'normal', zoneSpeed: 1, teamSize: 1 }
 
 export function startLocalServer(mapId: string, match: LocalMatchOptions = TRAINING_MATCH, timeoutMs = 20000): Promise<Transport> {
+  return startLocalServers(mapId, match, 1, timeoutMs).then((t) => t[0])
+}
+
+/**
+ * Um servidor local e `count` conexões a ele (tela dividida: uma por
+ * jogador). O Worker termina quando a última conexão fecha.
+ */
+export function startLocalServers(mapId: string, match: LocalMatchOptions, count: number, timeoutMs = 20000): Promise<Transport[]> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('../worker/local-host.worker.ts', import.meta.url), { type: 'module', name: 'servidor-local' })
-    const cid = 1
     let ready = false
+    let open = count
     const timer = setTimeout(() => {
       if (!ready) {
         worker.terminate()
         reject(new Error('O servidor local não respondeu'))
       }
     }, timeoutMs)
-    const transport: Transport = {
-      kind: 'local',
-      label: 'Servidor local',
-      send(data) {
-        const buf = ownBuffer(data)
-        worker.postMessage({ t: 'data', cid, buf } satisfies WorkerRequest, [buf])
-      },
-      close() {
-        worker.postMessage({ t: 'disconnect', cid } satisfies WorkerRequest)
-        worker.terminate()
-      },
-      onMessage: null,
-      onClose: null,
+    const transports = new Map<number, Transport>()
+    for (let cid = 1; cid <= count; cid++) {
+      let closed = false
+      transports.set(cid, {
+        kind: 'local',
+        label: count > 1 ? `Servidor local · jogador ${cid}` : 'Servidor local',
+        send(data) {
+          const buf = ownBuffer(data)
+          worker.postMessage({ t: 'data', cid, buf } satisfies WorkerRequest, [buf])
+        },
+        close() {
+          if (closed) return
+          closed = true
+          worker.postMessage({ t: 'disconnect', cid } satisfies WorkerRequest)
+          if (--open <= 0) worker.terminate()
+        },
+        onMessage: null,
+        onClose: null,
+      })
     }
     worker.onmessage = (ev: MessageEvent<WorkerEvent>) => {
       const m = ev.data
@@ -142,22 +158,22 @@ export function startLocalServer(mapId: string, match: LocalMatchOptions = TRAIN
         case 'ready':
           ready = true
           clearTimeout(timer)
-          worker.postMessage({ t: 'connect', cid } satisfies WorkerRequest)
-          resolve(transport)
+          for (const cid of transports.keys()) worker.postMessage({ t: 'connect', cid } satisfies WorkerRequest)
+          resolve([...transports.values()])
           break
         case 'error':
           clearTimeout(timer)
           if (!ready) reject(new Error(m.message))
-          else transport.onClose?.(m.message)
+          else for (const t of transports.values()) t.onClose?.(m.message)
           break
         case 'log':
           ;(m.level === 'warn' ? console.warn : console.info)(`[servidor local] ${m.message}`)
           break
         case 'data':
-          if (m.cid === cid) transport.onMessage?.(new Uint8Array(m.buf))
+          transports.get(m.cid)?.onMessage?.(new Uint8Array(m.buf))
           break
         case 'close':
-          if (m.cid === cid) transport.onClose?.(m.reason)
+          transports.get(m.cid)?.onClose?.(m.reason)
           break
       }
     }
@@ -165,8 +181,8 @@ export function startLocalServer(mapId: string, match: LocalMatchOptions = TRAIN
       clearTimeout(timer)
       const message = `Falha no servidor local: ${ev.message || 'erro desconhecido'}`
       if (!ready) reject(new Error(message))
-      else transport.onClose?.(message)
+      else for (const t of transports.values()) t.onClose?.(message)
     }
-    worker.postMessage({ t: 'start', mapId, maxPlayers: Math.max(16, match.bots + 1), match } satisfies WorkerRequest)
+    worker.postMessage({ t: 'start', mapId, maxPlayers: Math.max(16, match.bots + count), match } satisfies WorkerRequest)
   })
 }

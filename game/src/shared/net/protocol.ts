@@ -15,10 +15,10 @@ import { BinaryReader, BinaryWriter, ProtocolError } from './binary'
  * inventário). O servidor executa a simulação e devolve o estado oficial.
  */
 
-export const PROTOCOL_VERSION = 4
+export const PROTOCOL_VERSION = 5
 
-export const C2S = { Hello: 1, Input: 2, Ping: 3, Inventory: 4 } as const
-export const S2C = { Welcome: 10, Snapshot: 11, Pong: 12, PlayerInfo: 13, PlayerLeft: 14, Kick: 15, Events: 16 } as const
+export const C2S = { Hello: 1, Input: 2, Ping: 3, Inventory: 4, Lobby: 5 } as const
+export const S2C = { Welcome: 10, Snapshot: 11, Pong: 12, PlayerInfo: 13, PlayerLeft: 14, Kick: 15, Events: 16, Lobby: 17 } as const
 
 export const MAX_NAME_LENGTH = 16
 export const MAX_COMMANDS_PER_MESSAGE = 16
@@ -53,6 +53,14 @@ export interface EntityState {
   rarity: number
 }
 
+/** Estado de um colega de equipe (só para quem é da mesma equipe). */
+export interface TeamMate {
+  id: number
+  health: number
+  shield: number
+  alive: boolean
+}
+
 export interface Snapshot {
   tick: number
   ackSeq: number
@@ -66,6 +74,7 @@ export interface Snapshot {
   phaseEnd: number
   self: PlayerState | null
   entities: EntityState[]
+  mates: TeamMate[]
 }
 
 export interface ShotEnd {
@@ -95,7 +104,8 @@ export type GameEvent =
   | { type: 'harvest'; material: number; amount: number; x: number; y: number; z: number }
   | ({ type: 'zone' } & ZoneStage)
   | ({ type: 'airship' } & AirshipRoute)
-  | { type: 'matchEnd'; winner: number }
+  | { type: 'matchEnd'; winner: number; team: number }
+  | { type: 'teamOut'; team: number; place: number }
 
 export const TargetKind = { Player: 0, Dummy: 1, Structure: 2 } as const
 
@@ -115,12 +125,59 @@ export interface WelcomeMessage {
   serverName: string
   /** GameMode */
   mode: number
+  /** Token para voltar ao mesmo personagem se a conexão cair. */
+  token: string
 }
+
+/** Configuração da partida escolhida na sala de espera. */
+export interface LobbyConfig {
+  mapId: string
+  /** GameMode */
+  mode: number
+  bots: number
+  /** 0 fácil, 1 normal, 2 difícil */
+  difficulty: number
+  /** 1 solo, 2 dupla, 3 trio, 4 esquadrão */
+  teamSize: number
+  friendlyFire: boolean
+  zoneSpeed: number
+}
+
+export interface LobbyMember {
+  id: number
+  name: string
+  ready: boolean
+  /** Equipe escolhida (-1 = automática) */
+  team: number
+  skin: number
+}
+
+export interface LobbyState {
+  /** Id do destinatário na sala. */
+  you: number
+  /** Quem configura e inicia (o primeiro a entrar). */
+  owner: number
+  config: LobbyConfig
+  /** Há uma partida em andamento (quem chega espera a próxima). */
+  running: boolean
+  runningAlive: number
+  members: LobbyMember[]
+}
+
+export type LobbyAction =
+  | { op: 'ready'; ready: boolean }
+  | { op: 'team'; team: number }
+  | { op: 'config'; config: LobbyConfig }
+  | { op: 'start' }
+
+export const MAX_TEAM_SIZE = 4
+export const MAX_LOBBY_TEAMS = 25
 
 export type InventoryAction = { action: 'drop'; slot: number } | { action: 'swap'; a: number; b: number }
 
 export type ClientMessage =
-  | { type: 'hello'; version: number; name: string }
+  | { type: 'hello'; version: number; name: string; token: string }
+  | { type: 'lobby'; action: LobbyAction }
   | { type: 'input'; commands: InputCommand[] }
   | { type: 'ping'; time: number }
   | { type: 'inventory'; op: InventoryAction }
@@ -129,7 +186,8 @@ export type ServerMessage =
   | WelcomeMessage
   | { type: 'snapshot'; snapshot: Snapshot }
   | { type: 'pong'; time: number; tick: number }
-  | { type: 'playerInfo'; id: number; name: string; skin: number }
+  | { type: 'playerInfo'; id: number; name: string; skin: number; team: number }
+  | { type: 'lobby'; state: LobbyState }
   | { type: 'playerLeft'; id: number }
   | { type: 'kick'; reason: string }
   | { type: 'events'; events: GameEvent[] }
@@ -201,8 +259,52 @@ export function sanitizeCommand(c: InputCommand): InputCommand {
 // ---------------------------------------------------------------------------
 // Cliente → servidor
 
-export function encodeHello(name: string): Uint8Array {
-  return new BinaryWriter(32).u8(C2S.Hello).u16(PROTOCOL_VERSION).string(name).finish()
+export function encodeHello(name: string, token = ''): Uint8Array {
+  return new BinaryWriter(96).u8(C2S.Hello).u16(PROTOCOL_VERSION).string(name).string(token.slice(0, 64)).finish()
+}
+
+function writeLobbyConfig(w: BinaryWriter, c: LobbyConfig): void {
+  w.string(c.mapId).u8(c.mode).u8(clamp(c.bots | 0, 0, 99)).u8(clamp(c.difficulty | 0, 0, 2)).u8(clamp(c.teamSize | 0, 1, MAX_TEAM_SIZE)).u8(c.friendlyFire ? 1 : 0).f32(c.zoneSpeed)
+}
+
+function readLobbyConfig(r: BinaryReader): LobbyConfig {
+  return {
+    mapId: r.string(64),
+    mode: r.u8(),
+    bots: Math.min(99, r.u8()),
+    difficulty: Math.min(2, r.u8()),
+    teamSize: clamp(r.u8(), 1, MAX_TEAM_SIZE),
+    friendlyFire: r.u8() === 1,
+    zoneSpeed: clamp(r.f32() || 1, 0.25, 10),
+  }
+}
+
+export function encodeLobbyAction(a: LobbyAction): Uint8Array {
+  const w = new BinaryWriter(64).u8(C2S.Lobby)
+  switch (a.op) {
+    case 'ready':
+      w.u8(1).u8(a.ready ? 1 : 0)
+      break
+    case 'team':
+      w.u8(2).i8(clamp(a.team | 0, -1, MAX_LOBBY_TEAMS - 1))
+      break
+    case 'config':
+      w.u8(3)
+      writeLobbyConfig(w, a.config)
+      break
+    case 'start':
+      w.u8(4)
+      break
+  }
+  return w.finish()
+}
+
+export function encodeLobbyState(st: LobbyState): Uint8Array {
+  const w = new BinaryWriter(128 + st.members.length * 24).u8(S2C.Lobby).u16(st.you).u16(st.owner)
+  writeLobbyConfig(w, st.config)
+  w.u8(st.running ? 1 : 0).u16(st.runningAlive).u8(st.members.length)
+  for (const m of st.members) w.u16(m.id).string(m.name).u8(m.ready ? 1 : 0).i8(m.team).u8(m.skin)
+  return w.finish()
 }
 
 export function encodeInputs(commands: readonly InputCommand[]): Uint8Array {
@@ -232,8 +334,17 @@ export function decodeClientMessage(data: Uint8Array): ClientMessage {
   let msg: ClientMessage
   switch (type) {
     case C2S.Hello:
-      msg = { type: 'hello', version: r.u16(), name: r.string(128) }
+      msg = { type: 'hello', version: r.u16(), name: r.string(128), token: r.string(64) }
       break
+    case C2S.Lobby: {
+      const op = r.u8()
+      if (op === 1) msg = { type: 'lobby', action: { op: 'ready', ready: r.u8() === 1 } }
+      else if (op === 2) msg = { type: 'lobby', action: { op: 'team', team: clamp(r.i8(), -1, MAX_LOBBY_TEAMS - 1) } }
+      else if (op === 3) msg = { type: 'lobby', action: { op: 'config', config: readLobbyConfig(r) } }
+      else if (op === 4) msg = { type: 'lobby', action: { op: 'start' } }
+      else throw new ProtocolError('ação de sala desconhecida')
+      break
+    }
     case C2S.Input: {
       const n = r.u8()
       if (n > MAX_COMMANDS_PER_MESSAGE) throw new ProtocolError('comandos demais em uma mensagem')
@@ -321,7 +432,7 @@ export function readPlayerState(r: BinaryReader): PlayerState {
 // Servidor → cliente
 
 export function encodeWelcome(m: Omit<WelcomeMessage, 'type'>): Uint8Array {
-  return new BinaryWriter(64).u8(S2C.Welcome).u16(m.version).u16(m.playerId).string(m.mapId).u16(m.tickRate).u32(m.tick).string(m.serverName).u8(m.mode).finish()
+  return new BinaryWriter(128).u8(S2C.Welcome).u16(m.version).u16(m.playerId).string(m.mapId).u16(m.tickRate).u32(m.tick).string(m.serverName).u8(m.mode).string(m.token).finish()
 }
 
 /** Escreve o estado público de um jogador como entidade de snapshot. */
@@ -347,8 +458,14 @@ export function encodePong(time: number, tick: number): Uint8Array {
   return new BinaryWriter(13).u8(S2C.Pong).f64(time).u32(tick).finish()
 }
 
-export function encodePlayerInfo(id: number, name: string, skin: number): Uint8Array {
-  return new BinaryWriter(32).u8(S2C.PlayerInfo).u16(id).string(name).u8(skin).finish()
+export function encodePlayerInfo(id: number, name: string, skin: number, team: number): Uint8Array {
+  return new BinaryWriter(40).u8(S2C.PlayerInfo).u16(id).string(name).u8(skin).u16(team & 0xffff).finish()
+}
+
+/** Colegas de equipe do destinatário (depois das entidades do snapshot). */
+export function writeMates(w: BinaryWriter, mates: readonly TeamMate[]): void {
+  w.u8(mates.length)
+  for (const m of mates) w.u16(m.id).u8(Math.max(0, Math.min(255, Math.ceil(m.health)))).u8(Math.max(0, Math.min(255, Math.ceil(m.shield)))).u8(m.alive ? 1 : 0)
 }
 
 export function encodePlayerLeft(id: number): Uint8Array {
@@ -362,7 +479,7 @@ export function encodeKick(reason: string): Uint8Array {
 const EV = {
   shot: 1, hit: 2, damaged: 3, eliminated: 4, itemSpawn: 5, itemRemove: 6, chestOpen: 7, projSpawn: 8, explosion: 9, target: 10, respawn: 11,
   piecePlaced: 12, pieceDamaged: 13, pieceRemoved: 14, propDestroyed: 15, harvest: 16,
-  zone: 17, airship: 18, matchEnd: 19,
+  zone: 17, airship: 18, matchEnd: 19, teamOut: 20,
 } as const
 
 function writeEvent(w: BinaryWriter, e: GameEvent): void {
@@ -425,7 +542,10 @@ function writeEvent(w: BinaryWriter, e: GameEvent): void {
       w.f32(e.x0).f32(e.z0).f32(e.x1).f32(e.z1).f32(e.y).u32(e.startTick).u32(e.endTick)
       break
     case 'matchEnd':
-      w.u16(e.winner)
+      w.u16(e.winner).u16(e.team & 0xffff)
+      break
+    case 'teamOut':
+      w.u16(e.team & 0xffff).u8(Math.min(255, e.place))
       break
   }
 }
@@ -484,7 +604,9 @@ function readEvent(r: BinaryReader): GameEvent {
     case EV.airship:
       return { type: 'airship', x0: r.f32(), z0: r.f32(), x1: r.f32(), z1: r.f32(), y: r.f32(), startTick: r.u32(), endTick: r.u32() }
     case EV.matchEnd:
-      return { type: 'matchEnd', winner: r.u16() }
+      return { type: 'matchEnd', winner: r.u16(), team: r.u16() }
+    case EV.teamOut:
+      return { type: 'teamOut', team: r.u16(), place: r.u8() }
     default:
       throw new ProtocolError(`evento desconhecido: ${t}`)
   }
@@ -502,7 +624,7 @@ export function decodeServerMessage(data: Uint8Array): ServerMessage {
   let msg: ServerMessage
   switch (type) {
     case S2C.Welcome:
-      msg = { type: 'welcome', version: r.u16(), playerId: r.u16(), mapId: r.string(), tickRate: r.u16(), tick: r.u32(), serverName: r.string(), mode: r.u8() }
+      msg = { type: 'welcome', version: r.u16(), playerId: r.u16(), mapId: r.string(), tickRate: r.u16(), tick: r.u32(), serverName: r.string(), mode: r.u8(), token: r.string() }
       break
     case S2C.Snapshot: {
       const tick = r.u32()
@@ -523,14 +645,17 @@ export function decodeServerMessage(data: Uint8Array): ServerMessage {
           weapon: r.u8(), rarity: r.u8(),
         })
       }
-      msg = { type: 'snapshot', snapshot: { tick, ackSeq, queued, alive, kills, phase, phaseEnd, self, entities } }
+      const nm = r.u8()
+      const mates: TeamMate[] = []
+      for (let k = 0; k < nm; k++) mates.push({ id: r.u16(), health: r.u8(), shield: r.u8(), alive: r.u8() === 1 })
+      msg = { type: 'snapshot', snapshot: { tick, ackSeq, queued, alive, kills, phase, phaseEnd, self, entities, mates } }
       break
     }
     case S2C.Pong:
       msg = { type: 'pong', time: r.f64(), tick: r.u32() }
       break
     case S2C.PlayerInfo:
-      msg = { type: 'playerInfo', id: r.u16(), name: r.string(), skin: r.u8() }
+      msg = { type: 'playerInfo', id: r.u16(), name: r.string(), skin: r.u8(), team: r.u16() }
       break
     case S2C.PlayerLeft:
       msg = { type: 'playerLeft', id: r.u16() }
@@ -538,6 +663,18 @@ export function decodeServerMessage(data: Uint8Array): ServerMessage {
     case S2C.Kick:
       msg = { type: 'kick', reason: r.string() }
       break
+    case S2C.Lobby: {
+      const you = r.u16()
+      const owner = r.u16()
+      const config = readLobbyConfig(r)
+      const running = r.u8() === 1
+      const runningAlive = r.u16()
+      const n = r.u8()
+      const members: LobbyMember[] = []
+      for (let k = 0; k < n; k++) members.push({ id: r.u16(), name: r.string(), ready: r.u8() === 1, team: r.i8(), skin: r.u8() })
+      msg = { type: 'lobby', state: { you, owner, config, running, runningAlive, members } }
+      break
+    }
     case S2C.Events: {
       const n = r.u16()
       const events: GameEvent[] = []

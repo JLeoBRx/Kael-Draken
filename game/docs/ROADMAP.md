@@ -11,7 +11,7 @@ termina com uma entrega que pode ser jogada.
 | 2 — Gameplay | armas, tiros, vida/escudo, inventário, coleta, baús, mapa principal (1ª versão), HUD completa | 2–3 semanas | **concluída** |
 | 3 — Construção | paredes, rampas, pisos, telhados; pré-visualização, recursos, vida e destruição sincronizadas | 2 semanas | **concluída** |
 | 4 — IA | bots com navegação, loot, combate, fuga, abrigo, construção e zona; níveis de dificuldade; zona segura; partida BR completa offline | 2–3 semanas | **concluída** |
-| 5 — Multijogador local | lobby LAN, equipes, descoberta na rede, reconexão, tela dividida, testes com vários jogadores | 1–2 semanas | próxima |
+| 5 — Multijogador local | lobby LAN, equipes, descoberta na rede, reconexão, tela dividida, testes com vários jogadores | 1–2 semanas | **concluída** |
 | 6 — Online | plataforma (contas, amigos, convites, grupos, matchmaking, salas públicas/privadas, código de convite), alocação de servidores, segurança, gerência de interesse e compressão | 3–4 semanas | |
 | 7 — Polimento | arte final (GLTF, animações esqueléticas), sons, efeitos, pós-processamento, otimização, acessibilidade, correção de bugs | 3 semanas | |
 | 8 — Lançamento | app desktop (Electron/Tauri), instaladores, servidor em container, documentação de operação, testes de carga e finais | 1–2 semanas | |
@@ -180,14 +180,44 @@ Decisões de projeto:
 - **Zona começa a contar no fim do dirigível** e o último círculo fecha por
   completo: a partida sempre termina.
 
-## Fase 5 — Multijogador local
+## Fase 5 — Multijogador local ✅ (M3: a mesma partida com amigos na LAN)
 
-- Lobby LAN com lista de jogadores, prontos, configuração de partida (mapa,
-  bots, dificuldade, número de jogadores, equipes).
-- Descoberta na rede (anúncio UDP pelo host; lista no app desktop).
-- Equipes (solo/dupla/trio/esquadrão), fogo amigo configurável.
-- Reconexão ao mesmo personagem.
-- Tela dividida para 2 jogadores com controles.
+Entregue:
+
+- **Sala de espera** (`npm run host`, ou `--lobby` no servidor): lista de
+  jogadores com anfitrião, "pronto" e equipe escolhida; o anfitrião (primeiro
+  a entrar) configura mapa, modo, bots e dificuldade, tamanho das equipes,
+  fogo amigo e velocidade da zona, e inicia. No fim da partida, todos voltam à
+  sala pela mesma conexão; quem chega com a partida rolando espera a próxima.
+- **Equipes**: solo, duplas, trios e esquadrões; quem escolheu equipe entra
+  nela, os demais completam as equipes (pessoas antes dos bots); fogo amigo
+  opcional; colocação por equipe (a equipe sai quando o último cai) e vitória
+  da última equipe de pé. Na tela: placa verde e por cima das paredes nos
+  colegas, colegas no minimapa e no mapa, painel com vida e escudo de cada um,
+  espectador do colega ao ser eliminado. Bots respeitam a própria equipe.
+- **Reconexão ao mesmo personagem**: cada jogador recebe um token; se a
+  conexão cair, o personagem espera 60 s no mundo (`--reconnect`) e o cliente
+  tenta voltar sozinho (também depois de recarregar a página).
+- **Descoberta na rede**: cada servidor anuncia-se por broadcast UDP (porta
+  7351) e ouve os outros; a tela "Entrar em servidor" lista as partidas
+  encontradas (via `/api/lan` do host que serviu a página).
+- **Tela dividida** (offline): 2 jogadores no mesmo computador — teclado e
+  mouse para o 1, controle para o 2 —, duas cenas em cada metade do canvas e
+  dois HUDs; na mesma equipe quando há equipes.
+- **Testes**: equipes (montagem, fogo amigo, colocação e vitória, partida de
+  esquadrões só de bots), sala de espera (prontos, permissões, início, volta à
+  sala), reconexão (mesmo personagem, expiração), descoberta entre dois
+  servidores; no navegador, sala de espera com dois navegadores + queda e volta
+  da conexão, e tela dividida com controle simulado.
+
+Decisões de projeto:
+
+- **A sala de espera é do servidor**, não do cliente: a mesma conexão passa
+  pela sala, pela partida e volta à sala; o cliente só desenha o estado.
+- **Descoberta sem app**: como navegadores não escutam UDP, os próprios
+  servidores fazem a ponte; o app desktop (Fase 8) poderá ouvir direto.
+- **Sem "derrubado/reanimar"** por enquanto: em equipes, quem perde a vida é
+  eliminado e assiste os colegas. Pode entrar com o polimento (Fase 7).
 
 ## Fase 6 — Online
 

@@ -5,7 +5,14 @@ Battle royale 3D em terceira pessoa, com partidas **offline**, em **rede local
 armas, mapas e interface originais. *(Título provisório — definido em
 `src/shared/config/game.ts`.)*
 
-> **Estado: Fase 4 concluída — primeira versão jogável de battle royale.**
+> **Estado: Fase 5 concluída — multijogador local.** Sala de espera na rede
+> local (prontos, equipes, configuração pelo anfitrião), descoberta automática
+> das partidas na rede, duplas/trios/esquadrões com fogo amigo opcional,
+> reconexão ao mesmo personagem e tela dividida para 2 jogadores no mesmo
+> computador. Próximo: online (contas, amigos, matchmaking) — veja o
+> [roteiro](docs/ROADMAP.md).
+>
+> **Fase 4 — primeira versão jogável de battle royale.**
 > Partida completa offline contra até 99 bots (ou com amigos num servidor):
 > aquecimento, salto do dirigível, queda livre e planador, saque, combate,
 > construção, zona que fecha em 7 etapas e vencedor, com tela de resultado e
@@ -17,8 +24,10 @@ armas, mapas e interface originais. *(Título provisório — definido em
 
 ![A bordo do dirigível sobre a Ilha de Brasa, com a zona no horizonte e o aviso "Espaço — saltar"](docs/imagens/dirigivel.webp)
 
-| Mapa com a zona e a próxima zona | Fim de partida |
+| Sala de espera na rede local | Tela dividida (dupla no mesmo computador) |
 | --- | --- |
+| ![Sala de espera com jogadores, prontos, equipes e configuração da partida](docs/imagens/sala-de-espera.webp) | ![Duas visões lado a lado com o colega marcado no minimapa](docs/imagens/tela-dividida.webp) |
+| **Mapa com a zona e a próxima zona** | **Fim de partida** |
 | ![Mapa completo com o círculo da zona e o próximo círculo tracejado](docs/imagens/mapa-zona.webp) | ![Tela de resultado: #2 de 4, eliminações, dano e tempo](docs/imagens/resultado.webp) |
 | **Construção** | **Picareta coletando pedra** |
 | ![Forte de madeira, pedra e metal com o fantasma de uma rampa](docs/imagens/construcao.webp) | ![Golpe de picareta na mureta com "+8 Pedra"](docs/imagens/picareta.webp) |
@@ -74,9 +83,7 @@ Para desenvolvimento com recarga automática: `npm run dev` e abra
 No computador anfitrião:
 
 ```bash
-npm run host                                     # battle royale na Ilha de Brasa
-npm run host -- --bots 20 --bot-difficulty dificil   # completa com 20 bots
-npm run host -- --map campo-de-provas --mode treino  # treino livre
+npm run host
 ```
 
 O terminal mostra os endereços, por exemplo:
@@ -86,10 +93,25 @@ O terminal mostra os endereços, por exemplo:
   Na rede local:     http://192.168.0.10:7350
 ```
 
-Nos outros computadores da mesma rede, abra o endereço "Na rede local" no
-navegador, clique em **Entrar em servidor** e em **Conectar** (com o campo de
-endereço vazio, conecta ao próprio host). Se o firewall perguntar, permita o
-Node na rede privada (porta TCP 7350).
+Nos outros computadores da mesma rede, abra o endereço "Na rede local" e
+clique em **Entrar em servidor**: a lista **Partidas na rede local** mostra
+este e os outros servidores encontrados (cada um se anuncia por UDP na porta
+7351); clique em **Entrar**. Todos caem na **sala de espera**: cada um marca
+"pronto" e escolhe a equipe; o primeiro a entrar é o anfitrião, configura a
+partida (mapa, battle royale ou treino, bots e dificuldade, solo/duplas/trios/
+esquadrões, fogo amigo, zona) e clica em **Iniciar partida**. No fim, todos
+voltam à sala. Se a rede de alguém cair, o personagem espera 60 s no mundo e o
+jogo reconecta sozinho ao mesmo personagem. Se o firewall perguntar, permita o
+Node na rede privada (TCP 7350 e UDP 7351).
+
+Sem sala de espera (partida contínua, entra quem chegar):
+`npm run server -- --mode br --bots 20` ou `--mode treino`.
+
+### Tela dividida
+
+Em **Jogar offline**, escolha **Neste computador: 2 jogadores (tela dividida)**:
+o jogador 1 usa teclado e mouse e o jogador 2 o primeiro controle conectado
+(padrão Xbox/PlayStation). Com equipes, os dois ficam na mesma.
 
 ### Online (servidor dedicado)
 
@@ -103,8 +125,9 @@ npm run server -- --port 7350 --max-players 32 --name "Servidor BR-1"
 Em produção, coloque-o atrás de um proxy com TLS (o cliente conecta por
 `wss://seu-dominio/ws`). Matchmaking, contas e convites chegam na Fase 6.
 
-Opções do servidor: `npm run server -- --help` (modo, bots e dificuldade,
-aquecimento, velocidade da zona, reinício automático). Em battle royale, a
+Opções do servidor: `npm run server -- --help` (sala de espera, modo, bots e
+dificuldade, equipes e fogo amigo, aquecimento, velocidade da zona, reinício
+automático, espera de reconexão, descoberta na rede). Em battle royale, a
 contagem do aquecimento começa quando a primeira pessoa entra; quem chega com a
 partida em andamento assiste até a próxima, e no fim todos reconectam sozinhos
 para a partida seguinte.
@@ -177,7 +200,10 @@ Para os testes de navegador em uma máquina nova: `npx playwright install chromi
 
 ## Testes
 
-- **Unitários e integração (129)**: dirigível, queda livre e planador; zona
+- **Unitários e integração (138)**: equipes (montagem, fogo amigo, colocação e
+  vitória por equipe, partida de esquadrões só de bots); sala de espera
+  (prontos, permissões do anfitrião, início, volta à sala); reconexão ao mesmo
+  personagem e expiração; descoberta UDP entre dois servidores; dirigível, queda livre e planador; zona
   (círculos aninhados em terra, tempos), fases, colocação e vencedor; servidor
   em modo battle royale (espectador atrasado, reinício e reconexão); uma partida
   inteira só de bots no mapa principal (24 bots, com vencedor e a maior parte das
@@ -192,7 +218,9 @@ Para os testes de navegador em uma máquina nova: `npx playwright install chromi
   autoritativa, custo e intervalo, paredes bloqueando tiros, explosões,
   picareta, coleta, sincronização), predição sem correções com 100 ms de
   latência (inclusive construindo) e servidor WebSocket real.
-- **Navegador (9)**: battle royale offline (aquecimento, dirigível, salto,
+- **Navegador (11)**: sala de espera com dois navegadores (dupla na mesma
+  equipe, início pelo anfitrião, queda da conexão e volta ao mesmo
+  personagem); tela dividida com controle simulado; battle royale offline (aquecimento, dirigível, salto,
   planador, pouso, zona e bots) e uma partida até o fim num servidor dedicado
   (resultado, histórico e reconexão para a partida seguinte); menu e configurações; partida offline (movimento, pulo,
   deslize, mira, pausa); arsenal → acerto no boneco → inventário → soltar;
@@ -228,9 +256,12 @@ Variáveis de ambiente do servidor: `PORT` e `HOST` (equivalem a `--port` e
 `--host`). Configurações do jogador ficam no navegador (`localStorage`),
 inclusive o volume.
 
-## Limitações conhecidas (Fase 4)
+## Limitações conhecidas (Fase 5)
 
-- Partidas solo (sem equipes); lobby, prontos e equipes chegam na Fase 5.
+- Em equipes não há "derrubado e reanimar": quem perde a vida é eliminado e
+  assiste os colegas.
+- A tela dividida é offline e para 2 jogadores; ela desenha o mundo duas
+  vezes (precisa de uma placa de vídeo razoável no mapa principal).
 - Bots ficam no térreo dos prédios (não sobem escadas) e constroem só paredes
   defensivas; não usam granadas.
 - O histórico fica no navegador; contas, XP e estatísticas online são da Fase 6.
@@ -244,5 +275,6 @@ inclusive o volume.
   valida dispersão, cadência, munição e acertos.
 - Banda: com 100 jogadores atirando, eventos de tiro e snapshots completos somam
   ~10 MB/s de saída; gerência de interesse e compressão entram na Fase 6.
-- A descoberta automática de partidas na LAN vem com o app desktop (Fases 5/8);
-  hoje entra-se pelo endereço exibido no host.
+- A descoberta de partidas na LAN funciona pela página servida por um host
+  (o navegador não escuta UDP); quem abre o jogo de outro lugar entra pelo
+  endereço exibido no terminal do host.

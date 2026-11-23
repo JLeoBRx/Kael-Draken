@@ -161,7 +161,17 @@ export class InputManager {
   private materialLatch = false
   private readonly listeners: [EventTarget, string, EventListener, AddEventListenerOptions?][] = []
 
-  constructor(private readonly canvas: HTMLCanvasElement, private settings: Settings) {}
+  /**
+   * `keyboardMouse`: lê teclado e mouse (o jogador 2 da tela dividida não).
+   * `pad`: qual controle ler — 'any' (o primeiro conectado), um índice da
+   * ordem de controles conectados, ou null (nenhum).
+   */
+  constructor(private readonly canvas: HTMLCanvasElement, private settings: Settings, private devices: { keyboardMouse: boolean; pad: 'any' | number | null } = { keyboardMouse: true, pad: 'any' }) {}
+
+  /** Troca os dispositivos lidos (tela dividida: o jogador 1 deixa o controle para o 2). */
+  setDevices(d: { keyboardMouse: boolean; pad: 'any' | number | null }): void {
+    this.devices = d
+  }
 
   updateSettings(s: Settings): void {
     this.settings = s
@@ -172,6 +182,7 @@ export class InputManager {
       target.addEventListener(type, fn, opts)
       this.listeners.push([target, type, fn, opts])
     }
+    if (!this.devices.keyboardMouse) return
     on(window, 'keydown', (e) => this.keyDown(e as KeyboardEvent))
     on(window, 'keyup', (e) => {
       this.keys.delete((e as KeyboardEvent).code)
@@ -309,13 +320,16 @@ export class InputManager {
     this.mouseDX = 0
     this.mouseDY = 0
 
-    const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
+    const pads = this.devices.pad !== null && typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
     let pad: GamepadReading | null = null
+    let index = 0
     for (const gp of pads) {
-      if (gp && gp.connected && gp.mapping === 'standard') {
+      if (!gp || !gp.connected || gp.mapping !== 'standard') continue
+      if (this.devices.pad === 'any' || this.devices.pad === index) {
         pad = readGamepad(gp)
         break
       }
+      index++
     }
     if (pad) {
       if (pad.pause && !this.padPausePrev) this.onPauseRequest?.()

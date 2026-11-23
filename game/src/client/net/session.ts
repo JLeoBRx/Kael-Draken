@@ -9,24 +9,33 @@ import {
   type InputCommand,
   encodeInventoryAction,
   type InventoryAction,
+  type LobbyAction,
+  type LobbyState,
   type ServerMessage,
   type Snapshot,
   type WelcomeMessage,
+  encodeLobbyAction,
 } from '../../shared/net/protocol'
 import type { Transport } from './transport'
 
 export interface SessionHandlers {
   onSnapshot(snapshot: Snapshot, receivedAt: number): void
-  onPlayerInfo(id: number, name: string, skin: number): void
+  onPlayerInfo(id: number, name: string, skin: number, team: number): void
   onPlayerLeft(id: number): void
   onEvents(events: GameEvent[]): void
   onClosed(reason: string): void
 }
 
+/** Resposta ao handshake: já na partida, ou na sala de espera. */
+export type Greeting = { kind: 'welcome'; welcome: WelcomeMessage } | { kind: 'lobby'; state: LobbyState }
+
 /**
  * Sessão de rede: handshake, despacho de mensagens, ping e estatísticas.
  * Mensagens que chegam enquanto a partida ainda carrega ficam guardadas
  * (só o snapshot mais recente) até os handlers serem registrados.
+ *
+ * A mesma sessão atravessa sala de espera → partida → sala: `onLobby` e
+ * `onWelcome` avisam a casca quando o servidor muda de fase.
  */
 export class NetSession {
   welcome: WelcomeMessage | null = null
@@ -34,10 +43,19 @@ export class NetSession {
   bytesIn = 0
   bytesOut = 0
   closedReason: string | null = null
+  /** O servidor encerrou com motivo (expulsão, nova partida) — não é queda de rede. */
+  kicked = false
+  lobby: LobbyState | null = null
+  /** Partida começou (vindo da sala de espera). */
+  onWelcome: ((w: WelcomeMessage) => void) | null = null
+  /** Estado da sala (ao entrar, a cada mudança e ao voltar do fim da partida). */
+  onLobby: ((st: LobbyState) => void) | null = null
+  /** Conexão terminou (antes de haver partida com handlers). */
+  onClose: ((reason: string) => void) | null = null
   private handlers: SessionHandlers | null = null
   private backlog: { msg: ServerMessage; at: number }[] = []
   private pingTimer: ReturnType<typeof setInterval> | null = null
-  private welcomeWaiter: ((w: WelcomeMessage) => void) | null = null
+  private welcomeWaiter: ((g: Greeting) => void) | null = null
   private failWaiter: ((e: Error) => void) | null = null
 
   constructor(readonly transport: Transport) {
@@ -45,19 +63,30 @@ export class NetSession {
     transport.onClose = (reason) => this.closed(reason)
   }
 
-  handshake(name: string, timeoutMs = 8000): Promise<WelcomeMessage> {
+  handshake(name: string, token = '', timeoutMs = 8000): Promise<Greeting> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('O servidor não respondeu ao handshake')), timeoutMs)
-      this.welcomeWaiter = (w) => {
+      this.welcomeWaiter = (g) => {
         clearTimeout(timer)
-        resolve(w)
+        resolve(g)
       }
       this.failWaiter = (e) => {
         clearTimeout(timer)
         reject(e)
       }
-      this.send(encodeHello(name))
+      this.send(encodeHello(name, token))
     })
+  }
+
+  sendLobby(a: LobbyAction): void {
+    this.send(encodeLobbyAction(a))
+  }
+
+  /** A partida acabou e voltamos à sala: descarta handlers e o que ficou pendente. */
+  detachMatch(): void {
+    this.handlers = null
+    this.backlog = []
+    this.welcome = null
   }
 
   setHandlers(h: SessionHandlers): void {
@@ -112,8 +141,18 @@ export class NetSession {
         return
       }
       this.welcome = msg
-      this.welcomeWaiter?.(msg)
-      this.welcomeWaiter = null
+      if (this.welcomeWaiter) {
+        this.welcomeWaiter({ kind: 'welcome', welcome: msg })
+        this.welcomeWaiter = null
+      } else this.onWelcome?.(msg)
+      return
+    }
+    if (msg.type === 'lobby') {
+      this.lobby = msg.state
+      if (this.welcomeWaiter) {
+        this.welcomeWaiter({ kind: 'lobby', state: msg.state })
+        this.welcomeWaiter = null
+      } else this.onLobby?.(msg.state)
       return
     }
     if (msg.type === 'pong') {
@@ -122,6 +161,7 @@ export class NetSession {
       return
     }
     if (msg.type === 'kick') {
+      this.kicked = true
       this.closed(msg.reason)
       return
     }
@@ -144,7 +184,7 @@ export class NetSession {
         h.onSnapshot(msg.snapshot, at)
         break
       case 'playerInfo':
-        h.onPlayerInfo(msg.id, msg.name, msg.skin)
+        h.onPlayerInfo(msg.id, msg.name, msg.skin, msg.team)
         break
       case 'playerLeft':
         h.onPlayerLeft(msg.id)
@@ -164,6 +204,7 @@ export class NetSession {
     this.pingTimer = null
     this.failWaiter?.(new Error(reason))
     this.failWaiter = null
-    this.handlers?.onClosed(reason)
+    if (this.handlers) this.handlers.onClosed(reason)
+    else this.onClose?.(reason)
   }
 }

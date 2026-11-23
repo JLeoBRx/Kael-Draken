@@ -340,3 +340,39 @@ kbd { display: inline-block; min-width: 26px; padding: 3px 8px; margin: 0 2px; b
 .seg { display: flex; gap: 6px; }
 .seg button { flex: 1; }
 .seg button.on { border-color: #ff7a2f; background: rgba(255,122,47,0.18); }
+
+/* ===================== Fase 5: equipes e sala de espera ===================== */
+.team-panel { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.team-panel .mate { display: grid; grid-template-columns: 110px 120px; align-items: center; gap: 8px; font-size: 12px; padding: 4px 8px; border-radius: 6px; background: rgba(10,14,20,0.6); border-left: 3px solid #5cf08a; }
+.team-panel .mate.out { opacity: 0.45; border-left-color: #888; }
+.team-panel .mate b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-panel .bars { display: flex; flex-direction: column; gap: 2px; }
+.team-panel .bars i { display: block; height: 4px; border-radius: 2px; }
+.team-panel .bars i.s { background: #5aa9ff; }
+.team-panel .bars i.h { background: #5cf08a; }
+.lobby-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; }
+@media (max-width: 760px) { .lobby-grid { grid-template-columns: 1fr; } }
+.lobby-members { display: flex; flex-direction: column; gap: 6px; }
+.lobby-member { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.05); font-size: 14px; }
+.lobby-member.me { outline: 1px solid rgba(255,122,47,0.6); }
+.lobby-member .tag { font-size: 11px; padding: 2px 6px; border-radius: 5px; background: rgba(255,255,255,0.1); color: var(--muted); }
+.lobby-member .ok { color: #5cf08a; font-weight: 800; }
+.lobby-config { display: flex; flex-direction: column; gap: 10px; }
+.lobby-config .field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.lobby-status { margin-top: 10px; font-size: 13px; color: #ffcf8a; }
+.lan-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 12px; }
+.lan-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.05); font-size: 13px; }
+.lan-row small { color: var(--muted); display: block; }
+.split-layer { position: absolute; top: 0; bottom: 0; width: 50%; overflow: hidden; }
+.split-layer.left { left: 0; }
+.split-layer.right { left: 50%; border-left: 2px solid rgba(0,0,0,0.6); }
+.split-layer .hud .help, .split-layer .hud .speed { display: none; }
+/* Tela dividida: HUD reduzido em cada metade (os números de dano mantêm a escala da cena) */
+.split-layer .hud { zoom: 0.72; }
+.split-layer .hud-fx { zoom: 1.3889; }
+/* Sala de espera compacta */
+[data-screen="lobby"] .panel { max-height: calc(100vh - 32px); overflow: auto; }
+.lobby-config { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; align-content: start; }
+.lobby-config h3 { grid-column: 1 / -1; }
+.lobby-config .field, .lobby-config .check { border: 0; padding: 0; margin: 0; text-align: left; align-items: stretch; }
+.lobby-config .check { grid-column: 1 / -1; display: flex; gap: 6px; align-items: center; }

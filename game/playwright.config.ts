@@ -12,6 +12,8 @@ import { defineConfig, devices } from '@playwright/test'
 const PORT = Number(process.env.E2E_PORT ?? 7361)
 /** Segundo servidor: battle royale curto (zona 30× mais rápida) com 2 bots fáceis. */
 export const BR_PORT = PORT + 1
+/** Terceiro servidor: sala de espera de LAN (equipes, prontos, reconexão). */
+export const LOBBY_PORT = PORT + 2
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -38,6 +40,12 @@ export default defineConfig({
       // espera o primeiro servidor compilar o cliente (dist/client) antes de subir
       command: `npx tsx src/server/node/main.ts --port ${BR_PORT} --host 127.0.0.1 --map campo-de-provas --mode br --bots 2 --bot-difficulty facil --warmup 4 --zone-speed 30 --name "BR de testes"`,
       url: `http://127.0.0.1:${BR_PORT}/api/info`,
+      timeout: 120_000,
+      reuseExistingServer: false,
+    },
+    {
+      command: `npx tsx src/server/node/main.ts --port ${LOBBY_PORT} --host 127.0.0.1 --map campo-de-provas --lobby --no-discovery --name "Sala de testes"`,
+      url: `http://127.0.0.1:${LOBBY_PORT}/api/info`,
       timeout: 120_000,
       reuseExistingServer: false,
     },

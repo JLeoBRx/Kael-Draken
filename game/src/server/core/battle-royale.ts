@@ -68,6 +68,10 @@ export class BattleRoyale {
     return n
   }
 
+  /** Equipes que começaram a partida. */
+  teams = 0
+  winnerTeam = -1
+
   /** Jogadores ainda na disputa. */
   get alive(): number {
     let n = 0
@@ -146,6 +150,8 @@ export class BattleRoyale {
       boardAirship(sp.p.char, route.x0, route.y, route.z0, vx, vz, duration)
       this.participants++
     }
+    sim.assignTeams()
+    this.teams = sim.aliveTeams().size
     sim.emit({ type: 'airship', ...route })
     const isLand = (x: number, z: number) => map.terrain.heightAt(x, z) > map.def.waterLevel + 0.5
     // a zona começa a contar quando o dirigível termina a rota (todos já saltaram)
@@ -178,16 +184,21 @@ export class BattleRoyale {
   }
 
   private checkEnd(): void {
-    const alive = this.alive
-    if (alive > 1 || (alive === 1 && this.participants < 2)) return
+    const teams = this.sim.aliveTeams()
+    if (teams.size > 1 || (teams.size === 1 && this.teams < 2)) return
     let winner = 0
-    if (alive === 1) for (const sp of this.sim.players.values()) if (sp.p.alive && !sp.spectator) winner = sp.id
+    let winnerTeam = -1
+    if (teams.size === 1) {
+      winnerTeam = [...teams][0]
+      for (const sp of this.sim.players.values()) if (sp.p.alive && !sp.spectator && !winner) winner = sp.id
+    }
     this.winner = winner
+    this.winnerTeam = winnerTeam
     this.phase = MatchPhase.Ended
     this.phaseEnd = this.sim.tick + this.ticks(this.opts.endDelay)
     // o vencedor não pode mais ser eliminado (zona, quedas)
     this.sim.rules.damage = false
-    this.sim.emit({ type: 'matchEnd', winner })
+    this.sim.emit({ type: 'matchEnd', winner, team: Math.max(0, winnerTeam) })
   }
 
   /** Estado da partida para quem entra depois (dirigível e etapa atual da zona). */
@@ -196,7 +207,7 @@ export class BattleRoyale {
     if (this.route) out.push({ type: 'airship', ...this.route })
     const st = this.stage
     if (st) out.push({ type: 'zone', ...st })
-    if (this.phase === MatchPhase.Ended) out.push({ type: 'matchEnd', winner: this.winner })
+    if (this.phase === MatchPhase.Ended) out.push({ type: 'matchEnd', winner: this.winner, team: Math.max(0, this.winnerTeam) })
     return out
   }
 }

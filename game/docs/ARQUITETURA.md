@@ -179,6 +179,9 @@ extrapola no máximo 150 ms e para.
 | Construir sem material, rápido demais ou no ar | custo (10), intervalo de 0,12 s, apoio no chão ou em outra peça, lugar livre e limite de altura — tudo na simulação oficial |
 | Coleta/golpe à distância | o servidor traça o golpe (3 m, a cada 0,55 s) e decide material e quantidade; o cliente só vê o resultado |
 | Peça "indestrutível" | vida, dano e desabamento existem só no servidor; o cliente recebe eventos |
+| Mexer na sala sem ser anfitrião | configuração e início só valem do anfitrião; mapa, bots, equipes e zona são validados |
+| Roubar o personagem de outro | o token de reconexão tem 96 bits aleatórios, vale uma vez e só enquanto o personagem espera |
+| Atirar no colega | sem fogo amigo, o servidor ignora dano entre membros da mesma equipe |
 
 Limitação conhecida: o coice da câmera é aplicado no cliente (como na maioria
 dos jogos de tiro); detecção estatística de mira automática entra na Fase 6.
@@ -305,15 +308,32 @@ construção e validação.
 | Transporte | `postMessage` (bytes do protocolo) | WebSocket `ws://IP:7350/ws` | WebSocket seguro `wss://` (TLS) |
 | Internet | **não precisa** | não precisa | precisa |
 | Como entrar | "Jogar offline" | os outros abrem `http://IP-DO-HOST:7350` e clicam em "Entrar em servidor" | matchmaking / código de convite (Fase 6) |
-| Bots | sim (0–99, três dificuldades) | sim (`--bots`) | sim (preencher partidas) |
+| Bots | sim (0–99, três dificuldades) | sim (`--bots` ou na sala de espera) | sim (preencher partidas) |
+| Equipes | sim (solo a esquadrão; tela dividida na mesma equipe) | sim (sala de espera) | sim |
 | Persistência | navegador (Fase 8: arquivo local no app desktop) | idem, no host | banco de dados |
 
-**Tela dividida**: viável — o host aceita várias conexões; o cliente desenha duas
-câmeras (viewports) e lê dois controles pela Gamepad API. Planejado para a Fase 5.
+**Sala de espera (LAN)**: com `--lobby` (padrão em `npm run host`), quem conecta
+recebe o estado da sala (`S2C.Lobby`: membros, prontos, equipe escolhida,
+anfitrião, configuração) e envia ações (`C2S.Lobby`: pronto, equipe e — só o
+anfitrião — configuração e início). No início, o servidor monta mapa,
+simulação, regras e bots e manda `Welcome` a todos; no fim, volta a mandar o
+estado da sala pela mesma conexão.
 
-**Descoberta na LAN**: navegadores não escutam UDP. Na Fase 5, o host anuncia-se
-por broadcast UDP e o app desktop (Fase 8) lista as partidas encontradas; pelo
-navegador, entra-se pelo endereço mostrado no terminal do host (já funciona).
+**Reconexão**: o `Welcome` traz um token. Se a conexão cair sem expulsão, o
+`SimPlayer` fica no mundo por `reconnectSeconds` (padrão 60); um `Hello` com o
+token devolve o mesmo personagem (posição, vida, inventário) e zera a
+numeração dos comandos. O cliente guarda o token por aba e por servidor
+(`sessionStorage`) e tenta voltar sozinho até 15 vezes.
+
+**Tela dividida**: o servidor local aceita várias conexões; cada jogador é uma
+`Match` com sua cena, câmera, HUD e `InputManager` (teclado/mouse para o 1,
+controle para o 2), desenhada na sua metade do canvas com `setViewport` e
+`setScissor`.
+
+**Descoberta na LAN**: navegadores não escutam UDP. Cada servidor anuncia-se
+por broadcast UDP (porta 7351, a cada 2 s, com nome, mapa, ocupação, modo,
+sala de espera e versão) e ouve os outros; `/api/lan` devolve a lista, que a
+tela "Entrar em servidor" mostra. O app desktop (Fase 8) poderá ouvir direto.
 
 ## 5. Online em escala (Fases 6–8)
 
@@ -384,7 +404,7 @@ game/
 │   ├── server/
 │   │   ├── core/              simulation.ts, game-host.ts, battle-royale.ts, loot.ts (sem dependências de ambiente)
 │   │   │   └── bots/          nav-grid.ts (grade + A*), bot.ts (cérebro), bot-manager.ts, profiles.ts
-│   │   └── node/              server.ts (HTTP + WebSocket), main.ts (CLI)
+│   │   └── node/              server.ts (HTTP + WebSocket), discovery.ts (UDP), main.ts (CLI)
 │   └── client/
 │       ├── app.ts, main.ts    casca e estados
 │       ├── game/              match.ts (laço da partida), world-items.ts, effects.ts

@@ -25,6 +25,7 @@ self.onmessage = (ev: MessageEvent<WorkerRequest>) => {
           mode: m.match.mode,
           bots: m.match.bots,
           botDifficulty: m.match.difficulty,
+          teamSize: m.match.teamSize,
           // offline: aquecimento curto e sem reinício (o jogador escolhe "Jogar de novo")
           br: { warmup: 5, zoneSpeed: m.match.zoneSpeed, endDelay: 3600 },
           autoRestart: false,

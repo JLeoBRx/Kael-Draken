@@ -14,6 +14,10 @@ export interface OfflinePrefs {
   bots: number
   difficulty: BotDifficulty
   zone: 'normal' | 'rapida'
+  /** Jogadores por equipe (1–4). */
+  teamSize: number
+  /** Pessoas neste computador (2 = tela dividida). */
+  localPlayers: 1 | 2
 }
 
 export interface Settings {
@@ -61,7 +65,7 @@ export const DEFAULT_SETTINGS: Settings = {
   crouchToggle: true,
   showFps: false,
   serverAddress: '',
-  offline: { mode: 'br', bots: 23, difficulty: 'normal', zone: 'normal' },
+  offline: { mode: 'br', bots: 23, difficulty: 'normal', zone: 'normal', teamSize: 1, localPlayers: 1 },
   volume: 0.7,
 }
 
@@ -102,6 +106,8 @@ function loadOffline(v: unknown, d: OfflinePrefs): OfflinePrefs {
     bots: Math.round(num(o.bots, 0, 99, d.bots)),
     difficulty: isBotDifficulty(o.difficulty) ? o.difficulty : d.difficulty,
     zone: o.zone === 'normal' || o.zone === 'rapida' ? o.zone : d.zone,
+    teamSize: Math.round(num(o.teamSize, 1, 4, d.teamSize)),
+    localPlayers: o.localPlayers === 2 ? 2 : 1,
   }
 }
 

@@ -45,9 +45,13 @@ export interface MatchRules {
   damage: boolean
   /** Pegar itens e abrir baús (desligado no aquecimento). */
   interact: boolean
+  /** Jogadores por equipe (1 = solo, 2 = dupla, 3 = trio, 4 = esquadrão). */
+  teamSize: number
+  /** Dano em colegas de equipe. */
+  friendlyFire: boolean
 }
 
-export const SANDBOX_RULES: MatchRules = { respawn: true, respawnDelay: 5, seed: 1, damage: true, interact: true }
+export const SANDBOX_RULES: MatchRules = { respawn: true, respawnDelay: 5, seed: 1, damage: true, interact: true, teamSize: 1, friendlyFire: false }
 
 /** Posições passadas de um jogador (para compensação de latência). */
 class PoseHistory {
@@ -118,6 +122,10 @@ export interface SimPlayer {
   bot: boolean
   /** Entrou com a partida em andamento: só assiste até a próxima. */
   spectator: boolean
+  /** Equipe (no solo, cada um tem a sua). */
+  team: number
+  /** Equipe escolhida na sala de espera (-1 = tanto faz). */
+  wantTeam: number
   p: PlayerState
   queue: InputCommand[]
   /** Último comando aplicado. */
@@ -236,12 +244,14 @@ export class Simulation {
     return createPlayerState(createCharacterState(sp.x, y + 0.02, sp.z, sp.yaw))
   }
 
-  addPlayer(name: string, skin = 0, opts: { bot?: boolean; spectator?: boolean } = {}): SimPlayer {
+  addPlayer(name: string, skin = 0, opts: { bot?: boolean; spectator?: boolean; team?: number } = {}): SimPlayer {
     const id = this.allocateId()
     const p: SimPlayer = {
       id, name, skin,
       bot: opts.bot ?? false,
       spectator: opts.spectator ?? false,
+      team: id,
+      wantTeam: opts.team ?? -1,
       p: this.spawnState(),
       queue: [],
       lastSeq: 0,
@@ -284,6 +294,54 @@ export class Simulation {
 
   removePlayer(id: number): void {
     this.players.delete(id)
+  }
+
+  /** Aumenta quando as equipes mudam (o anfitrião reenvia os nomes/equipes). */
+  rosterVersion = 0
+
+  /**
+   * Monta as equipes do tamanho das regras: primeiro quem escolheu equipe na
+   * sala de espera (se couber), depois pessoas e por fim bots, completando as
+   * equipes em ordem. No solo, cada jogador é a própria equipe.
+   */
+  assignTeams(): void {
+    const size = Math.max(1, Math.floor(this.rules.teamSize))
+    const players = [...this.players.values()].filter((p) => !p.spectator)
+    if (size === 1) {
+      for (const p of players) p.team = p.id
+    } else {
+      const count = new Map<number, number>()
+      const placed = new Set<SimPlayer>()
+      for (const p of players) {
+        if (p.wantTeam < 0) continue
+        const n = count.get(p.wantTeam) ?? 0
+        if (n >= size) continue
+        p.team = p.wantTeam
+        count.set(p.wantTeam, n + 1)
+        placed.add(p)
+      }
+      const rest = players.filter((p) => !placed.has(p)).sort((a, b) => Number(a.bot) - Number(b.bot) || a.id - b.id)
+      let t = 0
+      for (const p of rest) {
+        while ((count.get(t) ?? 0) >= size) t++
+        p.team = t
+        count.set(t, (count.get(t) ?? 0) + 1)
+      }
+    }
+    this.rosterVersion++
+  }
+
+  /** Equipes com alguém vivo (espectadores não contam). */
+  aliveTeams(): Set<number> {
+    const out = new Set<number>()
+    for (const p of this.players.values()) if (p.p.alive && !p.spectator) out.add(p.team)
+    return out
+  }
+
+  teammates(sp: SimPlayer): SimPlayer[] {
+    const out: SimPlayer[] = []
+    for (const p of this.players.values()) if (p !== sp && p.team === sp.team && !p.spectator) out.push(p)
+    return out
   }
 
   get aliveCount(): number {
@@ -579,6 +637,8 @@ export class Simulation {
     const p = victim.p
     // a bordo do dirigível ninguém leva dano
     if (!p.alive || amount <= 0 || !this.rules.damage || p.char.flags & CharFlag.Riding) return null
+    // colegas de equipe só se ferem com fogo amigo ligado
+    if (attacker && attacker !== victim && attacker.team === victim.team && !this.rules.friendlyFire) return null
     const shieldBefore = p.shield
     const toShield = ignoreShield ? 0 : Math.min(p.shield, amount)
     p.shield -= toShield
@@ -624,9 +684,13 @@ export class Simulation {
     if (killer && killer !== victim) killer.kills++
     victim.respawnTick = this.rules.respawn ? this.tick + Math.round(this.rules.respawnDelay * this.tickRate) : -1
     victim.history.clear()
-    // Colocação final (battle royale): quem sobrou + o eliminado
-    const place = this.rules.respawn ? 0 : this.aliveCount + 1
+    // Colocação (battle royale): a equipe sai quando o último dela cai;
+    // a colocação é o número de equipes ainda vivas + 1
+    const alive = this.aliveTeams()
+    const wiped = !this.rules.respawn && !alive.has(victim.team)
+    const place = wiped ? alive.size + 1 : 0
     this.emit({ type: 'eliminated', victim: victim.id, killer: killer && killer !== victim ? killer.id : 0, cause, respawnIn: this.rules.respawn ? this.rules.respawnDelay : 0, place })
+    if (wiped) this.emit({ type: 'teamOut', team: victim.team, place })
   }
 
   private respawn(sp: SimPlayer): void {

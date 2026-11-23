@@ -142,8 +142,25 @@ function drawBattle(ctx: CanvasRenderingContext2D, W: number, o: BattleOverlay |
   }
 }
 
+function drawMates(ctx: CanvasRenderingContext2D, mates: readonly { x: number; z: number }[], toPx: (x: number, z: number) => [number, number]): void {
+  ctx.save()
+  ctx.fillStyle = '#5cf08a'
+  ctx.strokeStyle = '#0b3318'
+  ctx.lineWidth = 2
+  for (const m of mates) {
+    const [px, pz] = toPx(m.x, m.z)
+    ctx.beginPath()
+    ctx.arc(px, pz, 5, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
 export class MinimapView {
   battle: BattleOverlay | null = null
+  /** Colegas de equipe (posições no mundo). */
+  mates: readonly { x: number; z: number }[] = []
   readonly el: HTMLElement
   private readonly canvas: HTMLCanvasElement
   private readonly ctx: CanvasRenderingContext2D
@@ -168,6 +185,7 @@ export class MinimapView {
     ctx.drawImage(this.image, (x - this.range - t.min) * s, (z - this.range - t.min) * s, this.range * 2 * s, this.range * 2 * s, 0, 0, W, W)
     const k = W / (this.range * 2)
     drawBattle(ctx, W, this.battle, (wx, wz) => [(wx - x + this.range) * k, (wz - z + this.range) * k], k)
+    drawMates(ctx, this.mates, (wx, wz) => [Math.max(4, Math.min(W - 4, (wx - x + this.range) * k)), Math.max(4, Math.min(W - 4, (wz - z + this.range) * k))])
     // marcador do jogador
     ctx.save()
     ctx.translate(W / 2, W / 2)
@@ -190,6 +208,7 @@ export class MinimapView {
 
 export class FullMapView {
   battle: BattleOverlay | null = null
+  mates: readonly { x: number; z: number }[] = []
   readonly el: HTMLElement
   private readonly canvas: HTMLCanvasElement
   private readonly ctx: CanvasRenderingContext2D
@@ -242,6 +261,7 @@ export class FullMapView {
     }
     ctx.textAlign = 'start'
     drawBattle(ctx, W, this.battle, (wx, wz) => [(wx - t.min) * s, (wz - t.min) * s], s)
+    drawMates(ctx, this.mates, (wx, wz) => [(wx - t.min) * s, (wz - t.min) * s])
     ctx.save()
     ctx.translate((x - t.min) * s, (z - t.min) * s)
     ctx.rotate((heading * Math.PI) / 180)

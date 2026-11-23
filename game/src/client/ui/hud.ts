@@ -53,6 +53,8 @@ export interface HudInfo {
   target: { name: string; health: number; max: number } | null
   /** Battle royale: fase, contagem e zona (null no treino). */
   br: BattleHud | null
+  /** Colegas de equipe (null no solo). */
+  team: { name: string; health: number; shield: number; alive: boolean }[] | null
   debug: Record<string, string | number>
 }
 
@@ -141,6 +143,7 @@ export class Hud {
   private readonly phaseEl: HTMLElement
   private readonly stormEl: HTMLElement
   private readonly resultsEl: HTMLElement
+  private readonly teamEl: HTMLElement
   private debugVisible = false
   private lastText = 0
   private lastSlotsKey = ''
@@ -238,6 +241,8 @@ export class Hud {
     this.stormEl = h('div', { class: 'storm-vignette' })
     this.resultsEl = h('div', { class: 'results', 'data-hud': 'results' })
     this.resultsEl.hidden = true
+    this.teamEl = h('div', { class: 'team-panel', 'data-hud': 'team' })
+    this.teamEl.hidden = true
 
     this.el = h('div', { class: 'hud', 'data-hud': '' },
       this.scopeEl,
@@ -252,7 +257,7 @@ export class Hud {
       this.headingEl,
       this.phaseEl,
       h('div', { class: 'hud-tr' }, this.minimapSlot, this.regionEl, this.matchEl, this.mapEl, h('div', { class: 'row', style: 'justify-content:flex-end;gap:6px' }, this.connEl), this.feedEl),
-      h('div', { class: 'hud-bl' }, h('div', { class: 'stance' }, ...Object.values(this.stanceEls)), this.speedEl, this.helpEl),
+      h('div', { class: 'hud-bl' }, this.teamEl, h('div', { class: 'stance' }, ...Object.values(this.stanceEls)), this.speedEl, this.helpEl),
       h('div', { class: 'hud-bc' }, this.promptEl, this.progressEl, vitals),
       h('div', { class: 'hud-br' }, this.toastsEl, this.buildEl, loadout),
       this.bannerEl,
@@ -406,6 +411,12 @@ export class Hud {
       const alt = br.altitude !== null ? `<em>${Math.round(br.altitude)} m</em>` : ''
       const html = `<b>${br.title}</b>${br.timer ? `<span>${br.timer}</span>` : ''}${zone}${alt}${br.hint ? `<small>${br.hint}</small>` : ''}`
       if (this.phaseEl.innerHTML !== html) this.phaseEl.innerHTML = html
+    }
+    // Equipe: nome e vida/escudo de cada colega
+    this.teamEl.hidden = !info.team || info.team.length === 0
+    if (info.team && info.team.length > 0) {
+      const html = info.team.map((m) => `<div class="mate${m.alive ? '' : ' out'}"><b>${m.name.replace(/[&<>"']/g, '')}</b><span class="bars"><i class="s" style="width:${Math.max(0, Math.min(100, m.shield))}%"></i><i class="h" style="width:${Math.max(0, Math.min(100, m.health))}%"></i></span></div>`).join('')
+      if (this.teamEl.innerHTML !== html) this.teamEl.innerHTML = html
     }
     this.targetEl.hidden = !info.target
     if (info.target) {

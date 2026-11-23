@@ -9,7 +9,7 @@ import type { GameMap } from '../../shared/maps/types'
 import { clamp, lerp, wrapAngle } from '../../shared/math/scalar'
 import { Buttons, CharFlag, copyCharacterState, createCharacterState } from '../../shared/movement/character'
 import { GameMode, MatchPhase, distanceOutside, zoneCircleAt, type AirshipRoute, type ZoneCircle, type ZoneStage } from '../../shared/match/zone'
-import { Cause, TargetKind, type EntityState, type GameEvent, type InputCommand, type InventoryAction, type Snapshot } from '../../shared/net/protocol'
+import { Cause, TargetKind, type EntityState, type GameEvent, type InputCommand, type InventoryAction, type Snapshot, type TeamMate, type WelcomeMessage } from '../../shared/net/protocol'
 import { pickInteractable } from '../../shared/player/interact'
 import { PICKAXE_SLOT, SLOT_COUNT, currentSpread, type PlayerEvent, type PlayerState } from '../../shared/player/player'
 import { Surface, createWorldHit } from '../../shared/world/collision-world'
@@ -20,7 +20,6 @@ import type { InputManager } from '../input/input'
 import { RemoteEntity, ServerClock } from '../net/interpolation'
 import { Predictor } from '../net/prediction'
 import { NetSession } from '../net/session'
-import type { Transport } from '../net/transport'
 import { AirshipView } from '../render/airship-view'
 import { BuildingsView } from '../render/buildings-view'
 import { ZoneView } from '../render/zone-view'
@@ -77,6 +76,7 @@ interface Remote {
 interface RosterEntry {
   name: string
   skin: number
+  team: number
 }
 
 export interface MatchDeps {
@@ -85,9 +85,14 @@ export interface MatchDeps {
   hud: Hud
   settings: Settings
   audio: AudioEngine
+  /** Tela dividida: área (px CSS) desta visão no canvas. */
+  viewport?: () => { x: number; y: number; w: number; h: number }
+  /** Este jogador define o ouvinte do áudio posicional (padrão: sim). */
+  listener?: boolean
 }
 
 export interface DebugState {
+  playerId: number
   tick: number
   x: number
   y: number
@@ -134,6 +139,8 @@ export interface DebugState {
   airship: boolean
   result: MatchResult | null
   spectating: string | null
+  team: number
+  mates: { id: number; name: string; health: number; shield: number; alive: boolean }[]
 }
 
 function fmtClock(seconds: number): string {
@@ -221,30 +228,33 @@ export class Match {
   private startedTick = -1
   private result: MatchResult | null = null
   private spectateId = 0
+  private mates: TeamMate[] = []
   /** Fim da partida para este jogador (vitória ou eliminação). */
   onResult: ((r: MatchResult) => void) | null = null
   onClosed: ((reason: string) => void) | null = null
 
-  /** Conecta, carrega o mapa e a cena, e espera o primeiro estado do servidor. */
-  static async start(transport: Transport, deps: MatchDeps, name: string, progress: (step: string) => void): Promise<Match> {
-    const session = new NetSession(transport)
+  /**
+   * Carrega o mapa e a cena para a partida anunciada em `welcome` e espera o
+   * primeiro estado do servidor. A sessão é de quem chamou (a casca): ela
+   * continua viva quando a partida termina e todos voltam à sala de espera.
+   */
+  static async start(session: NetSession, welcome: WelcomeMessage, deps: MatchDeps, progress: (step: string) => void): Promise<Match> {
+    progress(`Gerando o mapa "${welcome.mapId}"…`)
+    await nextFrame()
+    const map = loadMap(welcome.mapId)
+    progress('Preparando gráficos…')
+    await nextFrame()
+    const t = session.transport
+    const match = new Match(session, map, deps, welcome.playerId, welcome.tickRate, t.kind === 'local' ? 'Offline' : t.label, welcome.mode)
+    deps.renderer.compile(match.world.scene, match.cam.camera)
+    progress('Sincronizando com o servidor…')
     try {
-      progress('Conectando ao servidor…')
-      const welcome = await session.handshake(name)
-      progress(`Gerando o mapa "${welcome.mapId}"…`)
-      await nextFrame()
-      const map = loadMap(welcome.mapId)
-      progress('Preparando gráficos…')
-      await nextFrame()
-      const match = new Match(session, map, deps, welcome.playerId, welcome.tickRate, transport.kind === 'local' ? 'Offline' : transport.label, welcome.mode)
-      deps.renderer.compile(match.world.scene, match.cam.camera)
-      progress('Sincronizando com o servidor…')
       await match.waitForFirstState()
-      return match
     } catch (err) {
-      session.close()
+      match.dispose(false)
       throw err
     }
+    return match
   }
 
   private constructor(session: NetSession, map: GameMap, private readonly deps: MatchDeps, playerId: number, tickRate: number, modeLabel: string, gameMode: number) {
@@ -276,7 +286,7 @@ export class Match {
 
     session.setHandlers({
       onSnapshot: (s, at) => this.onSnapshot(s, at),
-      onPlayerInfo: (id, n, skin) => this.onPlayerInfo(id, n, skin),
+      onPlayerInfo: (id, n, skin, team) => this.onPlayerInfo(id, n, skin, team),
       onPlayerLeft: (id) => {
         this.roster.delete(id)
         this.removeRemote(id)
@@ -319,6 +329,7 @@ export class Match {
     this.phase = s.phase
     this.phaseEnd = s.phaseEnd
     if (s.phase === MatchPhase.Airship) this.participants = Math.max(this.participants, s.alive)
+    this.mates = s.mates
     if (s.self) this.predictor.reconcile(s.self, s.ackSeq)
     // Fila do servidor crescendo = relógio do cliente adiantado: desacelera um pouco.
     this.tickScale = s.queued > 2 ? 0.97 : 1
@@ -341,8 +352,28 @@ export class Match {
     return this.roster.get(id)?.name ?? `Jogador ${id}`
   }
 
-  private onPlayerInfo(id: number, name: string, skin: number): void {
-    this.roster.set(id, { name, skin })
+  /** Equipe deste jogador (no solo, só ele). */
+  get myTeam(): number {
+    return this.roster.get(this.playerId)?.team ?? -1
+  }
+
+  private isMate(id: number): boolean {
+    return id !== this.playerId && this.myTeam >= 0 && this.roster.get(id)?.team === this.myTeam && this.teamMode
+  }
+
+  private get teamMode(): boolean {
+    let mine = 0
+    for (const r of this.roster.values()) if (r.team === this.myTeam) mine++
+    return mine > 1
+  }
+
+  private onPlayerInfo(id: number, name: string, skin: number, team: number): void {
+    const prevTeam = this.roster.get(id)?.team
+    this.roster.set(id, { name, skin, team })
+    if (id === this.playerId && prevTeam !== team) {
+      // minha equipe mudou: refaz as placas de todo mundo
+      for (const [rid, r] of this.remotes) r.model?.setName(r.name, this.isMate(rid))
+    }
     if (id === this.playerId && skin !== this.localSkin) {
       // o visual do próprio personagem também é decidido pelo servidor
       this.local.dispose()
@@ -359,7 +390,7 @@ export class Match {
       r.model = null
     }
     r.skin = skin
-    r.model?.setName(name)
+    r.model?.setName(name, this.isMate(id))
   }
 
   private removeRemote(id: number): void {
@@ -462,6 +493,12 @@ export class Match {
             })
             audio.play('eliminated')
             if (e.place > 0) this.finish(false, e.place)
+            else if (this.gameMode === GameMode.BattleRoyale && this.teamMode) {
+              // a equipe continua: assiste um colega
+              const mate = [...this.remotes.keys()].find((id) => this.isMate(id))
+              if (mate) this.spectateId = mate
+              hud.banner('Sua equipe continua na disputa')
+            }
           } else if (e.killer === this.playerId) {
             hud.banner(`Eliminou ${this.nameOf(e.victim)}`, 'kill')
             audio.play('eliminated')
@@ -505,8 +542,11 @@ export class Match {
           this.startedTick = e.startTick
           break
         case 'matchEnd':
-          if (e.winner === this.playerId) this.finish(true, 1)
-          else if (e.winner) hud.banner(`${this.nameOf(e.winner)} venceu`, 'kill')
+          if (e.winner && (e.winner === this.playerId || (this.teamMode && e.team === this.myTeam))) this.finish(true, 1)
+          else if (e.winner) hud.banner(this.teamMode ? `A equipe de ${this.nameOf(e.winner)} venceu` : `${this.nameOf(e.winner)} venceu`, 'kill')
+          break
+        case 'teamOut':
+          if (e.team === this.myTeam) this.finish(false, e.place)
           break
         case 'respawn':
           if (e.player === this.playerId) {
@@ -619,8 +659,12 @@ export class Match {
     }
   }
 
-  /** Quem assistir: quem eliminou, senão qualquer um ainda em jogo. */
+  /** Quem assistir: um colega vivo, quem eliminou, senão qualquer um ainda em jogo. */
   private spectateTarget(): CharacterModel | null {
+    if (!this.isMate(this.spectateId)) {
+      const mate = this.mates.find((m) => m.alive && this.remotes.get(m.id)?.model)
+      if (mate) this.spectateId = mate.id
+    }
     const pick = this.remotes.get(this.spectateId)?.model
     if (pick) return pick
     for (const [id, r] of this.remotes) {
@@ -878,7 +922,7 @@ export class Match {
       if (!r.entity.sample(renderMs, this.sampled)) continue
       if (!r.model) {
         r.model = new CharacterModel(SKINS[r.skin % SKINS.length])
-        r.model.setName(r.name)
+        r.model.setName(r.name, this.isMate(id))
         this.world.scene.add(r.model.root)
       }
       r.model.setHeld(this.sampled.weapon, this.sampled.rarity)
@@ -913,12 +957,21 @@ export class Match {
     this.fullmap.battle = overlay
     this.updateGhost(state)
     this.updateTarget()
-    const size = this.deps.renderer.getSize(tmpSize)
+    // Tela dividida: cada jogador desenha só na sua metade
+    const vp = this.deps.viewport?.()
+    const size = vp ? tmpSize.set(vp.w, vp.h) : this.deps.renderer.getSize(tmpSize)
     this.effects.update(frameDt, this.cam.camera, size.x, size.y)
     const f = this.cam.forward
-    this.deps.audio.setListener(this.cam.camera.position.x, this.cam.camera.position.y, this.cam.camera.position.z, f.x, f.y, f.z)
+    if (this.deps.listener !== false) this.deps.audio.setListener(this.cam.camera.position.x, this.cam.camera.position.y, this.cam.camera.position.z, f.x, f.y, f.z)
     this.updateHud(size.y)
-    this.deps.renderer.render(this.world.scene, this.cam.camera)
+    const r = this.deps.renderer
+    if (vp) {
+      r.setScissorTest(true)
+      r.setViewport(vp.x, vp.y, vp.w, vp.h)
+      r.setScissor(vp.x, vp.y, vp.w, vp.h)
+    }
+    r.render(this.world.scene, this.cam.camera)
+    if (vp) r.setScissorTest(false)
   }
 
   private updateHud(viewHeight: number): void {
@@ -961,6 +1014,10 @@ export class Match {
     else if (def?.kind === 'consumable' && state.useTimer > 0) progress = { label: `Usando ${def.name}`, value: 1 - state.useTimer / def.useTime }
 
     const mm = state.alive ? s : this.focus
+    const matePos: { x: number; z: number }[] = []
+    for (const [id, r] of this.remotes) if (r.model && this.isMate(id)) matePos.push({ x: r.model.root.position.x, z: r.model.root.position.z })
+    this.minimap.mates = matePos
+    this.fullmap.mates = matePos
     this.minimap.update(mm.x, mm.z, heading, region?.name ?? '')
     this.fullmap.update(mm.x, mm.z, heading)
 
@@ -999,6 +1056,7 @@ export class Match {
       build: this.buildMode && state.alive ? { kind: this.buildMode.kind, material: this.buildMode.material, blocked: this.ghostBlocked } : null,
       target: this.target,
       br: this.battleHud(state),
+      team: this.teamMode ? this.mates.map((m) => ({ name: this.nameOf(m.id), health: m.health, shield: m.shield, alive: m.alive })) : null,
       debug: {
         modo: this.modeLabel,
         mapa: this.map.def.id,
@@ -1026,6 +1084,7 @@ export class Match {
     const remotePositions: DebugState['remotePositions'] = []
     for (const [id, r] of this.remotes) if (r.model) remotePositions.push({ id, name: r.name, x: r.model.root.position.x, y: r.model.root.position.y, z: r.model.root.position.z })
     return {
+      playerId: this.playerId,
       tick: this.serverTick,
       x: s.x,
       y: s.y,
@@ -1069,12 +1128,16 @@ export class Match {
       airship: (s.flags & CharFlag.Riding) !== 0,
       result: this.result,
       spectating: st.alive ? null : this.remotes.get(this.spectateId)?.name ?? null,
+      team: this.myTeam,
+      mates: this.mates.map((m) => ({ ...m, name: this.nameOf(m.id) })),
     }
   }
 
-  dispose(): void {
+  /** `closeSession` falso: a conexão continua (volta à sala de espera). */
+  dispose(closeSession = true): void {
     this.ended = true
-    this.session.close()
+    if (closeSession) this.session.close()
+    else this.session.detachMatch()
     for (const id of [...this.remotes.keys()]) this.removeRemote(id)
     this.local.dispose()
     this.items.dispose()

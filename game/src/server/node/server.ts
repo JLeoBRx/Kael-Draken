@@ -5,6 +5,7 @@ import { networkInterfaces } from 'node:os'
 import { extname, join, normalize, resolve, sep } from 'node:path'
 import { WebSocket, WebSocketServer, type RawData } from 'ws'
 import { GameHost, type HostConnection, type HostLogger, type HostOptions } from '../core/game-host'
+import { LanDiscovery, type DiscoveryOptions } from './discovery'
 
 /**
  * Servidor dedicado / host de LAN.
@@ -27,12 +28,15 @@ export interface ServerOptions {
   staticDir: string | null
   logger?: HostLogger
   /** Modo de jogo, bots e regras do battle royale (repassados ao GameHost). */
-  match?: Pick<HostOptions, 'mode' | 'bots' | 'botDifficulty' | 'br' | 'autoRestart'>
+  match?: Pick<HostOptions, 'mode' | 'bots' | 'botDifficulty' | 'br' | 'autoRestart' | 'lobby' | 'teamSize' | 'friendlyFire' | 'reconnectSeconds'>
+  /** Anunciar/descobrir partidas na rede local (UDP). Padrão: desligado. */
+  discovery?: boolean | Omit<DiscoveryOptions, 'httpPort' | 'info'>
 }
 
 export interface RunningServer {
   port: number
   host: GameHost
+  discovery: LanDiscovery | null
   lanAddresses: string[]
   close(): Promise<void>
 }
@@ -114,6 +118,12 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       res.end(JSON.stringify({ ...host.info(), tickMs: Number(host.tickMs.toFixed(3)) }))
       return
     }
+    if (path === '/api/lan') {
+      // partidas encontradas na rede local (este servidor + os anunciados)
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*', 'cache-control': 'no-store' })
+      res.end(JSON.stringify({ self: { ...host.info(), port: boundPort, addresses: lanAddresses() }, servers: discovery?.list() ?? [], discovery: !!discovery }))
+      return
+    }
     if (staticRoot && existsSync(staticRoot)) {
       serveStatic(staticRoot, req, res)
       return
@@ -153,19 +163,29 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     })
   })
 
+  let discovery: LanDiscovery | null = null
+  let boundPort = 0
   await new Promise<void>((ok, fail) => {
     http.once('error', fail)
     http.listen(opts.port, opts.host, () => ok())
   })
   host.start()
   const port = (http.address() as AddressInfo).port
+  boundPort = port
+  if (opts.discovery) {
+    const extra = typeof opts.discovery === 'object' ? opts.discovery : {}
+    const d = new LanDiscovery({ ...extra, httpPort: port, info: () => host.info(), onWarn: (m) => log.warn(m) })
+    if (await d.start()) discovery = d
+  }
 
   return {
     port,
     host,
+    discovery,
     lanAddresses: lanAddresses(),
     close: () =>
       new Promise<void>((ok) => {
+        discovery?.close()
         host.stop()
         for (const client of wss.clients) client.terminate()
         wss.close()

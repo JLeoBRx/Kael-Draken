@@ -92,6 +92,9 @@ export interface CombatState extends MatchState {
   airship: boolean
   result: { victory: boolean; place: number; total: number; kills: number; damage: number; seconds: number } | null
   spectating: string | null
+  playerId: number
+  team: number
+  mates: { id: number; name: string; health: number; shield: number; alive: boolean }[]
 }
 
 export async function combat(page: Page): Promise<CombatState> {

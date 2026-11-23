@@ -30,6 +30,11 @@ const { values } = parseArgs({
     warmup: { type: 'string', default: '45' },
     'zone-speed': { type: 'string', default: '1' },
     'no-restart': { type: 'boolean', default: false },
+    lobby: { type: 'boolean', default: false },
+    'team-size': { type: 'string', default: '1' },
+    'friendly-fire': { type: 'boolean', default: false },
+    reconnect: { type: 'string', default: '60' },
+    'no-discovery': { type: 'boolean', default: false },
     static: { type: 'string', default: resolve(gameRoot, 'dist/client') },
     'no-static': { type: 'boolean', default: false },
     help: { type: 'boolean', short: 'h', default: false },
@@ -51,6 +56,12 @@ if (values.help) {
                       primeira pessoa conectada (padrão 45)
   --zone-speed <x>    Velocidade da zona (1 = normal, 2 = o dobro…)
   --no-restart        Não recomeçar sozinho depois do fim da partida
+  --lobby             Sala de espera: quem entra marca "pronto" e escolhe equipe;
+                      o primeiro configura (mapa, modo, bots, equipes) e inicia
+  --team-size <1-4>   Jogadores por equipe (1 solo, 2 dupla, 3 trio, 4 esquadrão)
+  --friendly-fire     Dano entre colegas de equipe
+  --reconnect <s>     Segundos que o personagem espera quem caiu (padrão 60)
+  --no-discovery      Não anunciar o servidor na rede local (UDP)
   --static <pasta>    Cliente compilado a servir (padrão dist/client)
   --no-static         Não servir o cliente (só /ws e /api/info)`)
   process.exit(0)
@@ -98,10 +109,15 @@ const server = await startServer({
     botDifficulty: values['bot-difficulty'],
     br: { warmup: int('warmup', values.warmup, 0, 3600), zoneSpeed },
     autoRestart: !values['no-restart'],
+    lobby: values.lobby,
+    teamSize: int('team-size', values['team-size'], 1, 4),
+    friendlyFire: values['friendly-fire'],
+    reconnectSeconds: int('reconnect', values.reconnect, 0, 600),
   },
+  discovery: !values['no-discovery'],
 })
 
-const modeText = values.mode === 'br' ? `battle royale, ${values.bots} bots` : 'treino'
+const modeText = values.lobby ? 'sala de espera' : values.mode === 'br' ? `battle royale, ${values.bots} bots` : 'treino'
 console.log(`\nÚltima Chama — servidor em execução (mapa "${values.map}", ${modeText}, ${values['tick-rate']} ticks/s)`)
 console.log(`  Neste computador:  http://localhost:${server.port}`)
 for (const ip of server.lanAddresses) console.log(`  Na rede local:     http://${ip}:${server.port}`)

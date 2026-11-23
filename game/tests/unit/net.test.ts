@@ -21,11 +21,13 @@ import {
   decodeServerMessage,
   encodeHello,
   encodeInputs,
+  encodeLobbyAction,
   encodePing,
   encodeWelcome,
   quantizeCommand,
   sanitizeName,
   writeEntity,
+  writeMates,
   type InputCommand,
   type ServerMessage,
 } from '../../src/shared/net/protocol'
@@ -93,6 +95,7 @@ describe('protocolo', () => {
     other.selected = 0
     const w = beginSnapshot(99, 42, 3, 12, 4, 3, 123456, self, 1)
     writeEntity(w, 7, other)
+    writeMates(w, [{ id: 9, health: 73.2, shield: 50, alive: true }, { id: 11, health: 0, shield: 0, alive: false }])
     const msg = decodeServerMessage(w.finish())
     expect(msg.type).toBe('snapshot')
     if (msg.type !== 'snapshot') return
@@ -110,6 +113,7 @@ describe('protocolo', () => {
     expect(s.entities[0].id).toBe(7)
     expect(s.entities[0].z).toBe(20)
     expect(s.entities[0].vz).toBeCloseTo(-7.4, 2)
+    expect(s.mates).toEqual([{ id: 9, health: 74, shield: 50, alive: true }, { id: 11, health: 0, shield: 0, alive: false }])
   })
 
   it('rejeita mensagens truncadas, com lixo no fim ou de tipo desconhecido', () => {
@@ -117,7 +121,7 @@ describe('protocolo', () => {
     expect(() => decodeClientMessage(ping.subarray(0, 5))).toThrow()
     expect(() => decodeClientMessage(new Uint8Array([...ping, 0]))).toThrow()
     expect(() => decodeClientMessage(new Uint8Array([200]))).toThrow()
-    const welcome = encodeWelcome({ version: 1, playerId: 3, mapId: 'x', tickRate: 30, tick: 5, serverName: 'S', mode: 1 })
+    const welcome = encodeWelcome({ version: 1, playerId: 3, mapId: 'x', tickRate: 30, tick: 5, serverName: 'S', mode: 1, token: 'abc' })
     expect(decodeServerMessage(welcome)).toMatchObject({ type: 'welcome', playerId: 3, mapId: 'x', mode: 1 })
   })
 
@@ -185,8 +189,8 @@ describe('GameHost', () => {
     expect(Math.hypot(snap.self!.char.x - start.char.x, snap.self!.char.z - start.char.z)).toBeLessThan(MAX_TOKENS * 0.25 + 0.01)
   })
 
-  it('remove o jogador e avisa os demais ao desconectar', () => {
-    const host = new GameHost({ mapId: map.def.id, map })
+  it('sem espera de reconexão, remove o jogador e avisa os demais ao desconectar', () => {
+    const host = new GameHost({ mapId: map.def.id, map, reconnectSeconds: 0 })
     const a = join(host, 1)
     const b = join(host, 2)
     const bId = b.last('welcome')!.playerId
@@ -370,6 +374,7 @@ describe('servidor WebSocket (Node)', () => {
     server = await startServer({
       port: 0, host: '127.0.0.1', mapId: 'campo-de-provas', maxPlayers: 8, tickRate: 30, name: 'Teste', staticDir: null,
       logger: { info() {}, warn() {} },
+      match: { reconnectSeconds: 0 },
     })
   })
   afterAll(async () => {
@@ -455,5 +460,118 @@ describe('servidor em modo battle royale', () => {
     expect(b.closed).toBe(KICK_NEW_MATCH)
     expect(host.phase).toBe(MatchPhase.Warmup)
     expect(host.sim.players.size).toBe(3) // só os bots da nova partida
+  })
+})
+
+describe('sala de espera (LAN)', () => {
+  it('prontos, equipes, configuração do dono, início e volta à sala no fim', () => {
+    const map = testMap(() => {})
+    const host = new GameHost({ mapId: map.def.id, map, mapFactory: () => testMap(() => {}), lobby: true, mode: GameMode.BattleRoyale, br: { endDelay: 1 } })
+    const a = join(host, 1, 'Ana')
+    const b = join(host, 2, 'Bia')
+    const lobby = (c: FakeConn) => c.last('lobby')!.state
+    expect(a.last('welcome')).toBeUndefined()
+    expect(lobby(a)).toMatchObject({ you: 1, owner: 1, running: false })
+    expect(lobby(b).members.map((m) => m.name)).toEqual(['Ana', 'Bia'])
+    // só o dono configura
+    const cfg = { ...lobby(a).config, mode: GameMode.BattleRoyale, teamSize: 2, bots: 2, difficulty: 0, zoneSpeed: 50 }
+    host.receive(2, encodeLobbyAction({ op: 'config', config: { ...cfg, bots: 9 } }))
+    expect(lobby(a).config.bots).toBe(0)
+    host.receive(1, encodeLobbyAction({ op: 'config', config: cfg }))
+    expect(lobby(b).config).toMatchObject({ teamSize: 2, bots: 2, mode: GameMode.BattleRoyale })
+    // prontos e equipe escolhida
+    host.receive(2, encodeLobbyAction({ op: 'ready', ready: true }))
+    host.receive(1, encodeLobbyAction({ op: 'team', team: 4 }))
+    host.receive(2, encodeLobbyAction({ op: 'team', team: 4 }))
+    expect(lobby(a).members).toEqual([
+      expect.objectContaining({ name: 'Ana', ready: false, team: 4 }),
+      expect.objectContaining({ name: 'Bia', ready: true, team: 4 }),
+    ])
+    // quem não é dono não inicia
+    host.receive(2, encodeLobbyAction({ op: 'start' }))
+    expect(b.last('welcome')).toBeUndefined()
+    host.receive(1, encodeLobbyAction({ op: 'start' }))
+    expect(a.last('welcome')!.mode).toBe(GameMode.BattleRoyale)
+    expect(b.last('welcome')).toBeDefined()
+    for (let k = 0; k < 30 * 5; k++) host.tick()
+    // mesma equipe (a escolhida), dupla com 2 bots na outra
+    const infos = b.inbox.filter((m): m is Extract<ServerMessage, { type: 'playerInfo' }> => m.type === 'playerInfo')
+    const teamOf = (name: string) => [...infos].reverse().find((m) => m.name === name)!.team
+    expect(teamOf('Ana')).toBe(4)
+    expect(teamOf('Bia')).toBe(4)
+    expect(a.last('snapshot')!.snapshot.mates.map((m) => m.id)).toEqual([b.last('welcome')!.playerId])
+    // a partida acaba (zona 50×) e todos voltam para a sala pela mesma conexão
+    const before = a.inbox.length
+    for (let k = 0; k < 30 * 120 && !a.inbox.slice(before).some((m) => m.type === 'lobby' && !m.state.running); k++) host.tick()
+    expect(a.inbox.some((m) => m.type === 'events' && m.events.some((e) => e.type === 'matchEnd'))).toBe(true)
+    expect(lobby(a).running).toBe(false)
+    expect(lobby(a).members.every((m) => !m.ready)).toBe(true)
+    expect(a.closed).toBeNull()
+    expect(host.active).toBe(false)
+  })
+
+  it('quem entra com a partida rolando espera na sala', () => {
+    const map = testMap(() => {})
+    const host = new GameHost({ mapId: map.def.id, map, lobby: true })
+    const a = join(host, 1, 'Ana')
+    host.receive(1, encodeLobbyAction({ op: 'start' }))
+    host.tick()
+    const c = join(host, 3, 'Caio')
+    expect(c.last('welcome')).toBeUndefined()
+    expect(c.last('lobby')!.state).toMatchObject({ running: true, owner: 1 })
+    expect(a.last('snapshot')).toBeDefined()
+  })
+})
+
+describe('reconexão', () => {
+  it('a conexão cai e o jogador volta ao mesmo personagem com o token', () => {
+    const map = testMap(() => {})
+    const host = new GameHost({ mapId: map.def.id, map, reconnectSeconds: 5 })
+    const a = join(host, 1, 'Ana')
+    const b = join(host, 2, 'Bia')
+    const w = a.last('welcome')!
+    expect(w.token).toMatch(/^[0-9a-f]{24}$/)
+    const sp = host.sim.players.get(w.playerId)!
+    let seq = 1
+    for (let k = 0; k < 20; k++) {
+      host.receive(1, encodeInputs([{ seq: seq++, forward: 1, right: 0, yaw: 0, pitch: 0, buttons: 0, slot: 5, viewTick: 0, build: 0 }]))
+      host.tick()
+    }
+    sp.p.materials[0] = 42
+    const z = sp.p.char.z
+    // cai a conexão: o personagem continua no mundo (B não recebe "saiu")
+    host.disconnect(1)
+    for (let k = 0; k < 30; k++) host.tick()
+    expect(b.inbox.some((m) => m.type === 'playerLeft')).toBe(false)
+    expect(b.last('snapshot')!.snapshot.entities.map((e) => e.id)).toContain(w.playerId)
+    // volta com o token: mesmo id, mesma posição e inventário; comandos recomeçam do 1
+    const a2 = new FakeConn(7)
+    host.connect(a2)
+    host.receive(7, encodeHello('Outro nome', w.token))
+    const w2 = a2.last('welcome')!
+    expect(w2.playerId).toBe(w.playerId)
+    expect(w2.token).toBe(w.token)
+    host.receive(7, encodeInputs([{ seq: 1, forward: 1, right: 0, yaw: 0, pitch: 0, buttons: 0, slot: 5, viewTick: 0, build: 0 }]))
+    host.tick()
+    const s = a2.last('snapshot')!.snapshot
+    expect(s.ackSeq).toBe(1)
+    expect(s.self!.char.z).toBeLessThan(z)
+    expect(s.self!.materials[0]).toBe(42)
+    expect(host.sim.players.get(w.playerId)!.name).toBe('Ana')
+    // token usado não serve de novo; sem token é outro personagem
+    const a3 = join(host, 8, 'Ana')
+    expect(a3.last('welcome')!.playerId).not.toBe(w.playerId)
+  })
+
+  it('quem não volta a tempo sai da partida', () => {
+    const map = testMap(() => {})
+    const host = new GameHost({ mapId: map.def.id, map, reconnectSeconds: 1 })
+    join(host, 1, 'Ana')
+    const b = join(host, 2, 'Bia')
+    const id = host.sim.players.size && [...host.sim.players.values()][0].id
+    host.disconnect(1)
+    for (let k = 0; k < 40; k++) host.tick()
+    expect(b.last('playerLeft')?.id).toBe(id)
+    expect(host.sim.players.has(id)).toBe(false)
   })
 })

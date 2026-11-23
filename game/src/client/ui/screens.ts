@@ -1,6 +1,6 @@
 import { GAME } from '../../shared/config/game'
 import { MOVE } from '../../shared/config/movement'
-import { PROTOCOL_VERSION } from '../../shared/net/protocol'
+import { PROTOCOL_VERSION, type LobbyState } from '../../shared/net/protocol'
 import { QUALITY, type OfflinePrefs, type Quality, type Settings } from '../settings'
 import { BOT_DIFFICULTIES, BOT_PROFILES } from '../../server/core/bots/profiles'
 import { historyTotals, type MatchRecord } from '../history'
@@ -11,6 +11,21 @@ import { EMBLEM_SVG, h } from './dom'
  * configurações, controles). Cada tela é montada em uma camada própria e
  * removida ao trocar.
  */
+
+export interface LanEntry {
+  name: string
+  /** Endereço para conectar (ip:porta) */
+  address: string
+  detail: string
+}
+
+export interface LobbyActions {
+  ready(ready: boolean): void
+  team(team: number): void
+  config(c: LobbyState['config']): void
+  start(): void
+  leave(): void
+}
 
 export interface MainMenuActions {
   playOffline(): void
@@ -84,7 +99,7 @@ export class Screens {
           emblem,
           h('h1', { class: 'title' }, GAME.title),
           h('p', { class: 'tagline' }, GAME.tagline),
-          h('span', { class: 'badge' }, h('span', { class: 'dot' }), `${GAME.phase} · bots, zona e partida completa`),
+          h('span', { class: 'badge' }, h('span', { class: 'dot' }), `${GAME.phase} · sala de espera, equipes e tela dividida`),
           webglError ? h('p', { class: 'status error' }, webglError) : null),
         h('div', { class: 'actions' },
           playBtn,
@@ -95,14 +110,16 @@ export class Screens {
             h('button', { class: 'btn small', 'data-action': 'history', onclick: () => a.history() }, h('span', { class: 'label' }, 'Histórico'))))),
       h('div', { class: 'footer' },
         h('span', {}, `v${GAME.version} · protocolo ${PROTOCOL_VERSION}`),
-        h('span', {}, 'Próximas fases: lobby LAN e equipes, contas e matchmaking online'))))
+        h('span', {}, 'Próximas fases: contas, amigos e matchmaking online'))))
     playBtn.focus()
   }
 
-  join(defaults: { name: string; address: string }, onConnect: (name: string, address: string) => void, onBack: () => void): { setStatus(text: string, error?: boolean): void; setBusy(busy: boolean): void } {
+  join(defaults: { name: string; address: string }, onConnect: (name: string, address: string) => void, onBack: () => void): { setStatus(text: string, error?: boolean): void; setBusy(busy: boolean): void; setLan(list: LanEntry[] | null): void } {
     const name = h('input', { class: 'text-input', name: 'nome', maxlength: 16, value: defaults.name, placeholder: 'Jogador', autocomplete: 'nickname' })
     const address = h('input', { class: 'text-input', name: 'endereco', value: defaults.address, placeholder: 'ex.: 192.168.0.10:7350 (vazio = este servidor)', autocomplete: 'off', spellcheck: 'false' })
     const status = h('div', { class: 'status', 'aria-live': 'polite' })
+    const lan = h('div', { class: 'lan', 'data-screen': 'lan' })
+    lan.hidden = true
     const connect = h('button', { class: 'btn primary small', type: 'submit', 'data-action': 'connect' }, h('span', { class: 'label' }, 'Conectar'))
     const form = h('form', { class: 'stack', onsubmit: (e: Event) => { e.preventDefault(); onConnect(name.value, address.value) } },
       h('label', {}, 'Seu nome', name),
@@ -115,9 +132,21 @@ export class Screens {
       h('div', { class: 'panel' },
         h('h2', {}, 'Entrar em servidor'),
         h('p', { class: 'hint' }, `Na rede local, o anfitrião roda "npm run host" e informa o endereço exibido no terminal (porta ${GAME.defaultPort}). Para servidores online, use o endereço wss:// do servidor dedicado.`),
+        lan,
         form)))
     ;(defaults.name ? address : name).focus()
     return {
+      setLan(list) {
+        lan.hidden = !list
+        if (!list) return
+        lan.replaceChildren(
+          h('h3', { style: 'margin:6px 0 4px;font-size:15px' }, 'Partidas na rede local'),
+          list.length === 0
+            ? h('p', { class: 'hint', style: 'margin:0' }, 'Procurando… (os servidores se anunciam a cada 2 s)')
+            : h('div', { class: 'lan-list' }, ...list.map((e) => h('div', { class: 'lan-row', 'data-lan': e.address },
+              h('span', {}, h('b', {}, e.name), h('small', {}, e.detail)),
+              h('button', { class: 'btn small', type: 'button', onclick: () => { address.value = e.address; onConnect(name.value, e.address) } }, h('span', { class: 'label' }, 'Entrar'))))))
+      },
       setStatus(text, error = false) {
         status.textContent = text
         status.className = error ? 'status error' : 'status'
@@ -126,6 +155,70 @@ export class Screens {
         connect.disabled = busy
       },
     }
+  }
+
+  /** Sala de espera: membros, prontos, equipe e configuração (o dono edita e inicia). */
+  lobby(st: LobbyState, maps: { id: string; name: string }[], a: LobbyActions): void {
+    const me = st.members.find((m) => m.id === st.you)
+    const owner = st.you === st.owner
+    const c = st.config
+    const teamName = (t: number) => (t < 0 ? 'Automática' : `Equipe ${t + 1}`)
+    const sizeName = ['', 'Solo', 'Dupla', 'Trio', 'Esquadrão']
+    const members = st.members.map((m) => h('div', { class: `lobby-member${m.id === st.you ? ' me' : ''}`, 'data-member': m.name },
+      h('span', {}, h('b', {}, m.name), m.id === st.owner ? h('span', { class: 'tag', style: 'margin-left:6px' }, 'anfitrião') : null, m.id === st.you ? h('span', { class: 'tag', style: 'margin-left:6px' }, 'você') : null),
+      c.teamSize > 1 ? h('span', { class: 'tag' }, teamName(m.team)) : h('span'),
+      h('span', { class: m.ready ? 'ok' : 'tag' }, m.ready ? 'Pronto' : 'Aguardando')))
+    const sel = (field: string, options: [string | number, string][], value: string | number, onChange: (v: string) => void) => {
+      const el = h('select', { 'data-field': field }, ...options.map(([v, label]) => h('option', { value: String(v) }, label))) as HTMLSelectElement
+      el.value = String(value)
+      el.disabled = !owner || st.running
+      el.addEventListener('change', () => onChange(el.value))
+      return el
+    }
+    const send = (patch: Partial<LobbyState['config']>) => a.config({ ...c, ...patch })
+    const bots = h('input', { type: 'range', min: 0, max: 99, step: 1, 'data-field': 'bots' }) as HTMLInputElement
+    bots.value = String(c.bots)
+    bots.disabled = !owner || st.running
+    const botsLabel = h('b', {}, String(c.bots))
+    bots.addEventListener('input', () => { botsLabel.textContent = bots.value })
+    bots.addEventListener('change', () => send({ bots: Number(bots.value) }))
+    const ff = h('input', { type: 'checkbox', 'data-field': 'ff' }) as HTMLInputElement
+    ff.checked = c.friendlyFire
+    ff.disabled = !owner || st.running
+    ff.addEventListener('change', () => send({ friendlyFire: ff.checked }))
+    const teamSel = sel('team', [[-1, 'Automática'], ...Array.from({ length: 12 }, (_, k): [number, string] => [k, `Equipe ${k + 1}`])], me?.team ?? -1, (v) => a.team(Number(v)))
+    teamSel.disabled = st.running
+    const readyBtn = h('button', { class: `btn small${me?.ready ? '' : ' primary'}`, 'data-action': 'ready', onclick: () => a.ready(!me?.ready) }, h('span', { class: 'label' }, me?.ready ? 'Cancelar pronto' : 'Estou pronto'))
+    readyBtn.disabled = st.running
+    const allReady = st.members.every((m) => m.ready || m.id === st.owner)
+    const startBtn = h('button', { class: 'btn primary small', 'data-action': 'start', onclick: () => a.start() }, h('span', { class: 'label' }, 'Iniciar partida'))
+    startBtn.disabled = !owner || st.running
+    const status = st.running
+      ? `Partida em andamento (${st.runningAlive} vivos) — você entra na próxima.`
+      : owner
+        ? (allReady ? 'Todos prontos. Inicie quando quiser.' : 'Esperando os outros ficarem prontos (você pode iniciar mesmo assim).')
+        : `Esperando o anfitrião iniciar. ${st.members.filter((m) => m.ready).length}/${st.members.length} prontos.`
+    this.show(h('div', { class: 'screen', 'data-screen': 'lobby' },
+      h('div', { class: 'panel', style: 'width:min(860px,100%)' },
+        h('h2', {}, 'Sala de espera'),
+        h('div', { class: 'lobby-grid' },
+          h('div', {},
+            h('h3', { style: 'margin:0 0 8px;font-size:15px' }, `Jogadores (${st.members.length})`),
+            h('div', { class: 'lobby-members' }, ...members),
+            c.teamSize > 1 ? h('label', { class: 'field', style: 'margin-top:12px;display:flex;flex-direction:column;gap:4px;font-size:13px' }, 'Sua equipe', teamSel) : null,
+            h('div', { class: 'row', style: 'margin-top:12px;gap:8px' }, readyBtn, startBtn)),
+          h('div', { class: 'lobby-config' },
+            h('h3', { style: 'margin:0;font-size:15px' }, owner ? 'Partida (você configura)' : 'Partida'),
+            h('label', { class: 'field' }, 'Mapa', sel('map', maps.map((m): [string, string] => [m.id, m.name]), c.mapId, (v) => send({ mapId: v }))),
+            h('label', { class: 'field' }, 'Modo', sel('mode', [[1, 'Battle royale'], [0, 'Treino (renascimento)']], c.mode, (v) => send({ mode: Number(v) }))),
+            h('label', { class: 'field' }, 'Equipes', sel('team-size', [1, 2, 3, 4].map((n): [number, string] => [n, sizeName[n]]), c.teamSize, (v) => send({ teamSize: Number(v) }))),
+            h('label', { class: 'check', style: 'font-size:13px' }, ff, ' Fogo amigo'),
+            h('label', { class: 'field' }, h('span', {}, 'Bots: ', botsLabel), bots),
+            h('label', { class: 'field' }, 'Dificuldade dos bots', sel('difficulty', BOT_DIFFICULTIES.map((d, k): [number, string] => [k, BOT_PROFILES[d].label]), c.difficulty, (v) => send({ difficulty: Number(v) }))),
+            h('label', { class: 'field' }, 'Zona', sel('zone', [[1, 'Normal'], [2.2, 'Rápida']], c.zoneSpeed >= 2 ? 2.2 : 1, (v) => send({ zoneSpeed: Number(v) }))))),
+        h('p', { class: 'lobby-status', 'data-hud': 'lobby-status' }, status),
+        h('div', { class: 'row', style: 'margin-top:10px' },
+          h('button', { class: 'btn small', 'data-action': 'leave', onclick: () => a.leave() }, h('span', { class: 'label' }, 'Sair da sala'))))))
   }
 
   loading(title: string): { step(text: string): void } {
@@ -161,13 +254,22 @@ export class Screens {
     const zone = h('select', { 'data-field': 'zone' }, h('option', { value: 'normal' }, 'Normal (~9 min)'), h('option', { value: 'rapida' }, 'Rápida (~4 min)')) as HTMLSelectElement
     zone.value = p.zone
     const zoneField = h('label', { class: 'field' }, 'Zona', zone)
+    const teamSize = h('select', { 'data-field': 'team-size' }, h('option', { value: '1' }, 'Solo'), h('option', { value: '2' }, 'Duplas'), h('option', { value: '3' }, 'Trios'), h('option', { value: '4' }, 'Esquadrões')) as HTMLSelectElement
+    teamSize.value = String(p.teamSize)
+    teamSize.addEventListener('change', () => { p.teamSize = Number(teamSize.value); refresh() })
+    const local = h('select', { 'data-field': 'local-players' }, h('option', { value: '1' }, '1 jogador'), h('option', { value: '2' }, '2 jogadores (tela dividida)')) as HTMLSelectElement
+    local.value = String(p.localPlayers)
+    local.addEventListener('change', () => { p.localPlayers = local.value === '2' ? 2 : 1; refresh() })
     const refresh = () => {
       modeBtns.forEach((b) => b.classList.toggle('on', b.dataset.mode === p.mode))
       botsLabel.textContent = String(p.bots)
       zoneField.hidden = p.mode !== 'br'
-      hint.textContent = p.mode === 'br'
-        ? `Battle royale: você e ${p.bots} ${p.bots === 1 ? 'bot' : 'bots'} saltam do dirigível; a zona fecha e vence o último de pé. Sem renascimento.`
-        : `Treino livre${p.bots > 0 ? ` com ${p.bots} ${p.bots === 1 ? 'bot' : 'bots'}` : ''}: sem zona, quem é eliminado renasce em 5 s.`
+      const who = p.localPlayers === 2 ? 'vocês dois' : 'você'
+      const teams = p.teamSize > 1 ? ` em ${['', '', 'duplas', 'trios', 'esquadrões'][p.teamSize]}` : ''
+      const split = p.localPlayers === 2 ? ' Tela dividida: jogador 1 no teclado e mouse, jogador 2 no controle.' : ''
+      hint.textContent = (p.mode === 'br'
+        ? `Battle royale${teams}: ${who} e ${p.bots} ${p.bots === 1 ? 'bot' : 'bots'} saltam do dirigível; a zona fecha e vence a última equipe de pé. Sem renascimento.`
+        : `Treino livre${teams}${p.bots > 0 ? ` com ${p.bots} ${p.bots === 1 ? 'bot' : 'bots'}` : ''}: sem zona, quem é eliminado renasce em 5 s.`) + split
     }
     modeBtns.forEach((b) => b.addEventListener('click', () => { p.mode = b.dataset.mode as OfflinePrefs['mode']; refresh() }))
     bots.addEventListener('input', () => { p.bots = Number(bots.value); refresh() })
@@ -181,7 +283,9 @@ export class Screens {
           h('div', { class: 'field' }, 'Modo', h('div', { class: 'seg' }, ...modeBtns)),
           h('label', { class: 'field' }, h('span', {}, 'Bots: ', botsLabel), bots),
           h('label', { class: 'field' }, 'Dificuldade dos bots', difficulty),
-          zoneField),
+          zoneField,
+          h('label', { class: 'field' }, 'Equipes', teamSize),
+          h('label', { class: 'field' }, 'Neste computador', local)),
         hint,
         h('p', { class: 'hint', style: 'margin:14px 0 6px' }, 'Escolha o mapa para começar (o servidor roda no seu navegador):'),
         h('div', { class: 'map-cards' }, ...maps.map((m) => h('button', { class: 'btn map-card', 'data-map': m.id, onclick: () => onPick(m.id, { ...p }) },
