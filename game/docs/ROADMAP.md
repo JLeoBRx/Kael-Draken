@@ -12,7 +12,7 @@ termina com uma entrega que pode ser jogada.
 | 3 — Construção | paredes, rampas, pisos, telhados; pré-visualização, recursos, vida e destruição sincronizadas | 2 semanas | **concluída** |
 | 4 — IA | bots com navegação, loot, combate, fuga, abrigo, construção e zona; níveis de dificuldade; zona segura; partida BR completa offline | 2–3 semanas | **concluída** |
 | 5 — Multijogador local | lobby LAN, equipes, descoberta na rede, reconexão, tela dividida, testes com vários jogadores | 1–2 semanas | **concluída** |
-| 6 — Online | plataforma (contas, amigos, convites, grupos, matchmaking, salas públicas/privadas, código de convite), alocação de servidores, segurança, gerência de interesse e compressão | 3–4 semanas | |
+| 6 — Online | plataforma (contas, amigos, convites, grupos, matchmaking, salas públicas/privadas, código de convite), alocação de servidores, segurança, gerência de interesse e compressão | 3–4 semanas | **concluída** |
 | 7 — Polimento | arte final (GLTF, animações esqueléticas), sons, efeitos, pós-processamento, otimização, acessibilidade, correção de bugs | 3 semanas | |
 | 8 — Lançamento | app desktop (Electron/Tauri), instaladores, servidor em container, documentação de operação, testes de carga e finais | 1–2 semanas | |
 
@@ -22,7 +22,7 @@ termina com uma entrega que pode ser jogada.
 - **M2 (fim da Fase 4)** — *primeira versão jogável de battle royale*: partida
   completa contra bots, com zona, loot, construção e vencedor.
 - **M3 (fim da Fase 5)** — a mesma partida com amigos na LAN.
-- **M4 (fim da Fase 6)** — partidas online entre redes diferentes, com matchmaking.
+- **M4 (fim da Fase 6)** — partidas online entre redes diferentes, com matchmaking. ✅
 - **M5 (fim da Fase 8)** — versão de lançamento.
 
 ---
@@ -219,18 +219,66 @@ Decisões de projeto:
 - **Sem "derrubado/reanimar"** por enquanto: em equipes, quem perde a vida é
   eliminado e assiste os colegas. Pode entrar com o polimento (Fase 7).
 
-## Fase 6 — Online
+## Fase 6 — Online ✅ (M4: partidas online com matchmaking)
 
-- Plataforma: contas e autenticação, amigos, convites, grupos, códigos de
-  sala, partidas públicas e privadas, matchmaking por região/habilidade.
-- Alocação de servidores de jogo em containers; tickets assinados; resultados
-  reportados pelo servidor de jogo.
-- Persistência (PostgreSQL): perfis, XP, níveis, estatísticas, desafios,
-  cosméticos desbloqueados, histórico de partidas.
-- Rede: gerência de interesse, compressão delta, taxa adaptativa,
-  WebTransport, testes de carga com 100 clientes simulados.
-- Segurança: limites por IP, verificação de integridade de comandos, detecção
-  estatística de mira automática, registro de auditoria.
+Entregue:
+
+- **Plataforma online** (`npm run online`, porta 7370): um processo com
+  HTTP (cliente e situação), WebSocket JSON (`/platform`) e os servidores de
+  jogo (`/game/<id>`).
+- **Conta só pelo nome** (pedido do projeto): o nome é a conta, sem senha;
+  sessão salva no navegador para voltar direto; uma conexão por conta.
+- **Amigos** pelo nome, pedidos aceitos/recusados, **presença** (no menu,
+  procurando, em partida, em sala, offline) atualizada na hora.
+- **Grupos** de até 4 amigos com convite, líder, tirar do grupo; o grupo
+  entra junto na fila e cai na mesma equipe.
+- **Matchmaking** público: solo, dupla, trio e esquadrão; filas por região;
+  habilidade (MMR) com janela que alarga com a espera; "completar equipe";
+  partida começa cheia ou depois da espera máxima, completando com bots.
+- **Salas privadas com código** de 6 caracteres: a sala de espera da Fase 5
+  (o dono configura e inicia), partidas seguidas, convite automático ao grupo.
+- **Servidores de jogo alocados sob demanda** (até `--max-servers`), com
+  **bilhetes assinados (HMAC)** verificados pelo próprio servidor de jogo;
+  quem não tem bilhete não entra; nome, visual e equipe vêm do bilhete.
+- **Resultados reportados pelo servidor de jogo** (colocação de cada pessoa,
+  inclusive de quem desiste), gravados uma vez por partida.
+- **Progressão**: XP por partida, níveis até 100, habilidade, estatísticas
+  (partidas, vitórias, top 10, eliminações, mortes, dano, baús, construções,
+  coleta, tempo, melhor colocação), histórico, classificação, **desafios do
+  dia** com XP, **visuais e títulos desbloqueáveis**.
+- **Banco** SQLite embutido no Node (`node:sqlite`), com auditoria.
+- **Rede ~10× mais leve**: snapshots em delta por conexão (estado próprio
+  exato em f64, entidades quantizadas) e **gerência de interesse** (taxa por
+  distância, tiros distantes cortados): 62 → 4,7 KB/s por cliente no
+  dirigível, 35 → 3,6 KB/s na partida (`scripts/bench-net.ts`).
+- **Segurança**: validação de toda mensagem, limites por conexão/IP/conta,
+  ping para conexões mortas, uma conexão por conta no jogo, auditoria.
+- **Cliente**: "Jogar online" → entrada → casa (jogar, sala privada, grupo,
+  amigos, desafios, perfil com visuais e título, histórico, classificação);
+  convites no topo; XP ao fim da partida; volta à plataforma ao sair ou
+  quando o servidor encerra; reconexão automática à plataforma.
+- **Testes**: 162 unitários/integração (22 novos de plataforma e servidor
+  online) e o teste de navegador da plataforma com dois navegadores (amizade,
+  grupo, dupla pelo matchmaking até o fim com XP, sala privada pelo código,
+  sessão salva).
+
+Decisões de projeto:
+
+- **SQLite em vez de PostgreSQL**: zero instalação (o comando que sobe a
+  plataforma cria o banco), suficiente para um processo de plataforma; a
+  classe `PlatformStore` é a única porta, para trocar quando houver vários
+  processos.
+- **Servidores de jogo no mesmo processo** por enquanto; o bilhete assinado
+  já desacopla (outra máquina só precisa do segredo). Registro de nós remotos
+  e containers ficam com a Fase 8.
+- **WebSocket mantido**: com delta e interesse a banda deixou de ser o
+  gargalo; WebTransport fica para quando houver medições com jogadores reais.
+- **Conta sem senha** é uma escolha consciente para este projeto (documentada
+  nas limitações); a sessão já é separada do nome para permitir trocar a
+  forma de entrar sem mudar o resto.
+
+Ficou para depois: taxa adaptativa por cliente, detecção estatística de mira
+automática, teste de carga com 100 clientes reais em rede.
 
 ## Fase 7 — Polimento
 

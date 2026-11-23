@@ -480,7 +480,7 @@ export class Match {
           break
         }
         case 'eliminated': {
-          const cause = e.cause === Cause.Fall ? 'queda' : e.cause === Cause.Void ? 'fora do mapa' : e.cause === Cause.Zone ? 'zona' : e.cause === ITEM.Pickaxe ? 'picareta' : itemDef(e.cause)?.name ?? '—'
+          const cause = e.cause === Cause.Fall ? 'queda' : e.cause === Cause.Void ? 'fora do mapa' : e.cause === Cause.Zone ? 'zona' : e.cause === Cause.Quit ? 'saiu' : e.cause === ITEM.Pickaxe ? 'picareta' : itemDef(e.cause)?.name ?? '—'
           const killer = e.killer ? `<b>${escapeHtml(this.nameOf(e.killer))}</b> ` : ''
           hud.killFeed(`${killer}<span class="feed-cause">${escapeHtml(cause)}</span> <b>${escapeHtml(this.nameOf(e.victim))}</b>`, e.victim === this.playerId || e.killer === this.playerId)
           if (e.victim === this.playerId) {

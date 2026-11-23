@@ -59,7 +59,8 @@ por modelos GLTF e texturas reais.
 │ combat/    mira pelo ombro, caixas de acerto (cabeça/corpo), projéteis                     │
 │ config/    movimento, catálogo de itens (armas, raridades, consumíveis, munições)          │
 │ maps/      formato + builder + estruturas + "Ilha de Brasa" e "Campo de Provas"            │
-│ net/       serialização binária e protocolo (comandos, snapshots, eventos)                 │
+│ net/       serialização binária e protocolo (comandos, snapshots em delta, eventos)        │
+│ platform/  mensagens JSON da plataforma online · progression.ts (XP, níveis, desafios)     │
 └───────────────────────────────────────────────────────────────────────────────────────────┘
             ▲ usado por                                   ▲ usado por
 ┌───────────┴──────────── src/server ──────────┐  ┌───────┴──────────── src/client ──────────────┐
@@ -74,7 +75,13 @@ por modelos GLTF e texturas reais.
             ▲ mesma classe                         │ game/    Match, itens do mundo, efeitos        │
 ┌───────────┴─────── src/client/worker ─────────┐  │ ui/      menu, mapas, HUD, minimapa,           │
 │ GameHost dentro de um Web Worker (offline)    │  │          inventário, telas                     │
-└───────────────────────────────────────────────┘  └───────────────────────────────────────────────┘
+└───────────────────────────────────────────────┘  │ online/  cliente da plataforma e telas online  │
+┌──────────────────── src/platform ─────────────┐  └───────────────────────────────────────────────┘
+│ store (SQLite) · service (contas, amigos,     │
+│ grupos, fila, salas, resultados) · matchmaker │
+│ · pool (GameHosts alocados) · tickets (HMAC)  │
+│ · server (HTTP + /platform + /game/<id>)      │
+└───────────────────────────────────────────────┘
 ```
 
 ## 3. Modelo de rede: servidor autoritativo
@@ -103,14 +110,35 @@ as aplica e o resultado volta no snapshot.
 - O cliente usa a versão **quantizada** do comando na própria predição, então
   servidor e cliente calculam com exatamente os mesmos números.
 
-### Snapshot (servidor → cliente)
+### Snapshot (servidor → cliente, em delta por conexão)
 
 `tick` · `ackSeq` (último comando aplicado) · `queued` (fila no servidor) ·
 vivos · eliminações do destinatário · fase da partida e o tick em que ela
-muda (contagens do HUD) · estado COMPLETO do próprio jogador
-(movimento, vida, escudo, inventário, munições, materiais e temporizadores da
-arma — para reconciliação exata) · lista de entidades (28 bytes cada: id,
-posição, yaw, pitch, flags, velocidade, arma na mão e raridade).
+muda (contagens do HUD) · estado do próprio jogador · entidades · colegas de
+equipe (vida e escudo).
+
+O WebSocket entrega tudo e em ordem, então cada conexão tem uma **base** dos
+dois lados (`SnapshotEncoder` no servidor, `SnapshotDecoder` no cliente): o
+servidor manda só o que mudou desde o último snapshot enviado **àquela**
+conexão. A base recomeça a cada `Welcome` e esquece quem saiu (`PlayerLeft`);
+um delta sem base é erro de protocolo (o cliente encerra, nunca inventa estado).
+
+- **Estado próprio**: 60 números (personagem, vida, escudo, espaços, munições,
+  materiais, temporizadores da arma) com máscara de bits; os contínuos vão em
+  f64 — a reconciliação continua exata. Parado: ~10 bytes; correndo: ~70.
+- **Entidades**: id + máscara; posição quantizada em 1/32 m (±1.024 m), com
+  passos pequenos em 3 × i8 e grandes em 3 × u16; ângulos, estado,
+  velocidade e arma na mão só quando mudam. Primeira vez: 22 bytes; parado:
+  3 bytes; correndo: ~9 bytes (antes: 28 sempre).
+- **Gerência de interesse** (`GameHost.sendSnapshots`): até 150 m, todo
+  snapshot; 150–400 m, 1 a cada 2; além, 1 a cada 4; a bordo do dirigível
+  (invisíveis), 1 a cada 8 — escalonado pelo id para espalhar a carga. Vão
+  sempre: colegas de equipe, quem mudou de estado (agachar, saltar do
+  dirigível…) e quem a conexão ainda não conhece. Eliminados e espectadores
+  recebem todos. A interpolação aguenta o intervalo maior (a extrapolação de
+  até 150 ms cobre a falta de amostras de quem está longe).
+- **Eventos**: tiros e projéteis lançados a mais de 450 m de quem está vivo
+  não são enviados (estado do mundo — itens, peças, baús — vai sempre).
 
 ### Eventos (servidor → cliente, confiáveis e em ordem)
 
@@ -182,10 +210,14 @@ extrapola no máximo 150 ms e para.
 | Mexer na sala sem ser anfitrião | configuração e início só valem do anfitrião; mapa, bots, equipes e zona são validados |
 | Roubar o personagem de outro | o token de reconexão tem 96 bits aleatórios, vale uma vez e só enquanto o personagem espera |
 | Atirar no colega | sem fogo amigo, o servidor ignora dano entre membros da mesma equipe |
+| Entrar em partida online alheia | o servidor de jogo só aceita bilhete HMAC assinado para ele, dentro da validade; nome, visual e equipe vêm do bilhete |
+| Abrir a mesma conta duas vezes na partida | a conexão nova assume o personagem e a antiga é encerrada |
+| Inventar resultado, XP ou nível | resultados só chegam do servidor de jogo à plataforma, uma vez por partida e conta; visuais e títulos bloqueados são recusados |
+| Inundar a plataforma | limites por conexão, IP e conta; a conexão abusiva é encerrada e registrada na auditoria |
 
 Limitação conhecida: o coice da câmera é aplicado no cliente (como na maioria
-dos jogos de tiro); detecção estatística de mira automática entra na Fase 6.
-O resultado da partida seguirá a mesma regra na Fase 4.
+dos jogos de tiro); a detecção estatística de mira automática ficou para depois
+da Fase 6 (o servidor já registra acertos e eliminações por partida).
 
 ### Combate
 
@@ -295,10 +327,19 @@ construção e validação.
   automatizado com 24 bots).
 - **Geração do mapa principal: ~240 ms** (relevo de 160 mil amostras, 4.900
   caixas, 4.600 adereços, 252 pontos de loot, 100 baús), igual no cliente e no servidor.
-- **Banda: o gargalo real.** Com 100 jogadores atirando, snapshots completos e
-  eventos de tiro para todos somam ~10 MB/s de saída. A Fase 6 traz gerência de
-  interesse (só quem está por perto, em taxa cheia), compressão delta e taxa
-  adaptativa (alvo: < 1,5 MB/s por partida cheia).
+- **Banda (Fase 6)** — `npx tsx scripts/bench-net.ts 60 8 150`: battle
+  royale no mapa principal com 60 bots e 8 conexões, bytes enviados a cada
+  cliente:
+
+  | | antes (v5) | só delta | delta + interesse |
+  | --- | --- | --- | --- |
+  | dirigível | 61,9 KB/s | 14,5 KB/s | **4,7 KB/s** |
+  | partida | 34,6 KB/s | 7,7 KB/s | **3,6 KB/s** |
+  | snapshot médio | 1.473 bytes | 336 bytes | **135 bytes** |
+
+  Uma partida cheia (100 pessoas) fica na ordem de 0,5 MB/s de saída, abaixo
+  da meta de 1,5 MB/s. Taxa adaptativa por cliente (menos snapshots para
+  conexões lentas) ainda não existe.
 
 ## 4. Os três modos
 
@@ -307,10 +348,10 @@ construção e validação.
 | Onde roda o servidor | Web Worker no navegador do jogador | processo Node em um computador da rede (`npm run host`) | processo Node em servidor dedicado (nuvem) |
 | Transporte | `postMessage` (bytes do protocolo) | WebSocket `ws://IP:7350/ws` | WebSocket seguro `wss://` (TLS) |
 | Internet | **não precisa** | não precisa | precisa |
-| Como entrar | "Jogar offline" | os outros abrem `http://IP-DO-HOST:7350` e clicam em "Entrar em servidor" | matchmaking / código de convite (Fase 6) |
-| Bots | sim (0–99, três dificuldades) | sim (`--bots` ou na sala de espera) | sim (preencher partidas) |
-| Equipes | sim (solo a esquadrão; tela dividida na mesma equipe) | sim (sala de espera) | sim |
-| Persistência | navegador (Fase 8: arquivo local no app desktop) | idem, no host | banco de dados |
+| Como entrar | "Jogar offline" | os outros abrem `http://IP-DO-HOST:7350` e clicam em "Rede local" | "Jogar online": nome → matchmaking ou código de sala |
+| Bots | sim (0–99, três dificuldades) | sim (`--bots` ou na sala de espera) | sim (completam as partidas públicas; nas salas, o dono escolhe) |
+| Equipes | sim (solo a esquadrão; tela dividida na mesma equipe) | sim (sala de espera) | sim (o grupo fica junto; "completar equipe" junta desconhecidos) |
+| Persistência | navegador (Fase 8: arquivo local no app desktop) | idem, no host | banco da plataforma (SQLite): conta, XP, estatísticas, histórico, desafios |
 
 **Sala de espera (LAN)**: com `--lobby` (padrão em `npm run host`), quem conecta
 recebe o estado da sala (`S2C.Lobby`: membros, prontos, equipe escolhida,
@@ -335,37 +376,107 @@ controle para o 2), desenhada na sua metade do canvas com `setViewport` e
 **Descoberta na LAN**: navegadores não escutam UDP. Cada servidor anuncia-se
 por broadcast UDP (porta 7351, a cada 2 s, com nome, mapa, ocupação, modo,
 sala de espera e versão) e ouve os outros; `/api/lan` devolve a lista, que a
-tela "Entrar em servidor" mostra. O app desktop (Fase 8) poderá ouvir direto.
+tela "Rede local" mostra. O app desktop (Fase 8) poderá ouvir direto.
 
-## 5. Online em escala (Fases 6–8)
+## 5. Online (Fase 6)
 
 ```
-            ┌──────────────── Plataforma (Node, sem estado de partida) ───────────────┐
- Cliente ──►│ Autenticação (contas, tokens JWT) · Amigos/convites · Grupos (equipes)  │
-  HTTPS     │ Matchmaking (filas por modo/região/habilidade) · Códigos de sala        │
-            │ Alocador de partidas · Progressão/estatísticas · Histórico              │
-            └──────┬─────────────────────────────┬──────────────────────┬─────────────┘
-                   │ aloca partida               │ resultados (só do     │
-                   ▼                             │ servidor de jogo)     ▼
-       ┌───────────────────────┐                 │              ┌──────────────┐
-       │ Nós de servidores de  │─────────────────┘              │ PostgreSQL   │
-       │ jogo (GameHost em     │◄── Cliente (wss, com ticket    │ (+ Redis p/  │
-       │ processos/containers) │    assinado da partida)        │ filas/presença)
-       └───────────────────────┘                                └──────────────┘
+                 ┌──────────────── processo da plataforma (npm run online, :7370) ────────────────┐
+ navegador ─────►│ /platform (JSON)   PlatformService: sessões, presença, amigos, grupos,         │
+   (HTTPS/wss)   │                    convites, fila, salas, resultados → XP/desafios             │
+                 │                       │ Matchmaker (fila por modo+região, janela de habilidade)│
+                 │                       │ GameServerPool ──► GameHost s1, s2… (laço próprio)      │
+ navegador ─────►│ /game/<id> (binário) ─┘   bilhete HMAC verificado pelo próprio GameHost         │
+                 │ PlatformStore (node:sqlite, data/plataforma.db)                                  │
+                 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Cada partida é um processo `GameHost` (o mesmo de hoje), empacotado em container.
-- Os nós registram-se no alocador com batimentos; o alocador escolhe o nó com
-  capacidade na região certa.
-- O cliente recebe um **ticket assinado** (HMAC/JWT) para entrar na partida; o
-  servidor de jogo valida o ticket — ninguém entra em partida para a qual não foi
-  escalado.
-- Resultados, XP e estatísticas são enviados **pelo servidor de jogo** à
-  plataforma, nunca pelo cliente.
-- Reconexão: o jogador desconectado continua na simulação por N segundos; o
-  ticket permite voltar ao mesmo personagem.
-- Evolução de transporte: WebTransport (datagramas, sem bloqueio de cabeça de
-  fila) com WebSocket como alternativa; o protocolo já é independente do transporte.
+**Entrada só pelo nome** (pedido do projeto): `login {name}` cria a conta na
+primeira vez e usa a mesma depois (sem diferenciar maiúsculas, acentos em forma
+canônica). A resposta traz uma **sessão** (token aleatório de 24 bytes, válido
+por 30 dias sem uso) que o cliente guarda e usa para voltar sem digitar o nome
+(`resume`). Uma conta tem uma conexão por vez: entrar em outro lugar derruba a
+anterior.
+
+**Mensagens** (`shared/platform/messages.ts`): pedidos do cliente com `rid` e
+resposta `ok`/`error`; avisos empurrados pelo servidor (`welcome`, `me`,
+`friends`, `party`, `partyInvite`, `queue`, `matchFound`, `reward`,
+`challenges`, `roomInvite`, `notice`, `online`, `kicked`). O cliente mantém um
+espelho do estado (`PlatformClient.state`) e as telas só leem dele.
+
+**Amigos e presença**: pedido pelo nome; pedir de volta vira amizade. A
+presença (offline, no menu, procurando, em partida, em sala) é calculada pela
+plataforma — "em partida" vem do próprio `GameHost` (contas conectadas ou com
+personagem esperando reconexão) — e enviada aos amigos e ao grupo quando muda.
+
+**Grupos**: até 4, só com amigos online; o líder convida, tira e entra na
+fila; quem cai da plataforma tem 30 s para voltar antes de sair do grupo.
+Qualquer mudança no grupo cancela a busca.
+
+**Matchmaking** (`platform/matchmaker.ts`): uma fila por (tamanho de equipe,
+região). A entrada mais antiga é a âncora; entram com ela os grupos com
+habilidade (MMR médio) a até 150 pontos, janela que alarga 25 pontos por
+segundo de espera. A partida sai com `maxHumans` pessoas ou quando a âncora
+esperou `maxWait` (padrão 20 s); o lobby é completado com bots até
+`lobbySize`. Grupos ficam na mesma equipe; com "completar equipe", grupos
+menores dividem equipe com outros (o que sobra o servidor completa com bots).
+
+**Servidores de jogo** (`platform/pool.ts`): cada partida é um `GameHost` com
+o próprio laço de ticks, servido em `/game/<id>`, até `--max-servers`. Sem
+vaga, os grupos voltam à fila sem perder o lugar. Partida pública: battle
+royale, aquecimento até todos os esperados chegarem (encurta para 6 s quando
+chegam), encerrada no fim (`KICK_MATCH_OVER` manda o cliente de volta à
+plataforma sem tentar reconectar). Sala privada: a sala de espera da Fase 5
+com código de 6 caracteres (sem 0/O/1/I/L), partidas seguidas, fechada
+depois de 2 min vazia.
+
+**Bilhetes** (`platform/tickets.ts`): `base64url(JSON).base64url(HMAC-SHA256)`
+com conta, nome, visual, grupo (equipe), servidor de destino e validade
+(3 h). O `GameHost` (opção `auth`) recusa `Hello` sem bilhete válido para ele
+e tira nome, visual e equipe do bilhete — o cliente não escolhe nada disso. O
+servidor de jogo não consulta a plataforma: servidores em outras máquinas só
+precisam do mesmo segredo (`PLATFORM_SECRET`).
+
+**Resultados** (`GameHost.onResult`): no embarque do dirigível o servidor
+registra as pessoas na disputa; a cada equipe eliminada (`teamOut`) e na
+vitória, fecha o resultado de quem era dela — colocação, eliminações, dano,
+baús, peças, materiais coletados e tempo vivo. Quem sai no meio conta como
+eliminado (`Cause.Quit`, solta o que carregava). A plataforma grava **uma
+vez por partida e conta** (chave primária), calcula XP (`matchXp`),
+habilidade (Elo por colocação contra a média do lobby, só em públicas) e o
+avanço dos desafios do dia, e empurra `reward`, `me` e `challenges`.
+
+**Progressão** (`shared/progression.ts`, igual no cliente e no servidor):
+níveis até 100 (300 XP no 1º, +150 por nível, teto 2.500); XP por presença,
+minutos vivo, eliminações, dano, colocação e vitória; 3 desafios por dia
+(sorteados pela data, iguais para todos); 8 visuais liberados por nível e 8
+títulos por nível ou vitórias — a plataforma recusa o que está bloqueado.
+
+**Banco** (`platform/store.ts`, `node:sqlite` embutido no Node 22, modo WAL):
+`users`, `stats`, `sessions`, `friends`, `friend_requests`, `matches`,
+`match_players`, `challenges`, `audit`, `meta` (versão do esquema). Toda
+escrita composta é uma transação. Trocar por PostgreSQL é reimplementar esta
+classe (a única porta de acesso).
+
+**Segurança**:
+
+- mensagens validadas campo a campo, até 4 KB, tipo desconhecido recusado;
+- limites: 20 mensagens/s por conexão (a conexão é encerrada e registrada),
+  10 entradas por minuto por IP, convites/pedidos/salas por conta,
+  20 conexões novas por IP em rajada (2/s) e 16 simultâneas;
+- WebSocket com `ping` a cada 30 s (conexões mortas são derrubadas);
+- o servidor de jogo só aceita bilhete assinado para ele, uma conexão por
+  conta, e mantém as validações das fases anteriores (comandos, ritmo,
+  cadência, construção);
+- resultados só vêm do servidor de jogo e contam uma vez;
+- **auditoria** (`audit`): contas criadas, entradas e saídas, amizades,
+  grupos, filas, partidas formadas, resultados, salas e abusos (com IP).
+
+**Escala (próximos passos)**: o desenho já separa plataforma e servidores de
+jogo pelo bilhete; falta o registro de nós remotos com batimentos (Fase 8,
+junto do container), PostgreSQL + Redis se a plataforma tiver mais de um
+processo, e WebTransport (datagramas) com WebSocket como alternativa — o
+protocolo binário já é independente do transporte.
 
 ## 6. Simulação e física
 
@@ -387,7 +498,8 @@ tela "Entrar em servidor" mostra. O app desktop (Fase 8) poderá ouvir direto.
 ```
 game/
 ├── index.html                 entrada do cliente
-├── package.json               scripts (dev, build, server, host, test, test:e2e)
+├── package.json               scripts (dev, build, server, host, platform, online, test, test:e2e)
+├── scripts/bench-net.ts       medição de banda por cliente
 ├── vite.config.ts             build do cliente (e proxy /ws para o servidor em dev)
 ├── playwright.config.ts       testes de navegador
 ├── docs/                      ARQUITETURA.md (este), ROADMAP.md
@@ -402,7 +514,10 @@ game/
 │   │   ├── building/          grid.ts (peças, alvo), buildings.ts (BuildingWorld: apoio, desabamento)
 │   │   ├── match/             zone.ts (modos, fases, zona, rota do dirigível)
 │   │   ├── maps/              types, builder, structures, ember-island, proving-grounds, index
-│   │   └── net/               binary, protocol
+│   │   ├── net/               binary, protocol (snapshots em delta)
+│   │   ├── platform/          messages.ts (mensagens da plataforma online)
+│   │   └── progression.ts     níveis, XP, habilidade, visuais, títulos, desafios
+│   ├── platform/              store (SQLite), service, matchmaker, pool, tickets, rate-limit, server, main (CLI)
 │   ├── server/
 │   │   ├── core/              simulation.ts, game-host.ts, battle-royale.ts, loot.ts (sem dependências de ambiente)
 │   │   │   └── bots/          nav-grid.ts (grade + A*), bot.ts (cérebro), bot-manager.ts, profiles.ts
@@ -418,6 +533,7 @@ game/
 │       ├── input/             input.ts
 │       ├── audio/             audio.ts
 │       ├── ui/                screens, hud, minimap, inventory-screen, icons, dom, styles.css
+│       ├── online/            platform-client.ts, online-screens.ts, online.ts (fluxo online)
 │       ├── history.ts         histórico local de partidas
 │       └── settings.ts
 └── tests/
@@ -452,5 +568,5 @@ Nada usa nomes, personagens, arte ou sons de outros jogos.
 | Servidor | Node.js + `ws` | 22 / 8 |
 | Execução TS no servidor | tsx | 4 |
 | Testes | Vitest (unidade/integração), Playwright (navegador) | 5 / 1.63 |
-| Persistência (planejada) | navegador (offline), PostgreSQL + Drizzle (online), Redis (filas/presença) | Fase 6 |
+| Persistência | navegador (offline/LAN); `node:sqlite` embutido no Node (plataforma online) | Node 22 |
 | Desktop (planejado) | Electron ou Tauri (inclui o servidor Node para LAN e descoberta UDP) | Fase 8 |

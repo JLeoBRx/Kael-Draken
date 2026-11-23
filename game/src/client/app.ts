@@ -2,12 +2,13 @@ import * as THREE from 'three'
 import { GAME } from '../shared/config/game'
 import { MAIN_MAP_ID, MAPS, TRAINING_MAP_ID } from '../shared/maps'
 import { AudioEngine } from './audio/audio'
-import { KICK_NEW_MATCH, sanitizeName, type LobbyState, type WelcomeMessage } from '../shared/net/protocol'
+import { KICK_MATCH_OVER, KICK_NEW_MATCH, sanitizeName, type LobbyState, type WelcomeMessage } from '../shared/net/protocol'
 import { GameMode } from '../shared/match/zone'
 import { addToHistory, loadHistory } from './history'
 import { Match, type DebugState } from './game/match'
 import { InputManager } from './input/input'
 import { NetSession } from './net/session'
+import { OnlineController } from './online/online'
 import { TRAINING_MATCH, connectWebSocket, normalizeServerUrl, startLocalServer, startLocalServers, type LocalMatchOptions, type Transport } from './net/transport'
 import { QUALITY, loadSettings, saveSettings, type OfflinePrefs, type Settings } from './settings'
 import type { MatchResult } from './ui/hud'
@@ -27,6 +28,10 @@ interface StartRecipe {
   url?: string
   /** Tela dividida: mapa e partida para "Jogar de novo". */
   split?: { mapId: string; match: LocalMatchOptions }
+  /** Bilhete da plataforma (servidores online). */
+  ticket?: string
+  /** Partida online: ao sair ou terminar, volta para a casa da plataforma. */
+  online?: { onExit: (notice?: string) => void; code?: string; name: string }
 }
 
 const TOKEN_KEY = 'ultima-chama:token:'
@@ -76,6 +81,7 @@ export class App {
   private split: { huds: [Hud, Hud]; layers: HTMLElement[]; p2: Match | null; p2Input: InputManager } | null = null
   private session: NetSession | null = null
   private lanTimer: ReturnType<typeof setInterval> | null = null
+  private readonly online: OnlineController
 
   constructor(root: HTMLElement) {
     this.settings = loadSettings()
@@ -105,6 +111,20 @@ export class App {
     this.input.onPointerLockLost = () => {
       if (this.state === 'playing') this.pause()
     }
+    this.online = new OnlineController({
+      screens: this.screens,
+      settings: () => this.settings,
+      saveSettings: (s) => {
+        this.settings = s
+        saveSettings(s)
+        this.input.updateSettings(s)
+      },
+      startOnlineMatch: (o) => void this.begin({
+        make: () => connectWebSocket(o.url), title: o.title, offline: false, url: o.url, ticket: o.ticket, online: { onExit: o.onExit, code: o.code, name: o.name },
+      }, (err) => o.onExit(`Não foi possível entrar na partida: ${err}`)),
+      inMatch: () => this.state !== 'menu' && !!this.recipe?.online,
+      mainMenu: () => this.showMenu(),
+    })
     this.input.onToggleDebug = () => this.hud.toggleDebug()
     this.input.onToggleHelp = () => this.hud.toggleHelp()
     this.canvas.addEventListener('click', () => {
@@ -176,6 +196,7 @@ export class App {
     this.hud.hide()
     this.screens.mainMenu({
       playOffline: () => this.showMapSelect(),
+      online: () => void this.online.open(),
       join: () => this.showJoin(),
       settings: () => this.showSettings(),
       controls: () => this.showControls(),
@@ -360,7 +381,7 @@ export class App {
       s.onLobby = (st) => this.showLobbyState(st)
       s.onClose = (reason) => this.onSessionClosed(s, reason)
       loading.step('Conectando ao servidor…')
-      const greeting = await s.handshake(this.playerName(), recipe.url ? loadToken(recipe.url) : '')
+      const greeting = await s.handshake(recipe.online?.name ?? this.playerName(), recipe.url ? loadToken(recipe.url) : '', recipe.ticket ?? '')
       if (greeting.kind === 'lobby') {
         this.state = 'lobby'
         this.showLobbyState(greeting.state)
@@ -434,7 +455,7 @@ export class App {
       config: (config) => session.sendLobby({ op: 'config', config }),
       start: () => session.sendLobby({ op: 'start' }),
       leave: () => this.quitToMenu(),
-    })
+    }, this.recipe?.online?.code)
   }
 
   /** A conexão acabou: expulsão/nova partida, ou queda de rede (tenta voltar ao mesmo personagem). */
@@ -444,6 +465,7 @@ export class App {
     const recipe = this.recipe
     if (session.kicked) {
       if (reason === KICK_NEW_MATCH && recipe) this.restart('Nova partida começando…')
+      else if (reason === KICK_MATCH_OVER && recipe?.online) this.quitToMenu('Partida encerrada')
       else this.quitToMenu(`Partida encerrada: ${reason}`)
       return
     }
@@ -499,7 +521,7 @@ export class App {
     const actions: { label: string; action: string; primary?: boolean; run: () => void }[] = []
     if (this.recipe?.offline) actions.push({ label: 'Jogar de novo', action: 'again', primary: true, run: () => this.restart() })
     if (!r.victory) actions.push({ label: 'Assistir', action: 'spectate', run: () => { this.p1Hud.showResults(null); void this.resume() } })
-    actions.push({ label: 'Voltar ao menu', action: 'menu', run: () => this.quitToMenu() })
+    actions.push({ label: this.recipe?.online ? 'Voltar à plataforma' : 'Voltar ao menu', action: 'menu', run: () => this.quitToMenu() })
     this.p1Hud.showResults(r, actions)
   }
 
@@ -573,6 +595,7 @@ export class App {
 
   quitToMenu(notice?: string): void {
     this.p1Hud.showResults(null)
+    const onExit = this.recipe?.online?.onExit
     this.recipe = null
     const session = this.session
     this.session = null
@@ -585,6 +608,11 @@ export class App {
     this.match = null
     this.endSplit()
     this.hud.hide()
+    this.state = 'menu'
+    if (onExit) {
+      onExit(notice)
+      return
+    }
     this.showMenu()
     if (notice) this.screens.toast(notice, 'error', 7000)
   }
@@ -627,7 +655,7 @@ export class App {
   }
 
   /** Estado resumido para testes automatizados e diagnóstico. */
-  debugState(): { screen: AppState; version: string; match: DebugState | null; match2: DebugState | null } {
-    return { screen: this.state, version: GAME.version, match: this.match?.debugState() ?? null, match2: this.split?.p2?.debugState() ?? null }
+  debugState(): { screen: AppState; version: string; match: DebugState | null; match2: DebugState | null; online: ReturnType<OnlineController['debug']> } {
+    return { screen: this.state, version: GAME.version, match: this.match?.debugState() ?? null, match2: this.split?.p2?.debugState() ?? null, online: this.online.debug() }
   }
 }

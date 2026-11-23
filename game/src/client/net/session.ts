@@ -1,6 +1,7 @@
 import {
   MAX_COMMANDS_PER_MESSAGE,
   PROTOCOL_VERSION,
+  SnapshotDecoder,
   decodeServerMessage,
   encodeHello,
   encodeInputs,
@@ -57,13 +58,16 @@ export class NetSession {
   private pingTimer: ReturnType<typeof setInterval> | null = null
   private welcomeWaiter: ((g: Greeting) => void) | null = null
   private failWaiter: ((e: Error) => void) | null = null
+  /** Base dos snapshots em delta (recomeça a cada Welcome). */
+  private readonly decoder = new SnapshotDecoder()
 
   constructor(readonly transport: Transport) {
     transport.onMessage = (data) => this.receive(data)
     transport.onClose = (reason) => this.closed(reason)
   }
 
-  handshake(name: string, token = '', timeoutMs = 8000): Promise<Greeting> {
+  /** `ticket`: bilhete da plataforma (servidores online). */
+  handshake(name: string, token = '', ticket = '', timeoutMs = 8000): Promise<Greeting> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('O servidor não respondeu ao handshake')), timeoutMs)
       this.welcomeWaiter = (g) => {
@@ -74,7 +78,7 @@ export class NetSession {
         clearTimeout(timer)
         reject(e)
       }
-      this.send(encodeHello(name, token))
+      this.send(encodeHello(name, token, ticket))
     })
   }
 
@@ -130,9 +134,12 @@ export class NetSession {
     const at = performance.now()
     let msg: ServerMessage
     try {
-      msg = decodeServerMessage(data)
+      msg = decodeServerMessage(data, this.decoder)
     } catch (err) {
+      // a base dos snapshots ficaria errada daqui em diante: encerra a conexão
       console.error('Mensagem inválida do servidor', err)
+      this.closed(`Mensagem inválida do servidor (${err instanceof Error ? err.message : err})`)
+      this.transport.close()
       return
     }
     if (msg.type === 'welcome') {

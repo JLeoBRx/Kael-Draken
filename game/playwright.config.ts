@@ -14,6 +14,8 @@ const PORT = Number(process.env.E2E_PORT ?? 7361)
 export const BR_PORT = PORT + 1
 /** Terceiro servidor: sala de espera de LAN (equipes, prontos, reconexão). */
 export const LOBBY_PORT = PORT + 2
+/** Plataforma online (banco em memória): partidas de dupla curtas, salas privadas. */
+export const PLATFORM_PORT = PORT + 3
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -46,6 +48,12 @@ export default defineConfig({
     {
       command: `npx tsx src/server/node/main.ts --port ${LOBBY_PORT} --host 127.0.0.1 --map campo-de-provas --lobby --no-discovery --name "Sala de testes"`,
       url: `http://127.0.0.1:${LOBBY_PORT}/api/info`,
+      timeout: 120_000,
+      reuseExistingServer: false,
+    },
+    {
+      command: `npx tsx --disable-warning=ExperimentalWarning src/platform/main.ts --port ${PLATFORM_PORT} --host 127.0.0.1 --db :memory: --map campo-de-provas --max-humans 2 --lobby-size 4 --max-wait 3 --warmup 8 --zone-speed 40 --bot-difficulty facil`,
+      url: `http://127.0.0.1:${PLATFORM_PORT}/api/online/status`,
       timeout: 120_000,
       reuseExistingServer: false,
     },

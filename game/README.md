@@ -5,12 +5,20 @@ Battle royale 3D em terceira pessoa, com partidas **offline**, em **rede local
 armas, mapas e interface originais. *(Título provisório — definido em
 `src/shared/config/game.ts`.)*
 
-> **Estado: Fase 5 concluída — multijogador local.** Sala de espera na rede
-> local (prontos, equipes, configuração pelo anfitrião), descoberta automática
-> das partidas na rede, duplas/trios/esquadrões com fogo amigo opcional,
-> reconexão ao mesmo personagem e tela dividida para 2 jogadores no mesmo
-> computador. Próximo: online (contas, amigos, matchmaking) — veja o
-> [roteiro](docs/ROADMAP.md).
+> **Estado: Fase 6 concluída — online.** Plataforma online (`npm run online`)
+> com entrada **só pelo nome** (o nome é a conta), amigos com presença, grupos
+> com convite, **matchmaking** de partidas públicas (solo, dupla, trio ou
+> esquadrão, por região e habilidade, completando com bots), **salas privadas
+> com código**, servidores de jogo alocados sob demanda com **bilhetes
+> assinados**, resultados reportados pelo servidor de jogo, **XP, níveis,
+> estatísticas, histórico, classificação, desafios do dia e visuais/títulos
+> desbloqueáveis** guardados em banco (SQLite). A rede ficou ~10× mais leve:
+> snapshots em delta por conexão e gerência de interesse. Próximo: polimento
+> (arte, som e efeitos finais) — veja o [roteiro](docs/ROADMAP.md).
+>
+> **Fase 5 — multijogador local.** Sala de espera na rede local, descoberta
+> automática das partidas, duplas/trios/esquadrões com fogo amigo opcional,
+> reconexão ao mesmo personagem e tela dividida para 2 jogadores.
 >
 > **Fase 4 — primeira versão jogável de battle royale.**
 > Partida completa offline contra até 99 bots (ou com amigos num servidor):
@@ -23,6 +31,10 @@ armas, mapas e interface originais. *(Título provisório — definido em
 > — veja o [roteiro](docs/ROADMAP.md) e a [arquitetura](docs/ARQUITETURA.md).
 
 ![A bordo do dirigível sobre a Ilha de Brasa, com a zona no horizonte e o aviso "Espaço — saltar"](docs/imagens/dirigivel.webp)
+
+| Plataforma online (grupo, amigos, desafios, perfil) | Sala privada com código |
+| --- | --- |
+| ![Casa da plataforma: jogar, sala privada, grupo, amigos, desafios do dia e perfil](docs/imagens/online-casa.webp) | ![Sala privada com o código para os amigos entrarem](docs/imagens/online-sala.webp) |
 
 | Sala de espera na rede local | Tela dividida (dupla no mesmo computador) |
 | --- | --- |
@@ -94,7 +106,7 @@ O terminal mostra os endereços, por exemplo:
 ```
 
 Nos outros computadores da mesma rede, abra o endereço "Na rede local" e
-clique em **Entrar em servidor**: a lista **Partidas na rede local** mostra
+clique em **Rede local**: a lista **Partidas na rede local** mostra
 este e os outros servidores encontrados (cada um se anuncia por UDP na porta
 7351); clique em **Entrar**. Todos caem na **sala de espera**: cada um marca
 "pronto" e escolhe a equipe; o primeiro a entrar é o anfitrião, configura a
@@ -113,17 +125,47 @@ Em **Jogar offline**, escolha **Neste computador: 2 jogadores (tela dividida)**:
 o jogador 1 usa teclado e mouse e o jogador 2 o primeiro controle conectado
 (padrão Xbox/PlayStation). Com equipes, os dois ficam na mesma.
 
-### Online (servidor dedicado)
+### Online (plataforma)
 
-O mesmo servidor roda em uma máquina na nuvem:
+Num servidor acessível pela internet (ou no seu computador, para testar):
 
 ```bash
-npm run build
-npm run server -- --port 7350 --max-players 32 --name "Servidor BR-1"
+npm run online
 ```
 
-Em produção, coloque-o atrás de um proxy com TLS (o cliente conecta por
-`wss://seu-dominio/ws`). Matchmaking, contas e convites chegam na Fase 6.
+O terminal mostra o endereço (porta **7370**). Cada pessoa abre esse endereço
+no navegador e clica em **Jogar online**:
+
+1. **Entrar**: digite só o seu nome — sem senha, o nome é a conta. Entrando
+   com o mesmo nome em outro computador, você continua com o mesmo nível,
+   amigos e estatísticas (a sessão fica salva no navegador; ao recarregar a
+   página você entra direto).
+2. **Amigos**: adicione pelo nome; o outro aceita. A lista mostra quem está
+   no menu, procurando partida, em partida ou em sala privada.
+3. **Grupo**: clique em **convidar** num amigo online; ele aceita no topo da
+   tela. O líder escolhe o modo (Solo, Dupla, Trio, Esquadrão), a região e
+   **Procurar partida**: o grupo inteiro cai na mesma partida, na mesma equipe.
+4. **Partida pública**: o matchmaking junta grupos de habilidade parecida
+   (a janela alarga com a espera) e, depois de ~20 s, começa com quem houver
+   e completa com bots. Ao terminar, XP, estatísticas e desafios já aparecem
+   na tela; o servidor da partida é encerrado e todos voltam à plataforma.
+5. **Sala privada**: **Criar sala** gera um código de 6 letras/números; os
+   amigos digitam o código e **Entrar**. É a mesma sala de espera da LAN (o
+   dono escolhe mapa, modo, equipes, bots e inicia), com partidas seguidas.
+6. **Perfil**: nível e XP, estatísticas (partidas, vitórias, top 10,
+   eliminações, dano, tempo, habilidade), visuais liberados por nível,
+   título, histórico de partidas e classificação geral.
+
+Opções: `npm run platform -- --help` (porta, arquivo do banco, segredo dos
+bilhetes, mapa, servidores simultâneos, tamanho do lobby, espera da fila,
+aquecimento, zona, dificuldade dos bots, `--trust-proxy`). Em produção,
+coloque-a atrás de um proxy com TLS (`wss://`) e defina `PLATFORM_SECRET`
+(segredo dos bilhetes). O banco fica em `data/plataforma.db`.
+
+### Servidor dedicado sem plataforma
+
+O servidor da LAN também roda sozinho numa máquina na nuvem, com entrada pelo
+endereço (sem contas): `npm run server -- --port 7350 --max-players 32`.
 
 Opções do servidor: `npm run server -- --help` (sala de espera, modo, bots e
 dificuldade, equipes e fogo amigo, aquecimento, velocidade da zona, reinício
@@ -188,9 +230,11 @@ volta às armas.
 
 | Comando | O que faz |
 | --- | --- |
-| `npm run dev` | cliente em modo desenvolvimento (Vite, :5173; repassa `/ws` ao servidor em :7350) |
+| `npm run dev` | cliente em modo desenvolvimento (Vite, :5173; repassa `/ws` ao servidor em :7350 e `/platform`/`/game` à plataforma em :7370) |
 | `npm run server` | servidor dedicado/LAN (serve `dist/client` se existir) |
-| `npm run host` | compila o cliente e sobe o servidor servindo o jogo |
+| `npm run host` | compila o cliente e sobe o servidor servindo o jogo (sala de espera de LAN) |
+| `npm run online` | compila o cliente e sobe a plataforma online (:7370) |
+| `npm run platform` | só a plataforma (usa o `dist/client` existente) |
 | `npm run build` | verificação de tipos + build do cliente em `dist/client` |
 | `npm test` | testes unitários e de integração (Vitest) |
 | `npm run test:e2e` | testes no navegador (Playwright) |
@@ -200,7 +244,18 @@ Para os testes de navegador em uma máquina nova: `npx playwright install chromi
 
 ## Testes
 
-- **Unitários e integração (140)**: equipes (montagem, fogo amigo, colocação e
+- **Unitários e integração (162)**: plataforma online (entrada pelo nome,
+  sessão, conta aberta em outro lugar, amizade, presença, grupo e permissões
+  do líder, fila de dupla → servidor alocado → bilhetes → partida até o fim →
+  XP, estatísticas, histórico e desafios; fila sozinho com bots; sala privada
+  pelo código; visuais e títulos bloqueados; mensagens inválidas e inundação;
+  WebSocket real até o servidor de jogo); bilhetes assinados (servidor errado,
+  vencido, adulterado); matchmaking (habilidade, espera, grupos, regiões);
+  banco (contas, sessões, amizades, resultado gravado uma vez, desafios);
+  progressão; servidor online (bilhete obrigatório, nome/visual/grupo do
+  bilhete, conta em dois lugares, aquecimento encurtado, colocação de cada
+  pessoa inclusive de quem desistiu); snapshots em delta e gerência de
+  interesse; equipes (montagem, fogo amigo, colocação e
   vitória por equipe, partida de esquadrões só de bots); sala de espera
   (prontos, permissões do anfitrião, início, volta à sala); reconexão ao mesmo
   personagem e expiração; descoberta UDP entre dois servidores; dirigível, queda livre e planador; zona
@@ -218,7 +273,11 @@ Para os testes de navegador em uma máquina nova: `npx playwright install chromi
   autoritativa, custo e intervalo, paredes bloqueando tiros, explosões,
   picareta, coleta, sincronização), predição sem correções com 100 ms de
   latência (inclusive construindo) e servidor WebSocket real.
-- **Navegador (11)**: sala de espera com dois navegadores (dupla na mesma
+- **Navegador (12)**: **plataforma online com dois navegadores** (nome curto
+  recusado, entrada pelo nome, amizade e presença, convite para o grupo, dupla
+  pelo matchmaking na mesma equipe, partida até o fim com XP e estatísticas,
+  sala privada pelo código, sair pela pausa de volta à plataforma, volta pela
+  sessão salva); sala de espera com dois navegadores (dupla na mesma
   equipe, início pelo anfitrião, queda da conexão e volta ao mesmo
   personagem); tela dividida com controle simulado; battle royale offline (aquecimento, dirigível, salto,
   planador, pouso, zona e bots) e uma partida até o fim num servidor dedicado
@@ -234,6 +293,7 @@ Para os testes de navegador em uma máquina nova: `npx playwright install chromi
 ```
 src/shared   simulação determinística compartilhada (movimento, combate, itens, mapas, protocolo)
 src/server   Simulation/GameHost (autoridade, loot, dano) e o servidor Node (HTTP + WebSocket)
+src/platform plataforma online: banco, contas, amigos, grupos, matchmaking, salas, servidores de jogo
 src/client   renderização (three.js), personagem, armas, efeitos, áudio, câmera, entrada, rede, HUD
 tests        unit (Vitest) e e2e (Playwright)
 docs         ARQUITETURA.md, ROADMAP.md, imagens/
@@ -247,16 +307,32 @@ Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 | --- | --- |
 | `three` | renderização 3D (WebGL 2) |
 | `ws` | WebSocket no servidor |
+| `node:sqlite` (embutido no Node 22) | banco da plataforma online — nenhuma instalação extra |
 | `tsx` | executa o servidor TypeScript |
 | `vite` (dev) | build do cliente |
 | `vitest`, `@playwright/test` (dev) | testes |
 | `typescript`, `@types/*` (dev) | tipos |
 
 Variáveis de ambiente do servidor: `PORT` e `HOST` (equivalem a `--port` e
-`--host`). Configurações do jogador ficam no navegador (`localStorage`),
+`--host`). Da plataforma: `PORT`, `HOST`, `PLATFORM_DB` (arquivo do banco) e
+`PLATFORM_SECRET` (segredo dos bilhetes de entrada). Configurações do jogador ficam no navegador (`localStorage`),
 inclusive o volume.
 
-## Limitações conhecidas (Fase 5)
+## Limitações conhecidas (Fase 6)
+
+- **Conta só pelo nome, sem senha** (decisão do projeto): quem souber o nome
+  de alguém entra na conta dessa pessoa. Para uso público, o próximo passo é
+  um código pessoal ou login por e-mail (a sessão já é um token separado do
+  nome).
+- A plataforma roda os servidores de jogo no mesmo processo (até
+  `--max-servers` partidas simultâneas). O bilhete assinado já permite
+  servidores em outras máquinas com o mesmo segredo; o registro automático de
+  nós e a imagem de container ficam para a Fase 8.
+- Regiões são rótulos da fila (separam quem joga junto); com um único
+  processo, todas as partidas rodam na mesma máquina.
+- O transporte é WebSocket (TCP). WebTransport/datagramas, detecção
+  estatística de mira automática e testes de carga com 100 clientes reais
+  ficam para as Fases 7–8.
 
 - Em equipes não há "derrubado e reanimar": quem perde a vida é eliminado e
   assiste os colegas.
@@ -264,7 +340,8 @@ inclusive o volume.
   vezes (precisa de uma placa de vídeo razoável no mapa principal).
 - Bots ficam no térreo dos prédios (não sobem escadas) e constroem só paredes
   defensivas; não usam granadas.
-- O histórico fica no navegador; contas, XP e estatísticas online são da Fase 6.
+- Offline e na LAN, o histórico fica no navegador (só as partidas online
+  contam XP e estatísticas da conta).
 - Ainda não há edição de peças (abrir portas e janelas em paredes).
 - A grade de construção é absoluta: em encostas, peças podem ficar
   parcialmente enterradas (como em outros jogos do gênero).
@@ -273,8 +350,10 @@ inclusive o volume.
   documentados na arquitetura.
 - O coice da arma é aplicado no cliente (como na maioria dos jogos); o servidor
   valida dispersão, cadência, munição e acertos.
-- Banda: com 100 jogadores atirando, eventos de tiro e snapshots completos somam
-  ~10 MB/s de saída; gerência de interesse e compressão entram na Fase 6.
+- Banda medida (60 bots + 8 clientes, mapa principal): ~4,7 KB/s por cliente
+  no dirigível e ~3,6 KB/s na partida (antes da Fase 6: 62 e 35 KB/s). Com 100
+  pessoas reais atirando perto umas das outras o número sobe; a taxa
+  adaptativa por cliente ainda não existe.
 - A descoberta de partidas na LAN funciona pela página servida por um host
   (o navegador não escuta UDP); quem abre o jogo de outro lugar entra pelo
   endereço exibido no terminal do host.

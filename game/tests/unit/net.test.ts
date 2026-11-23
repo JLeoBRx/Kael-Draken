@@ -16,7 +16,8 @@ import { GameMode, MatchPhase } from '../../src/shared/match/zone'
 import {
   KICK_NEW_MATCH,
   PROTOCOL_VERSION,
-  beginSnapshot,
+  SnapshotDecoder,
+  SnapshotEncoder,
   decodeClientMessage,
   decodeServerMessage,
   encodeHello,
@@ -26,8 +27,6 @@ import {
   encodeWelcome,
   quantizeCommand,
   sanitizeName,
-  writeEntity,
-  writeMates,
   type InputCommand,
   type ServerMessage,
 } from '../../src/shared/net/protocol'
@@ -37,9 +36,12 @@ const map = loadMap('campo-de-provas')
 class FakeConn implements HostConnection {
   inbox: ServerMessage[] = []
   closed: string | null = null
+  bytes = 0
+  readonly dec = new SnapshotDecoder()
   constructor(readonly id: number) {}
   send(data: Uint8Array) {
-    this.inbox.push(decodeServerMessage(data))
+    this.bytes += data.length
+    this.inbox.push(decodeServerMessage(data, this.dec))
   }
   close(reason: string) {
     this.closed = reason
@@ -93,10 +95,11 @@ describe('protocolo', () => {
     other.char.vz = -7.4
     other.slots[0] = { item: ITEM.Shotgun, rarity: 2, count: 1, ammo: 5 }
     other.selected = 0
-    const w = beginSnapshot(99, 42, 3, 12, 4, 3, 123456, self, 1)
-    writeEntity(w, 7, other)
-    writeMates(w, [{ id: 9, health: 73.2, shield: 50, alive: true }, { id: 11, health: 0, shield: 0, alive: false }])
-    const msg = decodeServerMessage(w.finish())
+    const enc = new SnapshotEncoder()
+    const dec = new SnapshotDecoder()
+    const data = enc.encode({ tick: 99, ackSeq: 42, queued: 3, alive: 12, kills: 4, phase: 3, phaseEnd: 123456 }, self, [{ id: 7, p: other }],
+      [{ id: 9, health: 73.2, shield: 50, alive: true }, { id: 11, health: 0, shield: 0, alive: false }])
+    const msg = decodeServerMessage(data, dec)
     expect(msg.type).toBe('snapshot')
     if (msg.type !== 'snapshot') return
     const s = msg.snapshot
@@ -112,8 +115,59 @@ describe('protocolo', () => {
     expect(s.entities[0].rarity).toBe(2)
     expect(s.entities[0].id).toBe(7)
     expect(s.entities[0].z).toBe(20)
-    expect(s.entities[0].vz).toBeCloseTo(-7.4, 2)
+    expect(s.entities[0].vz).toBeCloseTo(-7.4, 1)
     expect(s.mates).toEqual([{ id: 9, health: 74, shield: 50, alive: true }, { id: 11, health: 0, shield: 0, alive: false }])
+  })
+
+  it('snapshots em delta: só o que mudou, base por conexão, exato no estado próprio', () => {
+    const enc = new SnapshotEncoder()
+    const dec = new SnapshotDecoder()
+    const h = { tick: 1, ackSeq: 0, queued: 0, alive: 3, kills: 0, phase: 0, phaseEnd: 0 }
+    const self = createPlayerState(createCharacterState(100.123456789, 12.5, -300.987654321, 0.25))
+    const a = createPlayerState(createCharacterState(-512.3, 40, 700.01, 2))
+    const b = createPlayerState(createCharacterState(5, 6, 7, 0))
+    const ents = [{ id: 3, p: a }, { id: 4, p: b }]
+    const first = enc.encode(h, self, ents, [])
+    const m1 = decodeServerMessage(first, dec)
+    if (m1.type !== 'snapshot') throw new Error('tipo')
+    expect(m1.snapshot.self).toEqual(self)
+    expect(m1.snapshot.entities[0].x).toBeCloseTo(-512.3, 1)
+    expect(Math.abs(m1.snapshot.entities[0].z - 700.01)).toBeLessThanOrEqual(1 / 64)
+    // nada mudou: o segundo snapshot é bem menor e decodifica igual
+    const second = enc.encode({ ...h, tick: 2 }, self, ents, [])
+    expect(second.length).toBeLessThan(first.length / 4)
+    const m2 = decodeServerMessage(second, dec)
+    if (m2.type !== 'snapshot') throw new Error('tipo')
+    expect(m2.snapshot.self).toEqual(self)
+    expect(m2.snapshot.entities).toEqual(m1.snapshot.entities)
+    // passo pequeno, passo grande e troca de arma
+    a.char.x += 0.5
+    b.char.z -= 30
+    b.selected = 0
+    b.slots[0] = { item: ITEM.Rifle, rarity: 4, count: 1, ammo: 30 }
+    self.char.x += 1e-9
+    self.health = 42.25
+    const m3 = decodeServerMessage(enc.encode({ ...h, tick: 3 }, self, ents, []), dec)
+    if (m3.type !== 'snapshot') throw new Error('tipo')
+    expect(m3.snapshot.self).toEqual(self)
+    expect(m3.snapshot.entities[0].x).toBeCloseTo(-511.8, 1)
+    expect(m3.snapshot.entities[1].z).toBeCloseTo(-23, 1)
+    expect(m3.snapshot.entities[1]).toMatchObject({ weapon: ITEM.Rifle, rarity: 4 })
+    // entidade fora deste snapshot continua na base dos dois lados
+    a.char.y += 2
+    const m4 = decodeServerMessage(enc.encode({ ...h, tick: 4 }, self, [{ id: 3, p: a }], []), dec)
+    if (m4.type !== 'snapshot') throw new Error('tipo')
+    expect(m4.snapshot.entities).toHaveLength(1)
+    expect(m4.snapshot.entities[0].y).toBeCloseTo(42, 1)
+    // quem saiu é esquecido; um Welcome zera a base
+    enc.forget(4)
+    dec.forget(4)
+    expect(enc.knows(4)).toBe(false)
+    const m5 = decodeServerMessage(enc.encode({ ...h, tick: 5 }, self, ents, []), dec)
+    if (m5.type !== 'snapshot') throw new Error('tipo')
+    expect(m5.snapshot.entities[1].z).toBeCloseTo(-23, 1)
+    // um decodificador sem base recusa deltas (não inventa estado)
+    expect(() => decodeServerMessage(enc.encode({ ...h, tick: 6 }, self, ents, []), new SnapshotDecoder())).toThrow()
   })
 
   it('rejeita mensagens truncadas, com lixo no fim ou de tipo desconhecido', () => {
@@ -385,7 +439,8 @@ describe('servidor WebSocket (Node)', () => {
     const ws = new WebSocket(`ws://127.0.0.1:${server.port}/ws`)
     ws.binaryType = 'arraybuffer'
     const inbox: ServerMessage[] = []
-    ws.on('message', (d) => inbox.push(decodeServerMessage(new Uint8Array(d as ArrayBuffer))))
+    const dec = new SnapshotDecoder()
+    ws.on('message', (d) => inbox.push(decodeServerMessage(new Uint8Array(d as ArrayBuffer), dec)))
     const ready = new Promise<void>((ok) => ws.once('open', () => { ws.send(encodeHello(name)); ok() }))
     return { ws, inbox, ready }
   }

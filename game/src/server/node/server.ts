@@ -70,7 +70,7 @@ export function lanAddresses(): string[] {
   return out
 }
 
-function serveStatic(root: string, req: IncomingMessage, res: ServerResponse): void {
+export function serveStatic(root: string, req: IncomingMessage, res: ServerResponse): void {
   const url = new URL(req.url ?? '/', 'http://localhost')
   let rel = decodeURIComponent(url.pathname)
   if (rel.endsWith('/')) rel += 'index.html'
@@ -94,6 +94,41 @@ function toBytes(data: RawData): Uint8Array {
   if (data instanceof ArrayBuffer) return new Uint8Array(data)
   if (Array.isArray(data)) return new Uint8Array(Buffer.concat(data))
   return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+}
+
+/** Opções do WebSocket dos servidores de jogo (mensagens pequenas, sem compressão por mensagem). */
+export const GAME_SOCKET_OPTIONS = { noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false } as const
+
+/**
+ * Liga um WebSocket já aceito a um GameHost: mensagens binárias entram na
+ * simulação; o fechamento com código 1000 (saída pelo menu) tira o jogador
+ * na hora, outros códigos (queda, aba fechada) deixam o personagem esperando.
+ */
+export function bindGameSocket(ws: WebSocket, host: GameHost, connId: number, log: HostLogger, onClose?: () => void): HostConnection {
+  const conn: HostConnection = {
+    id: connId,
+    send: (data) => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(data)
+    },
+    close: (reason) => {
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close(1000, reason.slice(0, 120))
+    },
+  }
+  ws.binaryType = 'arraybuffer'
+  host.connect(conn)
+  ws.on('message', (data, isBinary) => {
+    if (!isBinary) {
+      conn.close('Somente mensagens binárias')
+      return
+    }
+    host.receive(conn.id, toBytes(data))
+  })
+  ws.on('close', (code) => {
+    host.disconnect(conn.id, code === 1000)
+    onClose?.()
+  })
+  ws.on('error', (err) => log.warn(`conexão ${conn.id}: ${err.message}`))
+  return conn
 }
 
 export async function startServer(opts: ServerOptions): Promise<RunningServer> {
@@ -131,7 +166,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }).end('Servidor de jogo ativo. Cliente não compilado (npm run build).')
   })
 
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false })
+  const wss = new WebSocketServer(GAME_SOCKET_OPTIONS)
   let nextConnId = 1
   http.on('upgrade', (req, socket, head) => {
     const path = (req.url ?? '').split('?')[0]
@@ -140,27 +175,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       return
     }
     wss.handleUpgrade(req, socket, head, (ws) => {
-      const conn: HostConnection = {
-        id: nextConnId++,
-        send: (data) => {
-          if (ws.readyState === WebSocket.OPEN) ws.send(data)
-        },
-        close: (reason) => {
-          if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close(1000, reason.slice(0, 120))
-        },
-      }
-      ws.binaryType = 'arraybuffer'
-      host.connect(conn)
-      ws.on('message', (data, isBinary) => {
-        if (!isBinary) {
-          conn.close('Somente mensagens binárias')
-          return
-        }
-        host.receive(conn.id, toBytes(data))
-      })
-      // 1000 = o cliente saiu pelo menu; outros códigos (queda, aba fechada) esperam a reconexão
-      ws.on('close', (code) => host.disconnect(conn.id, code === 1000))
-      ws.on('error', (err) => log.warn(`conexão ${conn.id}: ${err.message}`))
+      bindGameSocket(ws, host, nextConnId++, log)
     })
   })
 

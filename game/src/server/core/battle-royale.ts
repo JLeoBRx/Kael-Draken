@@ -96,7 +96,7 @@ export class BattleRoyale {
     switch (this.phase) {
       case MatchPhase.Warmup:
         // sem ninguém (só bots), a contagem não anda
-        if (this.humans === 0) this.phaseEnd = tick + this.ticks(this.opts.warmup)
+        if (this.humans === 0) this.phaseEnd = tick + this.ticks(Math.min(this.opts.warmup, this.warmupCap))
         else if (tick >= this.phaseEnd) this.startAirship()
         break
       case MatchPhase.Airship:
@@ -124,6 +124,16 @@ export class BattleRoyale {
         break
     }
   }
+
+  /** Encurta o aquecimento para no máximo `seconds` (todos os esperados chegaram). */
+  shortenWarmup(seconds: number): void {
+    if (this.phase !== MatchPhase.Warmup) return
+    this.phaseEnd = Math.min(this.phaseEnd, this.sim.tick + this.ticks(seconds))
+    this.warmupCap = seconds
+  }
+
+  /** Teto do aquecimento depois de encurtado (s). */
+  private warmupCap = Infinity
 
   /** Começa já (sem esperar o aquecimento). */
   startNow(): void {

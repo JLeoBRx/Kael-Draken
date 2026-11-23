@@ -29,6 +29,7 @@ export interface LobbyActions {
 
 export interface MainMenuActions {
   playOffline(): void
+  online(): void
   join(): void
   settings(): void
   controls(): void
@@ -72,6 +73,15 @@ export class Screens {
     this.layer.append(el)
   }
 
+  /** Mostra uma tela montada fora daqui (telas online). */
+  present(el: HTMLElement): void {
+    this.show(el)
+  }
+
+  presentModal(el: HTMLElement): void {
+    this.showModal(el)
+  }
+
   toast(message: string, kind: 'info' | 'error' = 'info', ms = 4500): void {
     this.toastEl?.remove()
     if (this.toastTimer) clearTimeout(this.toastTimer)
@@ -86,11 +96,15 @@ export class Screens {
     const playBtn = h('button', { class: 'btn primary', 'data-action': 'offline', onclick: () => a.playOffline() },
       h('span', { class: 'label' }, 'Jogar offline'),
       h('span', { class: 'sub' }, 'Battle royale contra bots ou treino livre · servidor local no navegador, sem internet'))
+    const onlineBtn = h('button', { class: 'btn', 'data-action': 'online', onclick: () => a.online() },
+      h('span', { class: 'label' }, 'Jogar online'),
+      h('span', { class: 'sub' }, 'Entre só com o seu nome: partidas públicas, salas com código, amigos e grupo'))
     const joinBtn = h('button', { class: 'btn', 'data-action': 'join', onclick: () => a.join() },
-      h('span', { class: 'label' }, 'Entrar em servidor'),
-      h('span', { class: 'sub' }, 'Rede local (LAN) ou servidor dedicado online'))
+      h('span', { class: 'label' }, 'Rede local'),
+      h('span', { class: 'sub' }, 'Sala de espera na LAN ou servidor dedicado pelo endereço'))
     if (webglError) {
       playBtn.disabled = true
+      onlineBtn.disabled = true
       joinBtn.disabled = true
     }
     this.show(h('div', { class: 'screen', 'data-screen': 'menu' },
@@ -99,10 +113,11 @@ export class Screens {
           emblem,
           h('h1', { class: 'title' }, GAME.title),
           h('p', { class: 'tagline' }, GAME.tagline),
-          h('span', { class: 'badge' }, h('span', { class: 'dot' }), `${GAME.phase} · sala de espera, equipes e tela dividida`),
+          h('span', { class: 'badge' }, h('span', { class: 'dot' }), `${GAME.phase} · contas, amigos, grupos e matchmaking`),
           webglError ? h('p', { class: 'status error' }, webglError) : null),
         h('div', { class: 'actions' },
           playBtn,
+          onlineBtn,
           joinBtn,
           h('div', { class: 'row' },
             h('button', { class: 'btn small', 'data-action': 'settings', onclick: () => a.settings() }, h('span', { class: 'label' }, 'Configurações')),
@@ -110,7 +125,7 @@ export class Screens {
             h('button', { class: 'btn small', 'data-action': 'history', onclick: () => a.history() }, h('span', { class: 'label' }, 'Histórico'))))),
       h('div', { class: 'footer' },
         h('span', {}, `v${GAME.version} · protocolo ${PROTOCOL_VERSION}`),
-        h('span', {}, 'Próximas fases: contas, amigos e matchmaking online'))))
+        h('span', {}, 'Próxima fase: polimento (arte, som e efeitos finais)'))))
     playBtn.focus()
   }
 
@@ -130,7 +145,7 @@ export class Screens {
         connect))
     this.show(h('div', { class: 'screen', 'data-screen': 'join' },
       h('div', { class: 'panel' },
-        h('h2', {}, 'Entrar em servidor'),
+        h('h2', {}, 'Rede local'),
         h('p', { class: 'hint' }, `Na rede local, o anfitrião roda "npm run host" e informa o endereço exibido no terminal (porta ${GAME.defaultPort}). Para servidores online, use o endereço wss:// do servidor dedicado.`),
         lan,
         form)))
@@ -158,7 +173,8 @@ export class Screens {
   }
 
   /** Sala de espera: membros, prontos, equipe e configuração (o dono edita e inicia). */
-  lobby(st: LobbyState, maps: { id: string; name: string }[], a: LobbyActions): void {
+  /** `code`: sala privada online (mostra o código para passar aos amigos). */
+  lobby(st: LobbyState, maps: { id: string; name: string }[], a: LobbyActions, code?: string): void {
     const me = st.members.find((m) => m.id === st.you)
     const owner = st.you === st.owner
     const c = st.config
@@ -200,7 +216,8 @@ export class Screens {
         : `Esperando o anfitrião iniciar. ${st.members.filter((m) => m.ready).length}/${st.members.length} prontos.`
     this.show(h('div', { class: 'screen', 'data-screen': 'lobby' },
       h('div', { class: 'panel', style: 'width:min(860px,100%)' },
-        h('h2', {}, 'Sala de espera'),
+        h('h2', {}, code ? 'Sala privada' : 'Sala de espera'),
+        code ? h('p', { class: 'room-code' }, 'Código da sala: ', h('b', { 'data-hud': 'room-code' }, code), h('span', { class: 'muted small' }, ' — passe para os amigos entrarem em "Jogar online"')) : null,
         h('div', { class: 'lobby-grid' },
           h('div', {},
             h('h3', { style: 'margin:0 0 8px;font-size:15px' }, `Jogadores (${st.members.length})`),

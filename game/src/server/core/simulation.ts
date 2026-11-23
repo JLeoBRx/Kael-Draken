@@ -135,11 +135,29 @@ export interface SimPlayer {
   tokens: number
   droppedCommands: number
   kills: number
+  /** Estatísticas da partida (para resultados, XP e desafios). */
+  stats: MatchStats
   lastAttacker: number
   lastAttackTick: number
   /** Tick de renascimento (-1 = não renasce). */
   respawnTick: number
   history: PoseHistory
+}
+
+export interface MatchStats {
+  /** Dano causado em outros jogadores. */
+  damage: number
+  chests: number
+  /** Peças construídas. */
+  built: number
+  /** Materiais coletados com a picareta. */
+  harvested: number
+  /** Tick da eliminação (-1 = ainda na disputa). */
+  outTick: number
+}
+
+function emptyStats(): MatchStats {
+  return { damage: 0, chests: 0, built: 0, harvested: 0, outTick: -1 }
 }
 
 export interface Dummy {
@@ -259,6 +277,7 @@ export class Simulation {
       tokens: MAX_TOKENS,
       droppedCommands: 0,
       kills: 0,
+      stats: emptyStats(),
       lastAttacker: 0,
       lastAttackTick: -1000,
       respawnTick: -1,
@@ -277,6 +296,7 @@ export class Simulation {
     sp.p = createPlayerState(createCharacterState(sp.p.char.x, sp.p.char.y, sp.p.char.z, sp.p.char.yaw))
     sp.spectator = false
     sp.kills = 0
+    sp.stats = emptyStats()
     sp.lastAttacker = 0
     sp.lastAttackTick = -1000
     sp.respawnTick = -1
@@ -293,6 +313,9 @@ export class Simulation {
   }
 
   removePlayer(id: number): void {
+    const sp = this.players.get(id)
+    // sem renascimento, quem sai no meio da disputa conta como eliminado (solta o que carregava)
+    if (sp && sp.p.alive && !sp.spectator && !this.rules.respawn && this.rules.damage) this.eliminate(sp, this.recentAttacker(sp), Cause.Quit)
     this.players.delete(id)
   }
 
@@ -572,6 +595,7 @@ export class Simulation {
     while (this.buildings.byId.has(id)) id = id >= 0xfffe ? 1 : id + 1
     this.nextPieceId = id >= 0xfffe ? 1 : id + 1
     this.buildings.add(spec, id, material, { builtAt: this.tick, builder: sp.id, seq })
+    sp.stats.built++
     this.emit({ type: 'piecePlaced', id, ...spec, material, builder: sp.id, seq, age: 0, damage: 0 })
     return true
   }
@@ -624,6 +648,7 @@ export class Simulation {
     const got = Math.min(amount, MATERIAL_MAX - sp.p.materials[material])
     if (got <= 0) return
     sp.p.materials[material] += got
+    sp.stats.harvested += got
     this.emit({ type: 'harvest', material, amount: got, x, y, z }, { to: sp.id })
   }
 
@@ -643,10 +668,12 @@ export class Simulation {
     // colegas de equipe só se ferem com fogo amigo ligado
     if (attacker && attacker !== victim && attacker.team === victim.team && !this.rules.friendlyFire) return null
     const shieldBefore = p.shield
+    const healthBefore = p.health
     const toShield = ignoreShield ? 0 : Math.min(p.shield, amount)
     p.shield -= toShield
     p.health = Math.max(0, p.health - (amount - toShield))
     if (attacker && attacker !== victim) {
+      attacker.stats.damage += toShield + (Math.min(amount - toShield, healthBefore))
       victim.lastAttacker = attacker.id
       victim.lastAttackTick = this.tick
     }
@@ -685,6 +712,7 @@ export class Simulation {
     })
     const killer = this.players.get(killerId)
     if (killer && killer !== victim) killer.kills++
+    victim.stats.outTick = this.tick
     victim.respawnTick = this.rules.respawn ? this.tick + Math.round(this.rules.respawnDelay * this.tickRate) : -1
     victim.history.clear()
     // Colocação (battle royale): a equipe sai quando o último dela cai;
@@ -702,6 +730,7 @@ export class Simulation {
 
   private respawn(sp: SimPlayer): void {
     sp.p = this.spawnState()
+    sp.stats.outTick = -1
     sp.respawnTick = -1
     sp.lastAttacker = 0
     sp.history.clear()
@@ -818,6 +847,7 @@ export class Simulation {
   private openChest(sp: SimPlayer, index: number): void {
     if (this.chestOpened[index]) return
     this.chestOpened[index] = true
+    sp.stats.chests++
     const ch = this.map.chests[index]
     this.emit({ type: 'chestOpen', chest: index, by: sp.id })
     const drops = rollChest(this.rng, ch.tier)

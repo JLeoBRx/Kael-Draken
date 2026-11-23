@@ -20,6 +20,15 @@ export interface OfflinePrefs {
   localPlayers: 1 | 2
 }
 
+/** Última escolha na tela online. */
+export interface OnlinePrefs {
+  /** Endereço da plataforma (vazio = o mesmo que serviu a página). */
+  address: string
+  teamSize: number
+  region: string
+  fill: boolean
+}
+
 export interface Settings {
   playerName: string
   /** Multiplicador da sensibilidade do mouse/controle. */
@@ -33,6 +42,7 @@ export interface Settings {
   showFps: boolean
   serverAddress: string
   offline: OfflinePrefs
+  online: OnlinePrefs
   /** Volume geral (0–1). */
   volume: number
 }
@@ -66,6 +76,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showFps: false,
   serverAddress: '',
   offline: { mode: 'br', bots: 23, difficulty: 'normal', zone: 'normal', teamSize: 1, localPlayers: 1 },
+  online: { address: '', teamSize: 1, region: 'sa', fill: true },
   volume: 0.7,
 }
 
@@ -96,6 +107,17 @@ export function loadSettings(): Settings {
     serverAddress: typeof raw.serverAddress === 'string' ? raw.serverAddress.slice(0, 200) : d.serverAddress,
     volume: num(raw.volume, 0, 1, d.volume),
     offline: loadOffline(raw.offline, d.offline),
+    online: loadOnline(raw.online, d.online),
+  }
+}
+
+function loadOnline(v: unknown, d: OnlinePrefs): OnlinePrefs {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
+  return {
+    address: typeof o.address === 'string' ? o.address.slice(0, 200) : d.address,
+    teamSize: Math.round(num(o.teamSize, 1, 4, d.teamSize)),
+    region: typeof o.region === 'string' && /^[a-z]{2,8}$/.test(o.region) ? o.region : d.region,
+    fill: typeof o.fill === 'boolean' ? o.fill : d.fill,
   }
 }
 
