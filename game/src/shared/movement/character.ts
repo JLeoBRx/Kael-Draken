@@ -1,6 +1,6 @@
 import { MOVE } from '../config/movement'
 import { approach, clamp, damp } from '../math/scalar'
-import type { Collider, CollisionWorld } from '../world/collision-world'
+import { createWorldHit, type Collider, type CollisionWorld } from '../world/collision-world'
 import { capsuleVsObb, type Contact } from '../world/obb'
 
 /**
@@ -39,7 +39,16 @@ export const CharFlag = {
   Aiming: 16,
   Swimming: 32,
   Walking: 64,
+  /** A bordo do dirigível (battle royale): segue a rota, sem colisão. */
+  Riding: 128,
+  /** Queda livre depois de saltar. */
+  Skydiving: 256,
+  /** Planador aberto. */
+  Gliding: 512,
 } as const
+
+/** Estados aéreos do início da partida (armas e construção ficam guardadas). */
+export const AIRBORNE_FLAGS = CharFlag.Riding | CharFlag.Skydiving | CharFlag.Gliding
 
 export interface MoveCommand {
   /** -1 (trás) a 1 (frente). */
@@ -74,12 +83,18 @@ export interface CharacterState {
   groundNz: number
   /** Velocidade de queda no tick em que aterrissou (0 nos demais). */
   landImpact: number
+  /** Velocidade do dirigível (enquanto a bordo). */
+  rideVx: number
+  rideVz: number
+  /** Segundos até o salto automático no fim da rota. */
+  rideTime: number
 }
 
 /** Campos numéricos do estado, na ordem usada pela serialização. */
 export const CHARACTER_STATE_FIELDS = [
   'x', 'y', 'z', 'vx', 'vy', 'vz', 'yaw', 'pitch', 'flags', 'slideTime', 'slideCooldown',
   'airTime', 'jumpBuffer', 'airSpeedCap', 'prevButtons', 'groundNx', 'groundNy', 'groundNz', 'landImpact',
+  'rideVx', 'rideVz', 'rideTime',
 ] as const satisfies readonly (keyof CharacterState)[]
 
 export function createCharacterState(x: number, y: number, z: number, yaw = 0): CharacterState {
@@ -88,7 +103,25 @@ export function createCharacterState(x: number, y: number, z: number, yaw = 0): 
     flags: 0, slideTime: 0, slideCooldown: 0, airTime: 1, jumpBuffer: 0,
     airSpeedCap: MOVE.runSpeed, prevButtons: 0,
     groundNx: 0, groundNy: 1, groundNz: 0, landImpact: 0,
+    rideVx: 0, rideVz: 0, rideTime: 0,
   }
+}
+
+/** Embarca no dirigível: segue (vx, vz) por `duration` segundos na altura `y`. */
+export function boardAirship(s: CharacterState, x: number, y: number, z: number, vx: number, vz: number, duration: number): void {
+  s.x = x
+  s.y = y
+  s.z = z
+  s.vx = vx
+  s.vy = 0
+  s.vz = vz
+  s.rideVx = vx
+  s.rideVz = vz
+  s.rideTime = duration
+  s.flags = CharFlag.Riding
+  s.slideTime = 0
+  s.airTime = 1
+  s.jumpBuffer = 0
 }
 
 export function copyCharacterState(src: CharacterState, dst: CharacterState): CharacterState {
@@ -298,6 +331,115 @@ function groundMove(s: CharacterState, dx: number, dy: number, dz: number, heigh
 }
 
 // ---------------------------------------------------------------------------
+// Dirigível, queda livre e planador
+
+const airHit = createWorldHit()
+const repAir = newReport()
+
+/** Altura sobre o chão, construções ou a água logo abaixo (até `max`). */
+function heightAboveSurface(s: CharacterState, world: CollisionWorld, max: number): number {
+  const ground = world.raycast(s.x, s.y + 0.05, s.z, 0, -1, 0, max + 0.05, airHit) ? airHit.y : -Infinity
+  return s.y - Math.max(ground, world.waterLevel)
+}
+
+function clampToBounds(s: CharacterState, world: CollisionWorld): void {
+  const b = world.bound
+  if (s.x < -b) { s.x = -b; if (s.vx < 0) s.vx = 0 }
+  else if (s.x > b) { s.x = b; if (s.vx > 0) s.vx = 0 }
+  if (s.z < -b) { s.z = -b; if (s.vz < 0) s.vz = 0 }
+  else if (s.z > b) { s.z = b; if (s.vz > 0) s.vz = 0 }
+}
+
+/** Retorna true se o passo foi tratado aqui (a bordo, em queda livre ou planando). */
+function stepAirborne(s: CharacterState, cmd: MoveCommand, buttons: number, pressed: number, world: CollisionWorld, dt: number): boolean {
+  if (s.flags & CharFlag.Riding) {
+    s.rideTime -= dt
+    s.x += s.rideVx * dt
+    s.z += s.rideVz * dt
+    clampToBounds(s, world)
+    if (pressed & Buttons.Jump || s.rideTime <= 0) {
+      // Salta: herda parte da velocidade do dirigível
+      s.flags = CharFlag.Skydiving
+      s.vx = s.rideVx * MOVE.exitSpeedFactor
+      s.vz = s.rideVz * MOVE.exitSpeedFactor
+      s.vy = 0
+      s.rideTime = 0
+    } else {
+      s.vx = s.rideVx
+      s.vz = s.rideVz
+      s.vy = 0
+    }
+    s.prevButtons = buttons
+    return true
+  }
+  if (!(s.flags & (CharFlag.Skydiving | CharFlag.Gliding))) return false
+
+  let gliding = (s.flags & CharFlag.Gliding) !== 0
+  if (!gliding) {
+    const h = heightAboveSurface(s, world, MOVE.glideDeployHeight + 2)
+    if (h < MOVE.glideDeployHeight) gliding = true
+    else if (pressed & Buttons.Jump && h > MOVE.glideManualMinHeight) gliding = true
+  }
+
+  // Direção desejada (igual ao chão)
+  let f = clamp(cmd.forward, -1, 1)
+  let r = clamp(cmd.right, -1, 1)
+  const len = Math.sqrt(f * f + r * r)
+  if (len > 1) {
+    f /= len
+    r /= len
+  }
+  const sinY = Math.sin(s.yaw)
+  const cosY = Math.cos(s.yaw)
+  const wx = -sinY * f + cosY * r
+  const wz = -cosY * f - sinY * r
+  const hTarget = gliding ? MOVE.glideHSpeed : MOVE.freefallHSpeed
+  const accel = (gliding ? MOVE.glideAccel : MOVE.freefallAccel) * dt
+  const dvx = wx * hTarget - s.vx
+  const dvz = wz * hTarget - s.vz
+  const dvl = Math.sqrt(dvx * dvx + dvz * dvz)
+  if (dvl <= accel) {
+    s.vx += dvx
+    s.vz += dvz
+  } else {
+    s.vx += (dvx / dvl) * accel
+    s.vz += (dvz / dvl) * accel
+  }
+  // Mergulho: olhar para baixo e ir para a frente acelera a queda
+  const dive = gliding ? 0 : clamp(-s.pitch / 1.2, 0, 1) * Math.max(0, f)
+  const vyTarget = gliding ? -MOVE.glideFallSpeed : -(MOVE.freefallSpeed + (MOVE.diveSpeed - MOVE.freefallSpeed) * dive)
+  s.vy = approach(s.vy, vyTarget, (gliding ? 30 : 14) * dt)
+
+  const rep = resetReport(repAir)
+  moveBy(s, s.vx * dt, s.vy * dt, s.vz * dt, MOVE.standHeight, world, rep)
+  clampToBounds(s, world)
+  let flags: number = gliding ? CharFlag.Gliding : CharFlag.Skydiving
+  if (rep.ground && s.vy <= 0) {
+    // Pousou
+    s.landImpact = -s.vy
+    s.vy = 0
+    s.groundNx = rep.gnx
+    s.groundNy = rep.gny
+    s.groundNz = rep.gnz
+    s.airTime = 0
+    flags = CharFlag.Grounded
+  } else if (world.waterLevel - s.y > MOVE.swimEnterDepth) {
+    // Caiu na água: passa a nadar
+    s.vy = Math.max(s.vy, -2)
+    flags = CharFlag.Swimming
+  }
+  const ground = world.terrain.heightAt(s.x, s.z)
+  if (s.y < ground - 0.5) {
+    s.y = ground
+    if (s.vy < 0) s.vy = 0
+  }
+  s.flags = flags
+  s.airSpeedCap = MOVE.runSpeed
+  s.prevButtons = buttons
+  return true
+}
+
+// ---------------------------------------------------------------------------
 // Passo principal
 
 /** Avança o personagem por `dt` segundos. Modifica `s` no lugar. */
@@ -307,6 +449,7 @@ export function stepCharacter(s: CharacterState, cmd: MoveCommand, world: Collis
   s.yaw = cmd.yaw
   s.pitch = clamp(cmd.pitch, -MOVE.maxPitch, MOVE.maxPitch)
   s.landImpact = 0
+  if (stepAirborne(s, cmd, buttons, pressed, world, dt)) return
 
   let flags = s.flags
   let grounded = (flags & CharFlag.Grounded) !== 0
@@ -506,11 +649,7 @@ export function stepCharacter(s: CharacterState, cmd: MoveCommand, world: Collis
   }
 
   // Limites do mapa e segurança contra atravessar o relevo
-  const b = world.bound
-  if (s.x < -b) { s.x = -b; if (s.vx < 0) s.vx = 0 }
-  else if (s.x > b) { s.x = b; if (s.vx > 0) s.vx = 0 }
-  if (s.z < -b) { s.z = -b; if (s.vz < 0) s.vz = 0 }
-  else if (s.z > b) { s.z = b; if (s.vz > 0) s.vz = 0 }
+  clampToBounds(s, world)
   const ground = world.terrain.heightAt(s.x, s.z)
   if (s.y < ground - 0.5) {
     s.y = ground

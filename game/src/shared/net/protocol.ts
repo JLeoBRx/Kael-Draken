@@ -4,6 +4,7 @@ import { MOVE } from '../config/movement'
 import { TAU, clamp } from '../math/scalar'
 import { BUTTONS_MASK, CHARACTER_STATE_FIELDS, type CharacterState } from '../movement/character'
 import { PICKAXE_SLOT, SELECT_COUNT, createPlayerState, type PlayerCommand, type PlayerState } from '../player/player'
+import type { AirshipRoute, ZoneStage } from '../match/zone'
 import { BinaryReader, BinaryWriter, ProtocolError } from './binary'
 
 /**
@@ -14,7 +15,7 @@ import { BinaryReader, BinaryWriter, ProtocolError } from './binary'
  * inventário). O servidor executa a simulação e devolve o estado oficial.
  */
 
-export const PROTOCOL_VERSION = 3
+export const PROTOCOL_VERSION = 4
 
 export const C2S = { Hello: 1, Input: 2, Ping: 3, Inventory: 4 } as const
 export const S2C = { Welcome: 10, Snapshot: 11, Pong: 12, PlayerInfo: 13, PlayerLeft: 14, Kick: 15, Events: 16 } as const
@@ -24,6 +25,9 @@ export const MAX_COMMANDS_PER_MESSAGE = 16
 
 /** Causas de dano/eliminação além dos ids de armas. */
 export const Cause = { Fall: 250, Void: 251, Zone: 252 } as const
+
+/** Motivo de desconexão quando o servidor recomeça a partida: o cliente reconecta sozinho. */
+export const KICK_NEW_MATCH = 'Nova partida'
 
 export interface InputCommand extends PlayerCommand {
   /**
@@ -57,6 +61,9 @@ export interface Snapshot {
   alive: number
   /** Eliminações do destinatário. */
   kills: number
+  /** Fase da partida (MatchPhase) e tick em que ela muda (0 = sem prazo). */
+  phase: number
+  phaseEnd: number
   self: PlayerState | null
   entities: EntityState[]
 }
@@ -73,7 +80,7 @@ export type GameEvent =
   | { type: 'shot'; shooter: number; item: number; ox: number; oy: number; oz: number; ends: ShotEnd[] }
   | { type: 'hit'; targetKind: number; target: number; damage: number; head: boolean; shield: boolean; broke: boolean; eliminated: boolean; x: number; y: number; z: number }
   | { type: 'damaged'; amount: number; fromX: number; fromZ: number; cause: number }
-  | { type: 'eliminated'; victim: number; killer: number; cause: number; respawnIn: number }
+  | { type: 'eliminated'; victim: number; killer: number; cause: number; respawnIn: number; place: number }
   | { type: 'itemSpawn'; id: number; item: number; rarity: number; count: number; ammo: number; x: number; y: number; z: number }
   | { type: 'itemRemove'; id: number; by: number }
   | { type: 'chestOpen'; chest: number; by: number }
@@ -86,6 +93,9 @@ export type GameEvent =
   | { type: 'pieceRemoved'; id: number; collapse: boolean }
   | { type: 'propDestroyed'; prop: number }
   | { type: 'harvest'; material: number; amount: number; x: number; y: number; z: number }
+  | ({ type: 'zone' } & ZoneStage)
+  | ({ type: 'airship' } & AirshipRoute)
+  | { type: 'matchEnd'; winner: number }
 
 export const TargetKind = { Player: 0, Dummy: 1, Structure: 2 } as const
 
@@ -103,6 +113,8 @@ export interface WelcomeMessage {
   tickRate: number
   tick: number
   serverName: string
+  /** GameMode */
+  mode: number
 }
 
 export type InventoryAction = { action: 'drop'; slot: number } | { action: 'swap'; a: number; b: number }
@@ -309,7 +321,7 @@ export function readPlayerState(r: BinaryReader): PlayerState {
 // Servidor → cliente
 
 export function encodeWelcome(m: Omit<WelcomeMessage, 'type'>): Uint8Array {
-  return new BinaryWriter(64).u8(S2C.Welcome).u16(m.version).u16(m.playerId).string(m.mapId).u16(m.tickRate).u32(m.tick).string(m.serverName).finish()
+  return new BinaryWriter(64).u8(S2C.Welcome).u16(m.version).u16(m.playerId).string(m.mapId).u16(m.tickRate).u32(m.tick).string(m.serverName).u8(m.mode).finish()
 }
 
 /** Escreve o estado público de um jogador como entidade de snapshot. */
@@ -323,9 +335,9 @@ export function writeEntity(w: BinaryWriter, id: number, p: PlayerState): void {
 /** Bytes por entidade em um snapshot (para estimativas de banda). */
 export const ENTITY_BYTES = 28
 
-export function beginSnapshot(tick: number, ackSeq: number, queued: number, alive: number, kills: number, self: PlayerState | null, entityCount: number): BinaryWriter {
-  const w = new BinaryWriter(32 + (self ? 300 : 0) + entityCount * ENTITY_BYTES)
-  w.u8(S2C.Snapshot).u32(tick).u32(ackSeq >>> 0).u8(Math.min(255, queued)).u16(alive).u16(kills).u8(self ? 1 : 0)
+export function beginSnapshot(tick: number, ackSeq: number, queued: number, alive: number, kills: number, phase: number, phaseEnd: number, self: PlayerState | null, entityCount: number): BinaryWriter {
+  const w = new BinaryWriter(40 + (self ? 330 : 0) + entityCount * ENTITY_BYTES)
+  w.u8(S2C.Snapshot).u32(tick).u32(ackSeq >>> 0).u8(Math.min(255, queued)).u16(alive).u16(kills).u8(phase).u32(phaseEnd >>> 0).u8(self ? 1 : 0)
   if (self) writePlayerState(w, self)
   w.u16(entityCount)
   return w
@@ -350,6 +362,7 @@ export function encodeKick(reason: string): Uint8Array {
 const EV = {
   shot: 1, hit: 2, damaged: 3, eliminated: 4, itemSpawn: 5, itemRemove: 6, chestOpen: 7, projSpawn: 8, explosion: 9, target: 10, respawn: 11,
   piecePlaced: 12, pieceDamaged: 13, pieceRemoved: 14, propDestroyed: 15, harvest: 16,
+  zone: 17, airship: 18, matchEnd: 19,
 } as const
 
 function writeEvent(w: BinaryWriter, e: GameEvent): void {
@@ -367,7 +380,7 @@ function writeEvent(w: BinaryWriter, e: GameEvent): void {
       w.u16(Math.min(65535, Math.round(e.amount))).f32(e.fromX).f32(e.fromZ).u8(e.cause)
       break
     case 'eliminated':
-      w.u16(e.victim).u16(e.killer).u8(e.cause).u8(Math.min(255, Math.round(e.respawnIn)))
+      w.u16(e.victim).u16(e.killer).u8(e.cause).u8(Math.min(255, Math.round(e.respawnIn))).u8(Math.min(255, e.place))
       break
     case 'itemSpawn':
       w.u16(e.id).u8(e.item).u8(e.rarity).u16(e.count).u16(e.ammo).f32(e.x).f32(e.y).f32(e.z)
@@ -405,6 +418,15 @@ function writeEvent(w: BinaryWriter, e: GameEvent): void {
     case 'harvest':
       w.u8(e.material).u8(e.amount).f32(e.x).f32(e.y).f32(e.z)
       break
+    case 'zone':
+      w.u8(e.index).f32(e.fromX).f32(e.fromZ).f32(e.fromR).f32(e.toX).f32(e.toZ).f32(e.toR).u32(e.shrinkStart).u32(e.shrinkEnd).u8(e.dps)
+      break
+    case 'airship':
+      w.f32(e.x0).f32(e.z0).f32(e.x1).f32(e.z1).f32(e.y).u32(e.startTick).u32(e.endTick)
+      break
+    case 'matchEnd':
+      w.u16(e.winner)
+      break
   }
 }
 
@@ -432,7 +454,7 @@ function readEvent(r: BinaryReader): GameEvent {
     case EV.damaged:
       return { type: 'damaged', amount: r.u16(), fromX: r.f32(), fromZ: r.f32(), cause: r.u8() }
     case EV.eliminated:
-      return { type: 'eliminated', victim: r.u16(), killer: r.u16(), cause: r.u8(), respawnIn: r.u8() }
+      return { type: 'eliminated', victim: r.u16(), killer: r.u16(), cause: r.u8(), respawnIn: r.u8(), place: r.u8() }
     case EV.itemSpawn:
       return { type: 'itemSpawn', id: r.u16(), item: r.u8(), rarity: r.u8(), count: r.u16(), ammo: r.u16(), x: r.f32(), y: r.f32(), z: r.f32() }
     case EV.itemRemove:
@@ -457,6 +479,12 @@ function readEvent(r: BinaryReader): GameEvent {
       return { type: 'propDestroyed', prop: r.u16() }
     case EV.harvest:
       return { type: 'harvest', material: r.u8(), amount: r.u8(), x: r.f32(), y: r.f32(), z: r.f32() }
+    case EV.zone:
+      return { type: 'zone', index: r.u8(), fromX: r.f32(), fromZ: r.f32(), fromR: r.f32(), toX: r.f32(), toZ: r.f32(), toR: r.f32(), shrinkStart: r.u32(), shrinkEnd: r.u32(), dps: r.u8() }
+    case EV.airship:
+      return { type: 'airship', x0: r.f32(), z0: r.f32(), x1: r.f32(), z1: r.f32(), y: r.f32(), startTick: r.u32(), endTick: r.u32() }
+    case EV.matchEnd:
+      return { type: 'matchEnd', winner: r.u16() }
     default:
       throw new ProtocolError(`evento desconhecido: ${t}`)
   }
@@ -474,7 +502,7 @@ export function decodeServerMessage(data: Uint8Array): ServerMessage {
   let msg: ServerMessage
   switch (type) {
     case S2C.Welcome:
-      msg = { type: 'welcome', version: r.u16(), playerId: r.u16(), mapId: r.string(), tickRate: r.u16(), tick: r.u32(), serverName: r.string() }
+      msg = { type: 'welcome', version: r.u16(), playerId: r.u16(), mapId: r.string(), tickRate: r.u16(), tick: r.u32(), serverName: r.string(), mode: r.u8() }
       break
     case S2C.Snapshot: {
       const tick = r.u32()
@@ -482,6 +510,8 @@ export function decodeServerMessage(data: Uint8Array): ServerMessage {
       const queued = r.u8()
       const alive = r.u16()
       const kills = r.u16()
+      const phase = r.u8()
+      const phaseEnd = r.u32()
       const self = r.u8() ? readPlayerState(r) : null
       const n = r.u16()
       const entities: EntityState[] = []
@@ -493,7 +523,7 @@ export function decodeServerMessage(data: Uint8Array): ServerMessage {
           weapon: r.u8(), rarity: r.u8(),
         })
       }
-      msg = { type: 'snapshot', snapshot: { tick, ackSeq, queued, alive, kills, self, entities } }
+      msg = { type: 'snapshot', snapshot: { tick, ackSeq, queued, alive, kills, phase, phaseEnd, self, entities } }
       break
     }
     case S2C.Pong:

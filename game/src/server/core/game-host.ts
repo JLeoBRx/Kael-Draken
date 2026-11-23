@@ -1,7 +1,9 @@
 import { loadMap } from '../../shared/maps'
 import type { GameMap } from '../../shared/maps/types'
+import { GameMode, MatchPhase } from '../../shared/match/zone'
 import { ProtocolError } from '../../shared/net/binary'
 import {
+  KICK_NEW_MATCH,
   PROTOCOL_VERSION,
   beginSnapshot,
   decodeClientMessage,
@@ -15,6 +17,9 @@ import {
   writeEntity,
   type GameEvent,
 } from '../../shared/net/protocol'
+import { BattleRoyale, type BattleRoyaleOptions } from './battle-royale'
+import { BotManager } from './bots/bot-manager'
+import type { BotDifficulty } from './bots/profiles'
 import { Simulation, type MatchRules, type SimPlayer } from './simulation'
 
 /**
@@ -44,18 +49,33 @@ export interface HostOptions {
   logger?: HostLogger
   /** Mapa já construído (evita reconstruir em testes). */
   map?: GameMap
+  /** Como gerar o mapa de novo a cada partida (padrão: pelo id). */
+  mapFactory?: () => GameMap
   /** Regras da partida (padrão: treino com renascimento). */
   rules?: Partial<MatchRules>
+  /** GameMode: treino (padrão) ou battle royale. */
+  mode?: number
+  /** Ajustes do battle royale (aquecimento, velocidade da zona…). */
+  br?: Partial<BattleRoyaleOptions>
+  /** Bots controlados pelo servidor. */
+  bots?: number
+  botDifficulty?: BotDifficulty
+  /** Recomeça sozinho depois do fim da partida (servidor dedicado/LAN). */
+  autoRestart?: boolean
 }
 
 export interface HostInfo {
   name: string
   mapId: string
   mapName: string
+  /** Pessoas conectadas (sem contar bots). */
   players: number
+  bots: number
   maxPlayers: number
   tickRate: number
   version: number
+  mode: number
+  phase: number
 }
 
 interface ClientSlot {
@@ -82,8 +102,11 @@ function now(): number {
 }
 
 export class GameHost {
-  readonly sim: Simulation
-  readonly map: GameMap
+  sim!: Simulation
+  map: GameMap
+  br: BattleRoyale | null = null
+  bots: BotManager | null = null
+  readonly mode: number
   readonly tickRate: number
   readonly maxPlayers: number
   readonly snapshotInterval: number
@@ -102,11 +125,32 @@ export class GameHost {
     this.snapshotInterval = Math.max(1, opts.snapshotInterval ?? 1)
     this.serverName = opts.serverName ?? 'Servidor'
     this.log = opts.logger ?? silentLogger
-    this.sim = new Simulation(this.map, this.tickRate, opts.rules)
+    this.mode = opts.mode ?? GameMode.Training
+    this.opts = opts
+    this.setupMatch()
+  }
+
+  private readonly opts: HostOptions
+  private matchNumber = 0
+
+  /** Cria simulação, regras do battle royale e bots de uma partida nova. */
+  private setupMatch(): void {
+    this.matchNumber++
+    const seed = (this.opts.rules?.seed ?? 1) + this.matchNumber - 1
+    this.sim = new Simulation(this.map, this.tickRate, { ...this.opts.rules, seed })
+    this.br = this.mode === GameMode.BattleRoyale ? new BattleRoyale(this.sim, { ...this.opts.br, seed }) : null
+    const count = Math.max(0, Math.min(this.opts.bots ?? 0, this.maxPlayers - 1))
+    this.bots = count > 0 ? new BotManager(this.sim, this.br, { count, difficulty: this.opts.botDifficulty ?? 'normal', seed }) : null
   }
 
   get playerCount(): number {
-    return this.sim.players.size
+    let n = 0
+    for (const p of this.sim.players.values()) if (!p.bot) n++
+    return n
+  }
+
+  get phase(): number {
+    return this.br?.phase ?? MatchPhase.Training
   }
 
   info(): HostInfo {
@@ -115,9 +159,12 @@ export class GameHost {
       mapId: this.map.def.id,
       mapName: this.map.def.name,
       players: this.playerCount,
+      bots: this.bots?.bots.length ?? 0,
       maxPlayers: this.maxPlayers,
       tickRate: this.tickRate,
       version: PROTOCOL_VERSION,
+      mode: this.mode,
+      phase: this.phase,
     }
   }
 
@@ -189,7 +236,9 @@ export class GameHost {
       return
     }
     const name = sanitizeName(rawName)
-    const player = this.sim.addPlayer(name, (this.sim.tick + slot.conn.id) % SKINS)
+    // Battle royale já começou: assiste até a próxima partida
+    const late = !!this.br && this.br.phase !== MatchPhase.Warmup
+    const player = this.sim.addPlayer(name, (this.sim.tick + slot.conn.id) % SKINS, { spectator: late })
     slot.player = player
     slot.conn.send(encodeWelcome({
       version: PROTOCOL_VERSION,
@@ -198,13 +247,14 @@ export class GameHost {
       tickRate: this.tickRate,
       tick: this.sim.tick,
       serverName: this.serverName,
+      mode: this.mode,
     }))
     for (const other of this.sim.players.values()) {
       if (other.id !== player.id) slot.conn.send(encodePlayerInfo(other.id, other.name, other.skin))
     }
     this.broadcast(encodePlayerInfo(player.id, player.name, player.skin))
     // Estado atual do mundo: itens no chão, baús abertos, alvos, projéteis em voo
-    const sync = this.sim.worldSyncEvents()
+    const sync = [...this.sim.worldSyncEvents(), ...(this.br?.syncEvents() ?? [])]
     for (let k = 0; k < sync.length; k += 2000) slot.conn.send(encodeEvents(sync.slice(k, k + 2000)))
     this.log.info(`${name} (#${player.id}) entrou — ${this.sim.players.size}/${this.maxPlayers}`)
   }
@@ -225,10 +275,21 @@ export class GameHost {
   /** Avança um tick e envia snapshots quando for a vez. */
   tick(): void {
     const t0 = now()
+    this.bots?.update()
     this.sim.step()
+    this.br?.update()
     this.sendEvents()
     if (this.sim.tick % this.snapshotInterval === 0) this.sendSnapshots()
     this.tickMs = this.tickMs * 0.95 + (now() - t0) * 0.05
+    if (this.br?.finished && this.opts.autoRestart) this.restart()
+  }
+
+  /** Nova partida: mapa e simulação do zero; os clientes reconectam sozinhos. */
+  restart(): void {
+    this.log.info('partida encerrada; preparando a próxima')
+    for (const slot of [...this.clients.values()]) this.kick(slot, KICK_NEW_MATCH)
+    this.map = this.opts.mapFactory?.() ?? loadMap(this.map.def.id)
+    this.setupMatch()
   }
 
   /**
@@ -256,13 +317,15 @@ export class GameHost {
   private sendSnapshots(): void {
     const players = [...this.sim.players.values()]
     const alive = players.filter((p) => p.p.alive)
+    const phase = this.phase
+    const phaseEnd = this.br?.phaseEnd ?? 0
     for (const slot of this.clients.values()) {
       const me = slot.player
       if (!me) continue
       // Todos os jogadores vivos são relevantes por enquanto. Gerência de
       // interesse (só quem está por perto, em taxas menores) entra na Fase 6.
       const others = alive.filter((p) => p !== me)
-      const w = beginSnapshot(this.sim.tick, me.lastSeq, me.queue.length, alive.length, me.kills, me.p, others.length)
+      const w = beginSnapshot(this.sim.tick, me.lastSeq, me.queue.length, alive.length, me.kills, phase, phaseEnd, me.p, others.length)
       for (const p of others) writeEntity(w, p.id, p.p)
       slot.conn.send(w.finish())
     }

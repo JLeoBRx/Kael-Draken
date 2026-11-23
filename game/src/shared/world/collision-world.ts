@@ -89,6 +89,11 @@ export class CollisionWorld {
     return this.colliders[id]
   }
 
+  /** Visita todos os colisores existentes. */
+  forEach(fn: (c: Collider) => void): void {
+    for (const c of this.colliders) if (c) fn(c)
+  }
+
   /** Colisores cuja caixa envolvente cruza a AABB dada. Limpa e preenche `out`. */
   queryAabb(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, out: Collider[]): Collider[] {
     out.length = 0

@@ -8,11 +8,11 @@ import { splashDamage, stepProjectile, type ProjectileState } from '../../shared
 import type { GameMap } from '../../shared/maps/types'
 import { Rng } from '../../shared/math/rng'
 import { clamp } from '../../shared/math/scalar'
-import { Buttons, createCharacterState } from '../../shared/movement/character'
+import { AIRBORNE_FLAGS, Buttons, CharFlag, createCharacterState } from '../../shared/movement/character'
 import { Cause, TargetKind, sanitizeCommand, type GameEvent, type InputCommand, type InventoryAction, type ShotEnd } from '../../shared/net/protocol'
 import { chestInteractable, itemInteractable, pickInteractable, type Interactable } from '../../shared/player/interact'
 import { pickupItem, swapSlots, takeSlot, type WorldItem } from '../../shared/player/inventory'
-import { createPlayerState, stepPlayer, type BuildDelegate, type PlayerEvent, type PlayerState } from '../../shared/player/player'
+import { MAX_HEALTH, createPlayerState, stepPlayer, type BuildDelegate, type PlayerEvent, type PlayerState } from '../../shared/player/player'
 import { Surface, createWorldHit } from '../../shared/world/collision-world'
 import { rollChest, rollFloor, type LootDrop } from './loot'
 
@@ -41,9 +41,13 @@ export interface MatchRules {
   respawnDelay: number
   /** Semente do loot desta partida. */
   seed: number
+  /** Dano em jogadores (desligado no aquecimento). */
+  damage: boolean
+  /** Pegar itens e abrir baús (desligado no aquecimento). */
+  interact: boolean
 }
 
-export const SANDBOX_RULES: MatchRules = { respawn: true, respawnDelay: 5, seed: 1 }
+export const SANDBOX_RULES: MatchRules = { respawn: true, respawnDelay: 5, seed: 1, damage: true, interact: true }
 
 /** Posições passadas de um jogador (para compensação de latência). */
 class PoseHistory {
@@ -110,6 +114,10 @@ export interface SimPlayer {
   id: number
   name: string
   skin: number
+  /** Controlado pelo servidor (bot). */
+  bot: boolean
+  /** Entrou com a partida em andamento: só assiste até a próxima. */
+  spectator: boolean
   p: PlayerState
   queue: InputCommand[]
   /** Último comando aplicado. */
@@ -205,7 +213,7 @@ export class Simulation {
     this.populateLoot()
   }
 
-  private emit(ev: GameEvent, route: { to?: number; except?: number } = {}): void {
+  emit(ev: GameEvent, route: { to?: number; except?: number } = {}): void {
     this.events.push({ ev, ...route })
   }
 
@@ -228,10 +236,12 @@ export class Simulation {
     return createPlayerState(createCharacterState(sp.x, y + 0.02, sp.z, sp.yaw))
   }
 
-  addPlayer(name: string, skin = 0): SimPlayer {
+  addPlayer(name: string, skin = 0, opts: { bot?: boolean; spectator?: boolean } = {}): SimPlayer {
     const id = this.allocateId()
     const p: SimPlayer = {
       id, name, skin,
+      bot: opts.bot ?? false,
+      spectator: opts.spectator ?? false,
       p: this.spawnState(),
       queue: [],
       lastSeq: 0,
@@ -244,8 +254,32 @@ export class Simulation {
       respawnTick: -1,
       history: new PoseHistory(),
     }
+    if (p.spectator) {
+      p.p.alive = false
+      p.p.health = 0
+    }
     this.players.set(id, p)
     return p
+  }
+
+  /** Prepara um jogador para a partida: estado zerado (o chamador o posiciona). */
+  resetForMatch(sp: SimPlayer): void {
+    sp.p = createPlayerState(createCharacterState(sp.p.char.x, sp.p.char.y, sp.p.char.z, sp.p.char.yaw))
+    sp.spectator = false
+    sp.kills = 0
+    sp.lastAttacker = 0
+    sp.lastAttackTick = -1000
+    sp.respawnTick = -1
+    sp.history.clear()
+  }
+
+  /** Remove todas as construções (fim do aquecimento). */
+  clearBuildings(): void {
+    for (const p of [...this.buildings.byId.values()]) {
+      this.buildings.remove(p)
+      this.emit({ type: 'pieceRemoved', id: p.id, collapse: false })
+    }
+    this.damagedPieces.clear()
   }
 
   removePlayer(id: number): void {
@@ -328,6 +362,8 @@ export class Simulation {
       else if (e.type === 'throw') {
         const def = itemDef(e.item)
         if (def?.kind === 'consumable' && def.throwable) this.spawnProjectile(sp, e.item, def.throwable, e.x, e.y, e.z, e.vx, e.vy, e.vz)
+      } else if (e.type === 'fall' && !this.rules.damage) {
+        sp.p.health = MAX_HEALTH
       } else if (e.type === 'fall' && sp.p.health <= 0) {
         this.eliminate(sp, this.recentAttacker(sp), Cause.Fall)
       }
@@ -337,7 +373,7 @@ export class Simulation {
       this.eliminate(sp, this.recentAttacker(sp), Cause.Void)
       return
     }
-    if ((c.buttons & ~prev) & Buttons.Use) this.interact(sp)
+    if ((c.buttons & ~prev) & Buttons.Use && this.rules.interact && !(sp.p.char.flags & AIRBORNE_FLAGS)) this.interact(sp)
   }
 
   private recentAttacker(sp: SimPlayer): number {
@@ -539,11 +575,12 @@ export class Simulation {
   }
 
   /** Aplica dano (escudo primeiro). Devolve os detalhes ou null se o alvo já estava fora. */
-  applyDamage(victim: SimPlayer, amount: number, attacker: SimPlayer | null, cause: number, fromX: number, fromZ: number): { shield: boolean; broke: boolean; eliminated: boolean } | null {
+  applyDamage(victim: SimPlayer, amount: number, attacker: SimPlayer | null, cause: number, fromX: number, fromZ: number, ignoreShield = false): { shield: boolean; broke: boolean; eliminated: boolean } | null {
     const p = victim.p
-    if (!p.alive || amount <= 0) return null
+    // a bordo do dirigível ninguém leva dano
+    if (!p.alive || amount <= 0 || !this.rules.damage || p.char.flags & CharFlag.Riding) return null
     const shieldBefore = p.shield
-    const toShield = Math.min(p.shield, amount)
+    const toShield = ignoreShield ? 0 : Math.min(p.shield, amount)
     p.shield -= toShield
     p.health = Math.max(0, p.health - (amount - toShield))
     if (attacker && attacker !== victim) {
@@ -587,7 +624,9 @@ export class Simulation {
     if (killer && killer !== victim) killer.kills++
     victim.respawnTick = this.rules.respawn ? this.tick + Math.round(this.rules.respawnDelay * this.tickRate) : -1
     victim.history.clear()
-    this.emit({ type: 'eliminated', victim: victim.id, killer: killer && killer !== victim ? killer.id : 0, cause, respawnIn: this.rules.respawn ? this.rules.respawnDelay : 0 })
+    // Colocação final (battle royale): quem sobrou + o eliminado
+    const place = this.rules.respawn ? 0 : this.aliveCount + 1
+    this.emit({ type: 'eliminated', victim: victim.id, killer: killer && killer !== victim ? killer.id : 0, cause, respawnIn: this.rules.respawn ? this.rules.respawnDelay : 0, place })
   }
 
   private respawn(sp: SimPlayer): void {

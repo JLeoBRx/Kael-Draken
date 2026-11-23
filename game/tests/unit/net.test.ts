@@ -7,12 +7,14 @@ import { MAX_QUEUE, MAX_TOKENS } from '../../src/server/core/simulation'
 import { startServer, type RunningServer } from '../../src/server/node/server'
 import { loadMap } from '../../src/shared/maps'
 import { Rng } from '../../src/shared/math/rng'
-import { Buttons, createCharacterState } from '../../src/shared/movement/character'
+import { Buttons, CharFlag, createCharacterState } from '../../src/shared/movement/character'
 import { createPlayerState } from '../../src/shared/player/player'
 import { ITEM } from '../../src/shared/config/items'
 import { BUILD, BuildKind, decodeBuild, encodeBuild } from '../../src/shared/config/building'
 import { testMap } from './sim-helpers'
+import { GameMode, MatchPhase } from '../../src/shared/match/zone'
 import {
+  KICK_NEW_MATCH,
   PROTOCOL_VERSION,
   beginSnapshot,
   decodeClientMessage,
@@ -89,7 +91,7 @@ describe('protocolo', () => {
     other.char.vz = -7.4
     other.slots[0] = { item: ITEM.Shotgun, rarity: 2, count: 1, ammo: 5 }
     other.selected = 0
-    const w = beginSnapshot(99, 42, 3, 12, 4, self, 1)
+    const w = beginSnapshot(99, 42, 3, 12, 4, 3, 123456, self, 1)
     writeEntity(w, 7, other)
     const msg = decodeServerMessage(w.finish())
     expect(msg.type).toBe('snapshot')
@@ -100,6 +102,8 @@ describe('protocolo', () => {
     expect(s.queued).toBe(3)
     expect(s.alive).toBe(12)
     expect(s.kills).toBe(4)
+    expect(s.phase).toBe(3)
+    expect(s.phaseEnd).toBe(123456)
     expect(s.self).toEqual(self)
     expect(s.entities[0].weapon).toBe(ITEM.Shotgun)
     expect(s.entities[0].rarity).toBe(2)
@@ -113,8 +117,8 @@ describe('protocolo', () => {
     expect(() => decodeClientMessage(ping.subarray(0, 5))).toThrow()
     expect(() => decodeClientMessage(new Uint8Array([...ping, 0]))).toThrow()
     expect(() => decodeClientMessage(new Uint8Array([200]))).toThrow()
-    const welcome = encodeWelcome({ version: 1, playerId: 3, mapId: 'x', tickRate: 30, tick: 5, serverName: 'S' })
-    expect(decodeServerMessage(welcome)).toMatchObject({ type: 'welcome', playerId: 3, mapId: 'x' })
+    const welcome = encodeWelcome({ version: 1, playerId: 3, mapId: 'x', tickRate: 30, tick: 5, serverName: 'S', mode: 1 })
+    expect(decodeServerMessage(welcome)).toMatchObject({ type: 'welcome', playerId: 3, mapId: 'x', mode: 1 })
   })
 
   it('normaliza nomes', () => {
@@ -414,5 +418,42 @@ describe('servidor WebSocket (Node)', () => {
     a.ws.close()
     await until(() => b.inbox.some((m) => m.type === 'playerLeft' && m.id === aId))
     b.ws.close()
+  })
+})
+
+describe('servidor em modo battle royale', () => {
+  it('aquecimento → dirigível; quem chega depois assiste; no fim reinicia e os clientes reconectam', () => {
+    const map = testMap(() => {})
+    const host = new GameHost({ mapId: map.def.id, map, mapFactory: () => testMap(() => {}), mode: GameMode.BattleRoyale, bots: 3, botDifficulty: 'facil', br: { warmup: 1, zoneSpeed: 50, endDelay: 1 }, autoRestart: true })
+    expect(host.info()).toMatchObject({ mode: GameMode.BattleRoyale, bots: 3, players: 0, phase: MatchPhase.Warmup })
+    const a = new FakeConn(1)
+    host.connect(a)
+    host.receive(1, encodeHello('Ana'))
+    expect(a.last('welcome')?.mode).toBe(GameMode.BattleRoyale)
+    host.tick()
+    expect(a.last('snapshot')!.snapshot.phase).toBe(MatchPhase.Warmup)
+    expect(a.last('snapshot')!.snapshot.phaseEnd).toBeGreaterThan(host.sim.tick)
+    for (let k = 0; k < 40; k++) host.tick()
+    const snap = a.last('snapshot')!.snapshot
+    expect(snap.phase).toBe(MatchPhase.Airship)
+    expect(snap.self!.char.flags & CharFlag.Riding).toBeTruthy()
+    const synced = a.inbox.filter((m) => m.type === 'events').flatMap((m) => (m.type === 'events' ? m.events : []))
+    expect(synced.some((e) => e.type === 'airship')).toBe(true)
+    expect(synced.some((e) => e.type === 'zone')).toBe(true)
+    // chegou atrasado: entra só para assistir, mas recebe o dirigível e a zona atuais
+    const b = new FakeConn(2)
+    host.connect(b)
+    host.receive(2, encodeHello('Bia'))
+    host.tick()
+    expect(b.last('snapshot')!.snapshot.self!.alive).toBe(false)
+    const bSync = b.inbox.filter((m) => m.type === 'events').flatMap((m) => (m.type === 'events' ? m.events : []))
+    expect(bSync.some((e) => e.type === 'airship') && bSync.some((e) => e.type === 'zone')).toBe(true)
+    // a zona (50× mais rápida) termina a partida; depois do resultado, nova partida
+    for (let k = 0; k < 30 * 120 && !a.closed; k++) host.tick()
+    expect(a.inbox.some((m) => m.type === 'events' && m.events.some((e) => e.type === 'matchEnd'))).toBe(true)
+    expect(a.closed).toBe(KICK_NEW_MATCH)
+    expect(b.closed).toBe(KICK_NEW_MATCH)
+    expect(host.phase).toBe(MatchPhase.Warmup)
+    expect(host.sim.players.size).toBe(3) // só os bots da nova partida
   })
 })

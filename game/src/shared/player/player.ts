@@ -4,7 +4,7 @@ import { aimFrame, createAimFrame } from '../combat/aim'
 import { buildTarget, type PieceSpec } from '../building/grid'
 import type { BuildingWorld } from '../building/buildings'
 import { hash2i } from '../math/rng'
-import { Buttons, CharFlag, copyCharacterState, createCharacterState, stepCharacter, type CharacterState, type MoveCommand } from '../movement/character'
+import { AIRBORNE_FLAGS, Buttons, CharFlag, copyCharacterState, createCharacterState, stepCharacter, type CharacterState, type MoveCommand } from '../movement/character'
 import type { CollisionWorld } from '../world/collision-world'
 
 /**
@@ -247,6 +247,12 @@ export function stepPlayer(p: PlayerState, cmd: PlayerCommand, world: CollisionW
 
   // Modo construção: o botão de tiro coloca peças; armas ficam guardadas
   p.buildCooldown = Math.max(0, p.buildCooldown - dt)
+  // No dirigível, em queda livre ou planando: nada de armas, itens ou construção
+  if (p.char.flags & AIRBORNE_FLAGS) {
+    p.reloadTimer = 0
+    p.useTimer = 0
+    return
+  }
   const build = decodeBuild(cmd.build | 0)
   if (build.kind !== 0) {
     p.reloadTimer = 0

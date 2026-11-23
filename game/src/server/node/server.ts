@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net'
 import { networkInterfaces } from 'node:os'
 import { extname, join, normalize, resolve, sep } from 'node:path'
 import { WebSocket, WebSocketServer, type RawData } from 'ws'
-import { GameHost, type HostConnection, type HostLogger } from '../core/game-host'
+import { GameHost, type HostConnection, type HostLogger, type HostOptions } from '../core/game-host'
 
 /**
  * Servidor dedicado / host de LAN.
@@ -26,6 +26,8 @@ export interface ServerOptions {
   /** Pasta do cliente compilado; null para não servir arquivos. */
   staticDir: string | null
   logger?: HostLogger
+  /** Modo de jogo, bots e regras do battle royale (repassados ao GameHost). */
+  match?: Pick<HostOptions, 'mode' | 'bots' | 'botDifficulty' | 'br' | 'autoRestart'>
 }
 
 export interface RunningServer {
@@ -98,6 +100,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     maxPlayers: opts.maxPlayers,
     serverName: opts.name,
     logger: log,
+    ...opts.match,
   })
   const staticRoot = opts.staticDir ? resolve(opts.staticDir) : null
   if (staticRoot && !existsSync(join(staticRoot, 'index.html'))) {

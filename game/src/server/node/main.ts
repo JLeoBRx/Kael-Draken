@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { DEFAULT_MAP_ID, MAPS } from '../../shared/maps'
+import { GameMode } from '../../shared/match/zone'
+import { BOT_DIFFICULTIES, isBotDifficulty } from '../core/bots/profiles'
 import { startServer } from './server'
 
 /**
@@ -22,6 +24,12 @@ const { values } = parseArgs({
     'max-players': { type: 'string', default: '16' },
     'tick-rate': { type: 'string', default: '30' },
     name: { type: 'string', default: 'Servidor Última Chama' },
+    mode: { type: 'string', default: 'br' },
+    bots: { type: 'string', default: '0' },
+    'bot-difficulty': { type: 'string', default: 'normal' },
+    warmup: { type: 'string', default: '45' },
+    'zone-speed': { type: 'string', default: '1' },
+    'no-restart': { type: 'boolean', default: false },
     static: { type: 'string', default: resolve(gameRoot, 'dist/client') },
     'no-static': { type: 'boolean', default: false },
     help: { type: 'boolean', short: 'h', default: false },
@@ -36,6 +44,13 @@ if (values.help) {
   --max-players <n>   Limite de jogadores (padrão 16)
   --tick-rate <n>     Ticks por segundo da simulação (padrão 30)
   --name <texto>      Nome do servidor
+  --mode <br|treino>  Battle royale (padrão) ou treino com renascimento
+  --bots <n>          Bots controlados pelo servidor (padrão 0)
+  --bot-difficulty <${BOT_DIFFICULTIES.join('|')}>  (padrão normal)
+  --warmup <s>        Aquecimento antes do dirigível, contado a partir da
+                      primeira pessoa conectada (padrão 45)
+  --zone-speed <x>    Velocidade da zona (1 = normal, 2 = o dobro…)
+  --no-restart        Não recomeçar sozinho depois do fim da partida
   --static <pasta>    Cliente compilado a servir (padrão dist/client)
   --no-static         Não servir o cliente (só /ws e /api/info)`)
   process.exit(0)
@@ -48,6 +63,20 @@ function int(name: string, v: string, min: number, max: number): number {
     process.exit(1)
   }
   return n
+}
+
+if (values.mode !== 'br' && values.mode !== 'treino') {
+  console.error(`Modo desconhecido: ${values.mode} (use br ou treino)`)
+  process.exit(1)
+}
+if (!isBotDifficulty(values['bot-difficulty'])) {
+  console.error(`Dificuldade desconhecida: ${values['bot-difficulty']} (${BOT_DIFFICULTIES.join(', ')})`)
+  process.exit(1)
+}
+const zoneSpeed = Number(values['zone-speed'])
+if (!(zoneSpeed >= 0.1 && zoneSpeed <= 100)) {
+  console.error(`Valor inválido para --zone-speed: ${values['zone-speed']}`)
+  process.exit(1)
 }
 
 if (!MAPS[values.map]) {
@@ -63,9 +92,17 @@ const server = await startServer({
   tickRate: int('tick-rate', values['tick-rate'], 10, 120),
   name: values.name,
   staticDir: values['no-static'] ? null : values.static,
+  match: {
+    mode: values.mode === 'br' ? GameMode.BattleRoyale : GameMode.Training,
+    bots: int('bots', values.bots, 0, 127),
+    botDifficulty: values['bot-difficulty'],
+    br: { warmup: int('warmup', values.warmup, 0, 3600), zoneSpeed },
+    autoRestart: !values['no-restart'],
+  },
 })
 
-console.log(`\nÚltima Chama — servidor em execução (mapa "${values.map}", ${values['tick-rate']} ticks/s)`)
+const modeText = values.mode === 'br' ? `battle royale, ${values.bots} bots` : 'treino'
+console.log(`\nÚltima Chama — servidor em execução (mapa "${values.map}", ${modeText}, ${values['tick-rate']} ticks/s)`)
 console.log(`  Neste computador:  http://localhost:${server.port}`)
 for (const ip of server.lanAddresses) console.log(`  Na rede local:     http://${ip}:${server.port}`)
 console.log('  Ctrl+C para encerrar.\n')

@@ -59,4 +59,22 @@ export const MOVE = {
   swimFloatDepth: 1.1,
 
   maxPitch: 1.45,
+
+  // Salto do dirigível (battle royale)
+  /** Velocidade vertical em queda livre (m/s) e mergulhando (olhando para baixo). */
+  freefallSpeed: 30,
+  diveSpeed: 44,
+  /** Velocidade horizontal em queda livre e aceleração para alcançá-la. */
+  freefallHSpeed: 15,
+  freefallAccel: 16,
+  /** Planador: descida lenta e deslocamento horizontal. */
+  glideFallSpeed: 6.5,
+  glideHSpeed: 12,
+  glideAccel: 10,
+  /** Abre o planador sozinho abaixo desta altura sobre o chão/água. */
+  glideDeployHeight: 38,
+  /** Abrir antes (botão de pulo) só acima desta altura. */
+  glideManualMinHeight: 12,
+  /** Fração da velocidade do dirigível herdada ao saltar. */
+  exitSpeedFactor: 0.35,
 } as const

@@ -145,4 +145,16 @@ export interface GameMap {
   targets: TargetDummy[]
   /** Colisor → índice do adereço (árvores, rochas e caixotes podem ser quebrados). */
   propColliders: Map<number, number>
+  /** Vãos de passagem (portas, aberturas em muros) — usados pela navegação dos bots. */
+  portals: Portal[]
+}
+
+/** Abertura por onde uma pessoa passa: centro no chão e normal da parede. */
+export interface Portal {
+  x: number
+  y: number
+  z: number
+  nx: number
+  nz: number
+  width: number
 }

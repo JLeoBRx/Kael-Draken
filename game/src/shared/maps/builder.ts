@@ -3,7 +3,7 @@ import { smoothstep } from '../math/scalar'
 import { CollisionWorld, Surface, type SurfaceId } from '../world/collision-world'
 import { Heightfield } from '../world/heightfield'
 import { makeObb, rampObb, type Obb } from '../world/obb'
-import type { Chest, FixedLoot, GameMap, LootSpot, MapDefinition, MapLabel, MaterialId, Prop, PropKind, Region, SpawnPoint, StaticBox, TargetDummy } from './types'
+import type { Chest, FixedLoot, GameMap, LootSpot, MapDefinition, MapLabel, MaterialId, Portal, Prop, PropKind, Region, SpawnPoint, StaticBox, TargetDummy } from './types'
 
 const SURFACE_OF: Record<MaterialId, SurfaceId> = {
   'grid-orange': Surface.Concrete,
@@ -74,6 +74,7 @@ export class MapBuilder {
   readonly lootSpots: LootSpot[] = []
   readonly targets: TargetDummy[] = []
   readonly propColliders = new Map<number, number>()
+  readonly portals: Portal[] = []
   private world: CollisionWorld | null = null
 
   constructor(def: MapDefinition) {
@@ -180,6 +181,12 @@ export class MapBuilder {
       cuts.add(Math.max(0, Math.min(len, o.at + o.width)))
     }
     const xs = [...cuts].sort((a, b) => a - b)
+    // Vãos que vão do chão até a altura de uma pessoa (ou até o topo do muro): portais de navegação
+    for (const o of openings) {
+      if (o.bottom > 0.35 || (o.top < 1.9 && o.top < height - 0.05) || o.width < 0.9) continue
+      const m = Math.max(0, Math.min(len, o.at + o.width / 2))
+      this.portals.push({ x: x0 + dx * m, y: baseY, z: z0 + dz * m, nx: -dz, nz: dx, width: o.width })
+    }
     const profileAt = (mid: number): [number, number][] => {
       const holes = openings
         .filter((o) => o.at <= mid && mid <= o.at + o.width)
@@ -424,6 +431,7 @@ export class MapBuilder {
       lootSpots: this.lootSpots,
       targets: this.targets,
       propColliders: this.propColliders,
+      portals: this.portals,
     }
   }
 }
