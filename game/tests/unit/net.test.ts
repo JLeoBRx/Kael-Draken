@@ -170,6 +170,46 @@ describe('protocolo', () => {
     expect(() => decodeServerMessage(enc.encode({ ...h, tick: 6 }, self, ents, []), new SnapshotDecoder())).toThrow()
   })
 
+  it('zonas mortas de velocidade e ângulos: as duas bases nunca se separam', () => {
+    const enc = new SnapshotEncoder()
+    const dec = new SnapshotDecoder()
+    const h = { tick: 1, ackSeq: 0, queued: 0, alive: 2, kills: 0, phase: 0, phaseEnd: 0 }
+    const self = createPlayerState(createCharacterState(0, 0, 0))
+    const o = createPlayerState(createCharacterState(10, 5, 10, 0))
+    const rng = new Rng(9)
+    const read = () => {
+      const m = decodeServerMessage(enc.encode(h, self, [{ id: 5, p: o }], []), dec)
+      if (m.type !== 'snapshot') throw new Error('tipo')
+      return m.snapshot.entities[0]
+    }
+    read()
+    // giro abaixo da zona morta não é enviado
+    o.char.yaw += 0.005
+    expect(read().yaw).toBeCloseTo(0, 5)
+    o.char.yaw += 0.02
+    expect(read().yaw).toBeCloseTo(0.025, 3)
+    // caminhada aleatória longa: posição sempre exata (só quantizada); velocidade e ângulos perto do real
+    for (let k = 0; k < 300; k++) {
+      o.char.yaw += (rng.next() - 0.5) * 0.3
+      o.char.vx = Math.sin(o.char.yaw) * 6
+      o.char.vz = Math.cos(o.char.yaw) * 6
+      o.char.x += o.char.vx / 30
+      o.char.z += o.char.vz / 30
+      const e = read()
+      expect(Math.abs(e.x - o.char.x)).toBeLessThanOrEqual(1 / 64)
+      expect(Math.abs(e.z - o.char.z)).toBeLessThanOrEqual(1 / 64)
+      expect(Math.abs(e.vx - o.char.vx)).toBeLessThanOrEqual(0.55)
+      expect(Math.abs(Math.atan2(Math.sin(e.yaw - o.char.yaw), Math.cos(e.yaw - o.char.yaw)))).toBeLessThanOrEqual(0.0125)
+    }
+    // parar chega sempre (velocidade exatamente zero)
+    o.char.vx = 0.2
+    o.char.vz = 0
+    read()
+    o.char.vx = 0
+    const stop = read()
+    expect([stop.vx, stop.vy, stop.vz]).toEqual([0, 0, 0])
+  })
+
   it('rejeita mensagens truncadas, com lixo no fim ou de tipo desconhecido', () => {
     const ping = encodePing(123)
     expect(() => decodeClientMessage(ping.subarray(0, 5))).toThrow()

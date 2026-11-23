@@ -227,13 +227,16 @@ const LOBBY_WARMUP = 3
 const EXPECTED_WARMUP = 6
 
 /**
- * Gerência de interesse: até NEAR m, todo snapshot; até MID m, 1 a cada 2;
- * além, 1 a cada 4; a bordo do dirigível (invisíveis), 1 a cada 8. Colegas
- * de equipe, quem acabou de mudar de estado e quem a conexão ainda não
- * conhece vão sempre. Eliminados/espectadores recebem todos.
+ * Gerência de interesse: os NEAR_SLOTS mais próximos até NEAR m vão em todo
+ * snapshot; o resto até MID m, 1 a cada 2; além, 1 a cada 4; a bordo do
+ * dirigível (invisíveis), 1 a cada 8. Colegas de equipe, quem acabou de
+ * mudar de estado e quem a conexão ainda não conhece vão sempre.
+ * Eliminados/espectadores recebem todos.
  */
 const INTEREST_NEAR = 150
 const INTEREST_MID = 400
+/** Quantos dos mais próximos vão em taxa cheia (multidão no começo da partida). */
+const INTEREST_NEAR_SLOTS = 24
 /** Tiros mais longe que isto não chegam a quem está vivo. */
 const SHOT_EVENT_RANGE = 450
 
@@ -804,6 +807,7 @@ export class GameHost {
     const interest = this.opts.interest !== false
     const near2 = INTEREST_NEAR * INTEREST_NEAR
     const mid2 = INTEREST_MID * INTEREST_MID
+    const dist = new Float64Array(alive.length)
     for (const slot of this.clients.values()) {
       const me = slot.player
       if (!me) continue
@@ -811,13 +815,21 @@ export class GameHost {
       const n = enc.count
       const watcher = !interest || !me.p.alive || me.spectator
       const mc = me.p.char
+      // taxa cheia só para os mais próximos (até INTEREST_NEAR_SLOTS dentro de INTEREST_NEAR)
+      let full2 = near2
+      if (!watcher && alive.length > INTEREST_NEAR_SLOTS + 1) {
+        alive.forEach((q, k) => (dist[k] = (q.p.char.x - mc.x) ** 2 + (q.p.char.z - mc.z) ** 2))
+        const sorted = dist.slice().sort()
+        // [0] é o próprio jogador (distância 0)
+        full2 = Math.min(near2, sorted[INTEREST_NEAR_SLOTS])
+      }
       const list: { id: number; p: SimPlayer['p'] }[] = []
       for (const q of alive) {
         if (q === me) continue
         if (!watcher && !(q.team === me.team) && enc.knows(q.id) && enc.knownFlags(q.id) === (q.p.char.flags & 0xffff)) {
           const qc = q.p.char
           const d2 = (qc.x - mc.x) ** 2 + (qc.z - mc.z) ** 2
-          const every = qc.flags & CharFlag.Riding ? 8 : d2 <= near2 ? 1 : d2 <= mid2 ? 2 : 4
+          const every = qc.flags & CharFlag.Riding ? 8 : d2 <= full2 ? 1 : d2 <= mid2 ? 2 : 4
           if (every > 1 && (n + q.id) % every !== 0) continue
         }
         list.push({ id: q.id, p: q.p })

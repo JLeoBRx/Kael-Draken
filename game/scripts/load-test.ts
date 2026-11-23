@@ -20,7 +20,8 @@ const SECONDS = Number(process.argv[3] ?? 90)
 const MAP = process.argv[4] ?? 'ilha-de-brasa'
 const PORT = 7390
 
-const proc = spawn('npx', ['tsx', '--disable-warning=ExperimentalWarning', 'src/platform/main.ts', '--port', String(PORT), '--host', '127.0.0.1', '--db', ':memory:', '--no-static', '--trust-proxy',
+// node direto (com o carregador do tsx): um processo só, que recebe o SIGTERM e encerra limpo
+const proc = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', '--import', 'tsx', 'src/platform/main.ts', '--port', String(PORT), '--host', '127.0.0.1', '--db', ':memory:', '--no-static', '--trust-proxy',
   '--map', MAP, '--max-humans', String(N), '--lobby-size', String(N), '--max-wait', '15', '--warmup', '10'], { stdio: ['ignore', 'pipe', 'inherit'] })
 const ready = new Promise<void>((ok) => proc.stdout!.on('data', (d: Buffer) => { if (d.toString().includes('em execução')) ok() }))
 
@@ -30,12 +31,14 @@ interface Bot {
   tick: number
   seq: number
   yaw: number
+  /** Lado para onde anda (muda a cada ~1 s, como quem segura as teclas). */
+  right: number
   game: WebSocket | null
 }
 
 async function person(i: number, bots: Bot[]): Promise<void> {
   const ip = `10.1.${i >> 8}.${i & 255}`
-  const b: Bot = { bytes: 0, snaps: 0, tick: 0, seq: 0, yaw: Math.random() * 6.28, game: null }
+  const b: Bot = { bytes: 0, snaps: 0, tick: 0, seq: 0, yaw: Math.random() * 6.28, right: 0, game: null }
   bots.push(b)
   const ws = new WebSocket(`ws://127.0.0.1:${PORT}/platform`, { headers: { 'x-forwarded-for': ip } })
   await new Promise((ok, fail) => { ws.once('open', ok); ws.once('error', fail) })
@@ -68,14 +71,16 @@ const t0 = Date.now()
 for (let i = 0; i < N; i++) await person(i, bots)
 console.log(`${N} pessoas conectadas à plataforma em ${Date.now() - t0} ms`)
 
-// comandos a 30 Hz: anda para a frente, vira devagar, pula e corre de vez em quando
+// comandos a 30 Hz: anda para a frente e de lado (troca ~1 vez por segundo), vira o mouse, pula às vezes
 const input = setInterval(() => {
   for (const b of bots) {
     if (!b.game || b.game.readyState !== WebSocket.OPEN || b.tick === 0) continue
     b.seq++
-    b.yaw += (Math.random() - 0.5) * 0.2
-    const buttons = (Math.random() < 0.05 ? 1 : 0) | (Math.random() < 0.5 ? 2 : 0)
-    b.game.send(encodeInputs([{ seq: b.seq, forward: 1, right: Math.random() - 0.5, yaw: b.yaw, pitch: 0, buttons, slot: 0, viewTick: b.tick, build: 0 }]))
+    // mouse: giros pequenos e contínuos, às vezes uma virada rápida
+    b.yaw += (Math.random() - 0.5) * 0.04 + (Math.random() < 0.01 ? (Math.random() - 0.5) * 2 : 0)
+    if (Math.random() < 1 / 30) b.right = [-1, 0, 0, 1][Math.floor(Math.random() * 4)]
+    const buttons = (Math.random() < 0.02 ? 1 : 0) | 2
+    b.game.send(encodeInputs([{ seq: b.seq, forward: 1, right: b.right, yaw: b.yaw, pitch: 0, buttons, slot: 0, viewTick: b.tick, build: 0 }]))
   }
 }, 1000 / 30)
 
@@ -101,5 +106,8 @@ if (playing.length) {
   console.log(`\ntick do servidor com ${N} pessoas: médio ${avg.toFixed(2)} ms, pior amostra ${max.toFixed(2)} ms (orçamento a 30 Hz: 33,3 ms)`)
 }
 for (const b of bots) b.game?.terminate()
+// espera a plataforma terminar antes de sair (a saída dela ainda está ligada a este processo)
+const exited = new Promise((ok) => proc.once('exit', ok))
 proc.kill('SIGTERM')
+await exited
 process.exit(0)

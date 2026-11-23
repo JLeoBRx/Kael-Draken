@@ -496,6 +496,16 @@ const VEL_SCALE = 20
 
 const EntBit = { Small: 1, Full: 2, Angles: 4, Flags: 8, Vel: 16, Held: 32 } as const
 
+/**
+ * Zonas mortas das entidades: velocidade e ângulos de OUTROS jogadores só
+ * servem para animar e extrapolar até 150 ms, então mudanças menores que
+ * 0,5 m/s ou ~0,7° não são enviadas (parar — velocidade zero — vai sempre).
+ * Os acertos usam o estado do servidor, não este.
+ */
+const VEL_DEADBAND = 10
+const YAW_DEADBAND = 128
+const PITCH_DEADBAND = 1
+
 function quantPos(v: number, offset: number): number {
   return clamp(Math.round((v + offset) * POS_SCALE), 0, 0xffff)
 }
@@ -617,9 +627,11 @@ export class SnapshotEncoder {
       const dy = q.y - b.y
       const dz = q.z - b.z
       if (dx || dy || dz) mask |= Math.abs(dx) <= 127 && Math.abs(dy) <= 127 && Math.abs(dz) <= 127 ? EntBit.Small : EntBit.Full
-      if (q.yaw !== b.yaw || q.pitch !== b.pitch) mask |= EntBit.Angles
+      const dyaw = Math.abs(((q.yaw - b.yaw + 32768) & 0xffff) - 32768)
+      if (dyaw > YAW_DEADBAND || Math.abs(q.pitch - b.pitch) > PITCH_DEADBAND) mask |= EntBit.Angles
       if (q.flags !== b.flags) mask |= EntBit.Flags
-      if (q.vx !== b.vx || q.vy !== b.vy || q.vz !== b.vz) mask |= EntBit.Vel
+      const stopped = q.vx === 0 && q.vy === 0 && q.vz === 0
+      if (Math.abs(q.vx - b.vx) > VEL_DEADBAND || Math.abs(q.vy - b.vy) > VEL_DEADBAND || Math.abs(q.vz - b.vz) > VEL_DEADBAND || (stopped && (b.vx || b.vy || b.vz))) mask |= EntBit.Vel
       if (q.weapon !== b.weapon || q.rarity !== b.rarity) mask |= EntBit.Held
     }
     w.u16(id).u8(mask)
@@ -629,7 +641,26 @@ export class SnapshotEncoder {
     if (mask & EntBit.Flags) w.u16(q.flags)
     if (mask & EntBit.Vel) w.i16(q.vx).i16(q.vy).i16(q.vz)
     if (mask & EntBit.Held) w.u8(q.weapon).u8(q.rarity)
-    Object.assign(b, q)
+    // a base guarda só o que foi enviado (o cliente tem exatamente isto)
+    if (mask & (EntBit.Small | EntBit.Full)) {
+      b.x = q.x
+      b.y = q.y
+      b.z = q.z
+    }
+    if (mask & EntBit.Angles) {
+      b.yaw = q.yaw
+      b.pitch = q.pitch
+    }
+    if (mask & EntBit.Flags) b.flags = q.flags
+    if (mask & EntBit.Vel) {
+      b.vx = q.vx
+      b.vy = q.vy
+      b.vz = q.vz
+    }
+    if (mask & EntBit.Held) {
+      b.weapon = q.weapon
+      b.rarity = q.rarity
+    }
   }
 }
 

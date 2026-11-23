@@ -248,16 +248,21 @@ Entregue:
   dia** com XP, **visuais e títulos desbloqueáveis**.
 - **Banco** SQLite embutido no Node (`node:sqlite`), com auditoria.
 - **Rede ~10× mais leve**: snapshots em delta por conexão (estado próprio
-  exato em f64, entidades quantizadas) e **gerência de interesse** (taxa por
-  distância, tiros distantes cortados): 62 → 4,7 KB/s por cliente no
-  dirigível, 35 → 3,6 KB/s na partida (`scripts/bench-net.ts`).
+  exato em f64, entidades quantizadas com zonas mortas) e **gerência de
+  interesse** (24 mais próximos em taxa cheia, taxa por distância, tiros
+  distantes cortados): 62 → 4,5 KB/s por cliente no dirigível, 35 → 3,4 KB/s
+  na partida (`scripts/bench-net.ts`).
+- **Teste de carga** (`scripts/load-test.ts`): 100 pessoas simuladas pelo
+  caminho real (plataforma → fila → bilhete → servidor de jogo, comandos a
+  30 Hz): tick de 4,5 ms (pior 5,6 ms) e ~15 KB/s por pessoa com todos
+  agrupados.
 - **Segurança**: validação de toda mensagem, limites por conexão/IP/conta,
   ping para conexões mortas, uma conexão por conta no jogo, auditoria.
 - **Cliente**: "Jogar online" → entrada → casa (jogar, sala privada, grupo,
   amigos, desafios, perfil com visuais e título, histórico, classificação);
   convites no topo; XP ao fim da partida; volta à plataforma ao sair ou
   quando o servidor encerra; reconexão automática à plataforma.
-- **Testes**: 162 unitários/integração (22 novos de plataforma e servidor
+- **Testes**: 163 unitários/integração (23 novos de plataforma e servidor
   online) e o teste de navegador da plataforma com dois navegadores (amizade,
   grupo, dupla pelo matchmaking até o fim com XP, sala privada pelo código,
   sessão salva).
@@ -278,7 +283,8 @@ Decisões de projeto:
   forma de entrar sem mudar o resto.
 
 Ficou para depois: taxa adaptativa por cliente, detecção estatística de mira
-automática, teste de carga com 100 clientes reais em rede.
+automática, teste de carga com computadores reais em rede (o atual simula 100
+clientes numa máquina).
 
 ## Fase 7 — Polimento
 

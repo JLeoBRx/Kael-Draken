@@ -239,12 +239,14 @@ volta às armas.
 | `npm test` | testes unitários e de integração (Vitest) |
 | `npm run test:e2e` | testes no navegador (Playwright) |
 | `npm run check` | tipos + testes unitários |
+| `npx tsx scripts/bench-net.ts` | banda por cliente numa partida de bots |
+| `npx tsx scripts/load-test.ts 100 120` | teste de carga: 100 pessoas simuladas pela plataforma |
 
 Para os testes de navegador em uma máquina nova: `npx playwright install chromium`.
 
 ## Testes
 
-- **Unitários e integração (162)**: plataforma online (entrada pelo nome,
+- **Unitários e integração (163)**: plataforma online (entrada pelo nome,
   sessão, conta aberta em outro lugar, amizade, presença, grupo e permissões
   do líder, fila de dupla → servidor alocado → bilhetes → partida até o fim →
   XP, estatísticas, histórico e desafios; fila sozinho com bots; sala privada
@@ -330,9 +332,9 @@ inclusive o volume.
   nós e a imagem de container ficam para a Fase 8.
 - Regiões são rótulos da fila (separam quem joga junto); com um único
   processo, todas as partidas rodam na mesma máquina.
-- O transporte é WebSocket (TCP). WebTransport/datagramas, detecção
-  estatística de mira automática e testes de carga com 100 clientes reais
-  ficam para as Fases 7–8.
+- O transporte é WebSocket (TCP). WebTransport/datagramas e detecção
+  estatística de mira automática ficam para as Fases 7–8. O teste de carga
+  usa 100 clientes simulados na mesma máquina, não 100 computadores.
 
 - Em equipes não há "derrubado e reanimar": quem perde a vida é eliminado e
   assiste os colegas.
@@ -350,10 +352,10 @@ inclusive o volume.
   documentados na arquitetura.
 - O coice da arma é aplicado no cliente (como na maioria dos jogos); o servidor
   valida dispersão, cadência, munição e acertos.
-- Banda medida (60 bots + 8 clientes, mapa principal): ~4,7 KB/s por cliente
-  no dirigível e ~3,6 KB/s na partida (antes da Fase 6: 62 e 35 KB/s). Com 100
-  pessoas reais atirando perto umas das outras o número sobe; a taxa
-  adaptativa por cliente ainda não existe.
+- Banda medida: ~3,4 KB/s por cliente numa partida espalhada (60 bots +
+  8 clientes; antes da Fase 6: 35 KB/s) e ~15 KB/s por pessoa no pior caso
+  (100 pessoas agrupadas, `scripts/load-test.ts`; servidor a 4,5 ms por tick).
+  Ainda não há taxa adaptativa para conexões lentas.
 - A descoberta de partidas na LAN funciona pela página servida por um host
   (o navegador não escuta UDP); quem abre o jogo de outro lugar entra pelo
   endereço exibido no terminal do host.

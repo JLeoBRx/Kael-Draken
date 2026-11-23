@@ -128,10 +128,14 @@ um delta sem base é erro de protocolo (o cliente encerra, nunca inventa estado)
   f64 — a reconciliação continua exata. Parado: ~10 bytes; correndo: ~70.
 - **Entidades**: id + máscara; posição quantizada em 1/32 m (±1.024 m), com
   passos pequenos em 3 × i8 e grandes em 3 × u16; ângulos, estado,
-  velocidade e arma na mão só quando mudam. Primeira vez: 22 bytes; parado:
-  3 bytes; correndo: ~9 bytes (antes: 28 sempre).
-- **Gerência de interesse** (`GameHost.sendSnapshots`): até 150 m, todo
-  snapshot; 150–400 m, 1 a cada 2; além, 1 a cada 4; a bordo do dirigível
+  velocidade e arma na mão só quando mudam — velocidade e ângulos com zona
+  morta (0,5 m/s, ~0,7°), pois só animam e extrapolam os outros jogadores
+  (acertos usam o estado do servidor). As duas bases guardam só o que foi
+  enviado, então nunca se separam. Primeira vez: 22 bytes; parado: 3 bytes;
+  correndo em linha reta: 6 bytes (antes: 28 sempre).
+- **Gerência de interesse** (`GameHost.sendSnapshots`): os 24 mais próximos
+  até 150 m, todo snapshot; o resto até 400 m, 1 a cada 2; além, 1 a cada 4;
+  a bordo do dirigível
   (invisíveis), 1 a cada 8 — escalonado pelo id para espalhar a carga. Vão
   sempre: colegas de equipe, quem mudou de estado (agachar, saltar do
   dirigível…) e quem a conexão ainda não conhece. Eliminados e espectadores
@@ -333,13 +337,28 @@ construção e validação.
 
   | | antes (v5) | só delta | delta + interesse |
   | --- | --- | --- | --- |
-  | dirigível | 61,9 KB/s | 14,5 KB/s | **4,7 KB/s** |
-  | partida | 34,6 KB/s | 7,7 KB/s | **3,6 KB/s** |
-  | snapshot médio | 1.473 bytes | 336 bytes | **135 bytes** |
+  | dirigível | 61,9 KB/s | 14,5 KB/s | **4,5 KB/s** |
+  | partida | 34,6 KB/s | 7,7 KB/s | **3,4 KB/s** |
+  | snapshot médio | 1.473 bytes | 336 bytes | **130 bytes** |
 
-  Uma partida cheia (100 pessoas) fica na ordem de 0,5 MB/s de saída, abaixo
-  da meta de 1,5 MB/s. Taxa adaptativa por cliente (menos snapshots para
-  conexões lentas) ainda não existe.
+- **Teste de carga (Fase 6)** — `npx tsx scripts/load-test.ts 100 120`: 100
+  pessoas simuladas pelo caminho real (entrada na plataforma, fila, bilhete,
+  WebSocket do servidor de jogo, comandos a 30 Hz andando, virando o mouse e
+  pulando), plataforma em outro processo, mapa principal. Pior caso de banda:
+  todos saltam juntos e continuam a menos de 400 m uns dos outros.
+
+  | | resultado |
+  | --- | --- |
+  | 100 entradas na plataforma | 0,2 s |
+  | tick do servidor de jogo | **4,5 ms médio, 5,6 ms no pior momento** (orçamento: 33 ms) |
+  | banda por pessoa (todos agrupados) | **~15 KB/s** (19 KB/s no dirigível) |
+  | saída do servidor | ~1,5 MB/s com 100 pessoas agrupadas |
+
+  O que pesou: entidades próximas mudam a cada tick. Daí os 24 mais
+  próximos em taxa cheia (o resto a cada 2) e as zonas mortas de velocidade
+  (0,5 m/s) e ângulos (~0,7°) dos outros jogadores — 25 → 15 KB/s. Taxa
+  adaptativa por cliente (menos snapshots para conexões lentas) ainda não
+  existe.
 
 ## 4. Os três modos
 
