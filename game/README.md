@@ -15,11 +15,13 @@ armas, mapas e interface originais. *(Título provisório — definido em
 > (Fase 2) e ao mapa principal **Ilha de Brasa**. Próximo: lobby LAN e equipes
 > — veja o [roteiro](docs/ROADMAP.md) e a [arquitetura](docs/ARQUITETURA.md).
 
-![Forte de madeira, pedra e metal com o fantasma de uma rampa e a barra de construção](docs/imagens/construcao.webp)
+![A bordo do dirigível sobre a Ilha de Brasa, com a zona no horizonte e o aviso "Espaço — saltar"](docs/imagens/dirigivel.webp)
 
-| Picareta coletando pedra | Estande de tiro |
+| Mapa com a zona e a próxima zona | Fim de partida |
 | --- | --- |
-| ![Golpe de picareta na mureta com "+8 Pedra"](docs/imagens/picareta.webp) | ![Acerto na cabeça do boneco a 10 m](docs/imagens/combate.webp) |
+| ![Mapa completo com o círculo da zona e o próximo círculo tracejado](docs/imagens/mapa-zona.webp) | ![Tela de resultado: #2 de 4, eliminações, dano e tempo](docs/imagens/resultado.webp) |
+| **Construção** | **Picareta coletando pedra** |
+| ![Forte de madeira, pedra e metal com o fantasma de uma rampa](docs/imagens/construcao.webp) | ![Golpe de picareta na mureta com "+8 Pedra"](docs/imagens/picareta.webp) |
 
 | Ilha de Brasa — Cidade Esquecida | Arsenal do Campo de Provas |
 | --- | --- |
