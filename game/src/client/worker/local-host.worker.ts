@@ -22,6 +22,12 @@ self.onmessage = (ev: MessageEvent<WorkerRequest>) => {
           mapId: m.mapId,
           maxPlayers: m.maxPlayers,
           serverName: 'Partida local',
+          mode: m.match.mode,
+          bots: m.match.bots,
+          botDifficulty: m.match.difficulty,
+          // offline: aquecimento curto e sem reinício (o jogador escolhe "Jogar de novo")
+          br: { warmup: 5, zoneSpeed: m.match.zoneSpeed, endDelay: 3600 },
+          autoRestart: false,
           logger: {
             info: (message) => post({ t: 'log', level: 'info', message }),
             warn: (message) => post({ t: 'log', level: 'warn', message }),

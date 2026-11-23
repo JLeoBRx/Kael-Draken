@@ -62,8 +62,8 @@ export const ZONE_PLAN: readonly ZonePlanStep[] = [
   { wait: 35, shrink: 35, radius: 0.1, dps: 7 },
   { wait: 25, shrink: 30, radius: 0.045, dps: 10 },
   { wait: 20, shrink: 25, radius: 0.015, dps: 15 },
-  // último círculo bem pequeno (não zero): quem sobrar ali precisa se enfrentar
-  { wait: 15, shrink: 30, radius: 0.008, dps: 25 },
+  // fecha por completo: quem sobrar sem se enfrentar cai pela zona (decide pela vida)
+  { wait: 15, shrink: 30, radius: 0, dps: 25 },
 ]
 
 export function zoneCircleAt(stage: ZoneStage, tick: number, out: ZoneCircle = { x: 0, z: 0, r: 0 }): ZoneCircle {

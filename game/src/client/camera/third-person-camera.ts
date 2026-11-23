@@ -18,6 +18,9 @@ const DIST_NORMAL = 3.1
 const DIST_SPRINT = 3.5
 const DIST_AIM = 1.55
 const DIST_SWIM = 3.6
+/** A bordo do dirigível e caindo: câmera bem mais afastada. */
+const DIST_RIDE = 16
+const DIST_FALL = 6.5
 const CAMERA_RADIUS = 0.22
 
 export class ThirdPersonCamera {
@@ -77,7 +80,9 @@ export class ThirdPersonCamera {
     this.right.set(Math.cos(yaw), 0, -Math.sin(yaw))
     this.pivot.set(target.x, this.pivotY + this.eye, target.z)
 
-    const wantDist = aiming ? DIST_AIM : swimming ? DIST_SWIM : sprinting ? DIST_SPRINT : DIST_NORMAL
+    const riding = (flags & CharFlag.Riding) !== 0
+    const falling = (flags & (CharFlag.Skydiving | CharFlag.Gliding)) !== 0
+    const wantDist = riding ? DIST_RIDE : falling ? DIST_FALL : aiming ? DIST_AIM : swimming ? DIST_SWIM : sprinting ? DIST_SPRINT : DIST_NORMAL
     this.dist = damp(this.dist, wantDist, aiming ? 16 : 7, dt)
 
     // ombro: garante que o próprio ombro não está dentro de uma parede

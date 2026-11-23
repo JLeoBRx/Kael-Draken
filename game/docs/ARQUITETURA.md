@@ -106,7 +106,8 @@ as aplica e o resultado volta no snapshot.
 ### Snapshot (servidor → cliente)
 
 `tick` · `ackSeq` (último comando aplicado) · `queued` (fila no servidor) ·
-vivos · eliminações do destinatário · estado COMPLETO do próprio jogador
+vivos · eliminações do destinatário · fase da partida e o tick em que ela
+muda (contagens do HUD) · estado COMPLETO do próprio jogador
 (movimento, vida, escudo, inventário, munições, materiais e temporizadores da
 arma — para reconciliação exata) · lista de entidades (28 bytes cada: id,
 posição, yaw, pitch, flags, velocidade, arma na mão e raridade).
@@ -121,8 +122,12 @@ peça colocada (com autor e `seq` do comando, para confirmar a previsão), dano
 em peça (agregado por tick), peça removida (destruída ou desabada), adereço
 quebrado (árvore, rocha, caixote) e material coletado (só para quem coletou).
 Golpes de picareta de outros jogadores chegam como "tiro" da picareta, para a
-animação e as lascas. Quem entra recebe o estado atual do mundo (itens, baús,
-projéteis, peças com idade e dano, adereços quebrados) como eventos.
+animação e as lascas. Battle royale: rota do dirigível, cada etapa da zona
+(círculo atual, próximo, ticks de início/fim do fechamento e dano por
+segundo — o cliente calcula o círculo de qualquer instante com a mesma função
+do servidor), colocação de quem foi eliminado e o fim da partida (vencedor).
+Quem entra recebe o estado atual do mundo (itens, baús, projéteis, peças com
+idade e dano, adereços quebrados, dirigível, zona) como eventos.
 
 ### Predição e reconciliação (jogador local)
 
@@ -217,6 +222,60 @@ O código vive em `shared/building/` (grade e `BuildingWorld` sobre o
 `CollisionWorld`), usado pelo servidor (cópia oficial) e pelo cliente (cópia
 com previsões).
 
+### Partida battle royale
+
+`server/core/battle-royale.ts` aplica as regras sobre a mesma `Simulation`:
+
+1. **Aquecimento** — todos no mapa, sem dano e sem loot. A contagem só corre
+   com uma pessoa conectada (no servidor dedicado: `--warmup`, padrão 45 s;
+   offline: 5 s).
+2. **Dirigível** — todos embarcam com o estado zerado numa rota que cruza o
+   mapa perto do centro (`planAirship`). A bordo, o personagem segue a rota sem
+   colisão e não leva dano; salta com o pulo ou no fim da rota. Quem não manda
+   comandos (travou, saiu da janela) é ejetado pelo servidor no fim da rota.
+3. **Queda livre e planador** — parte do controlador do personagem (mesmo
+   código no cliente e no servidor): mergulho mais rápido olhando para baixo,
+   planador automático a 38 m do chão/telhado/água, pouso sem dano.
+4. **Zona** — 7 etapas (espera, fechamento, dano por segundo de 1 a 25, direto
+   na vida); cada círculo novo fica dentro do anterior com o centro em terra
+   firme. A contagem começa quando o dirigível termina a rota. `--zone-speed`
+   (servidor) ou "Zona rápida" (offline) aceleram tudo.
+5. **Fim** — eliminados não renascem e recebem a colocação; com um só de pé, a
+   partida acaba. O servidor dedicado recomeça sozinho (`--no-restart`
+   desliga): avisa os clientes com o motivo "Nova partida" e eles reconectam.
+
+### Bots (`server/core/bots/`)
+
+Bots são jogadores da `Simulation` marcados como `bot`: a cada tick o
+`BotManager` enfileira para cada um um `InputCommand` — o mesmo que um cliente
+enviaria —, então valem as mesmas regras de movimento, munição, cadência,
+construção e validação.
+
+- **Navegação** — `NavGrid`: grade de 2 m gerada do mapa (inclinação do relevo,
+  água com custo maior, colisores fixos na altura do corpo; obstáculos finos
+  como cercas marcam toda célula que cruzam). Portas e vãos vêm do construtor
+  do mapa (`map.portals`) e abrem um corredor com pontos exatos, por onde o
+  caminho passa. A* em 8 direções sem cortar quinas, com heurística ponderada e
+  caminho suavizado; orçamento de 4 buscas por tick para todos os bots.
+  Mapa principal: grade gerada em ~90 ms.
+- **Percepção** (a cada 5 ticks) — alcance de visão, campo de visão, linha de
+  visão contra relevo, prédios e construções; quem atirou nele é notado mesmo
+  fora do campo de visão.
+- **Decisão** (a cada 10 ticks) — prioridades: sair da zona › fugir › lutar ›
+  curar › ir para a próxima zona › saquear › coletar materiais › explorar.
+  Fuga só de quem está armado e perto; brigas de picareta só revidando, no
+  fim da partida ou sem loot por perto. Sem munição, munição vira prioridade
+  máxima no saque.
+- **Execução** (todo tick) — mira resolvida pelo mesmo `aimFrame` do tiro,
+  com tempo de reação ao ver alguém, erro que diminui enquanto acompanha o alvo
+  e aumenta se ele corre, giro limitado; arma escolhida pela distância; tiro
+  semiautomático com toques; deslocamento lateral e pulos; parede de
+  construção ao tomar tiro; cura atrás de cobertura; quebra construções que o
+  prendem; detecção de travamento por falta de progresso até o destino.
+- **Dificuldades** (`profiles.ts`) — Fácil, Normal e Difícil mudam reação
+  (0,95 / 0,55 / 0,3 s), erro de mira, velocidade de giro, alcance e campo de
+  visão, chance de construir, limite para se curar, mira na cabeça e pulos.
+
 ### Desempenho medido
 
 - **Simulação (Fase 1): 3,3 ms por tick com 100 jogadores** correndo e pulando no
@@ -227,6 +286,10 @@ com previsões).
 - **Construção (Fase 3): 1,6 ms por tick com 100 jogadores construindo sem
   parar** na Ilha de Brasa (1.363 peças em 20 s); destruir todas, uma a uma,
   com a verificação de desabamento: 69 ms no total (~0,05 ms por peça).
+- **Bots (Fase 4): 0,2–0,4 ms por tick com 40 bots** jogando uma partida inteira
+  na Ilha de Brasa (saque, combate, zona, construção); 0,4 ms com 99 bots. Uma
+  partida só de bots termina em 4–7 min de jogo com vencedor (teste
+  automatizado com 24 bots).
 - **Geração do mapa principal: ~240 ms** (relevo de 160 mil amostras, 4.900
   caixas, 4.600 adereços, 252 pontos de loot, 100 baús), igual no cliente e no servidor.
 - **Banda: o gargalo real.** Com 100 jogadores atirando, snapshots completos e
@@ -242,7 +305,7 @@ com previsões).
 | Transporte | `postMessage` (bytes do protocolo) | WebSocket `ws://IP:7350/ws` | WebSocket seguro `wss://` (TLS) |
 | Internet | **não precisa** | não precisa | precisa |
 | Como entrar | "Jogar offline" | os outros abrem `http://IP-DO-HOST:7350` e clicam em "Entrar em servidor" | matchmaking / código de convite (Fase 6) |
-| Bots | sim (Fase 4) | sim | sim (preencher partidas) |
+| Bots | sim (0–99, três dificuldades) | sim (`--bots`) | sim (preencher partidas) |
 | Persistência | navegador (Fase 8: arquivo local no app desktop) | idem, no host | banco de dados |
 
 **Tela dividida**: viável — o host aceita várias conexões; o cliente desenha duas
@@ -315,22 +378,25 @@ game/
 │   │   ├── player/            player.ts (estado + stepPlayer), inventory.ts, interact.ts
 │   │   ├── combat/            aim.ts, hitboxes.ts, projectile.ts
 │   │   ├── building/          grid.ts (peças, alvo), buildings.ts (BuildingWorld: apoio, desabamento)
+│   │   ├── match/             zone.ts (modos, fases, zona, rota do dirigível)
 │   │   ├── maps/              types, builder, structures, ember-island, proving-grounds, index
 │   │   └── net/               binary, protocol
 │   ├── server/
-│   │   ├── core/              simulation.ts, game-host.ts, loot.ts (sem dependências de ambiente)
+│   │   ├── core/              simulation.ts, game-host.ts, battle-royale.ts, loot.ts (sem dependências de ambiente)
+│   │   │   └── bots/          nav-grid.ts (grade + A*), bot.ts (cérebro), bot-manager.ts, profiles.ts
 │   │   └── node/              server.ts (HTTP + WebSocket), main.ts (CLI)
 │   └── client/
 │       ├── app.ts, main.ts    casca e estados
 │       ├── game/              match.ts (laço da partida), world-items.ts, effects.ts
 │       ├── net/               transport, session, prediction, predicted-buildings, interpolation
 │       ├── worker/            servidor local (offline)
-│       ├── render/            world-view, sky, terrain-mesh, static-geometry, props, item-models, buildings-view, materials, textures
+│       ├── render/            world-view, sky, terrain-mesh, static-geometry, props, item-models, buildings-view, zone-view, airship-view, materials, textures
 │       ├── character/         character-model.ts
 │       ├── camera/            third-person-camera.ts
 │       ├── input/             input.ts
 │       ├── audio/             audio.ts
 │       ├── ui/                screens, hud, minimap, inventory-screen, icons, dom, styles.css
+│       ├── history.ts         histórico local de partidas
 │       └── settings.ts
 └── tests/
     ├── unit/                  Vitest: colisão, movimento, mapas, combate, construção, servidor, rede, cliente

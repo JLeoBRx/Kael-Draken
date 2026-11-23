@@ -8,6 +8,7 @@ import { loadMap, regionAt } from '../../shared/maps'
 import type { GameMap } from '../../shared/maps/types'
 import { clamp, lerp, wrapAngle } from '../../shared/math/scalar'
 import { Buttons, CharFlag, copyCharacterState, createCharacterState } from '../../shared/movement/character'
+import { GameMode, MatchPhase, distanceOutside, zoneCircleAt, type AirshipRoute, type ZoneCircle, type ZoneStage } from '../../shared/match/zone'
 import { Cause, TargetKind, type EntityState, type GameEvent, type InputCommand, type InventoryAction, type Snapshot } from '../../shared/net/protocol'
 import { pickInteractable } from '../../shared/player/interact'
 import { PICKAXE_SLOT, SLOT_COUNT, currentSpread, type PlayerEvent, type PlayerState } from '../../shared/player/player'
@@ -20,10 +21,12 @@ import { RemoteEntity, ServerClock } from '../net/interpolation'
 import { Predictor } from '../net/prediction'
 import { NetSession } from '../net/session'
 import type { Transport } from '../net/transport'
+import { AirshipView } from '../render/airship-view'
 import { BuildingsView } from '../render/buildings-view'
+import { ZoneView } from '../render/zone-view'
 import { WorldView } from '../render/world-view'
 import { QUALITY, type Settings } from '../settings'
-import type { Hud } from '../ui/hud'
+import type { BattleHud, Hud, MatchResult } from '../ui/hud'
 import { FullMapView, MinimapView, gridRef, renderMapImage } from '../ui/minimap'
 import { Effects } from './effects'
 import { WorldItemsView } from './world-items'
@@ -123,6 +126,19 @@ export interface DebugState {
   destroyedProps: number
   harvested: number
   target: { name: string; health: number; max: number } | null
+  /** GameMode e fase (MatchPhase) */
+  gameMode: number
+  phase: number
+  zone: ZoneCircle | null
+  outsideZone: boolean
+  airship: boolean
+  result: MatchResult | null
+  spectating: string | null
+}
+
+function fmtClock(seconds: number): string {
+  const s = Math.max(0, Math.ceil(seconds))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()))
@@ -151,6 +167,8 @@ export class Match {
   private readonly clock = new ServerClock()
   private readonly items: WorldItemsView
   private readonly buildings: BuildingsView
+  private readonly zoneView: ZoneView
+  private readonly airship: AirshipView
   private readonly effects: Effects
   private readonly minimap: MinimapView
   private readonly fullmap: FullMapView
@@ -190,6 +208,21 @@ export class Match {
   /** Índice do adereço → colisor (para removê-lo quando quebra). */
   private readonly propCollider = new Map<number, number>()
   private readonly ghostChar = createCharacterState(0, 0, 0)
+  // battle royale
+  readonly gameMode: number
+  private phase: number = MatchPhase.Training
+  private phaseEnd = 0
+  private stage: ZoneStage | null = null
+  private route: AirshipRoute | null = null
+  private zoneNow: ZoneCircle | null = null
+  private readonly zoneScratch: ZoneCircle = { x: 0, z: 0, r: 0 }
+  private participants = 0
+  private damageDealt = 0
+  private startedTick = -1
+  private result: MatchResult | null = null
+  private spectateId = 0
+  /** Fim da partida para este jogador (vitória ou eliminação). */
+  onResult: ((r: MatchResult) => void) | null = null
   onClosed: ((reason: string) => void) | null = null
 
   /** Conecta, carrega o mapa e a cena, e espera o primeiro estado do servidor. */
@@ -203,7 +236,7 @@ export class Match {
       const map = loadMap(welcome.mapId)
       progress('Preparando gráficos…')
       await nextFrame()
-      const match = new Match(session, map, deps, welcome.playerId, welcome.tickRate, transport.kind === 'local' ? 'Offline' : transport.label)
+      const match = new Match(session, map, deps, welcome.playerId, welcome.tickRate, transport.kind === 'local' ? 'Offline' : transport.label, welcome.mode)
       deps.renderer.compile(match.world.scene, match.cam.camera)
       progress('Sincronizando com o servidor…')
       await match.waitForFirstState()
@@ -214,7 +247,8 @@ export class Match {
     }
   }
 
-  private constructor(session: NetSession, map: GameMap, private readonly deps: MatchDeps, playerId: number, tickRate: number, modeLabel: string) {
+  private constructor(session: NetSession, map: GameMap, private readonly deps: MatchDeps, playerId: number, tickRate: number, modeLabel: string, gameMode: number) {
+    this.gameMode = gameMode
     this.session = session
     this.map = map
     this.playerId = playerId
@@ -230,6 +264,8 @@ export class Match {
     this.world.scene.add(this.local.root)
     this.items = new WorldItemsView(this.world.scene, map)
     this.buildings = new BuildingsView(this.world.scene, this.predictor.builds.buildings, tickRate)
+    this.zoneView = new ZoneView(this.world.scene)
+    this.airship = new AirshipView(this.world.scene)
     for (const [collider, index] of map.propColliders) this.propCollider.set(index, collider)
     this.effects = new Effects(this.world.scene, map.world, deps.hud.fx)
     const image = renderMapImage(map)
@@ -280,6 +316,9 @@ export class Match {
     this.aliveCount = s.alive
     this.kills = s.kills
     this.predictor.builds.serverTick = s.tick
+    this.phase = s.phase
+    this.phaseEnd = s.phaseEnd
+    if (s.phase === MatchPhase.Airship) this.participants = Math.max(this.participants, s.alive)
     if (s.self) this.predictor.reconcile(s.self, s.ackSeq)
     // Fila do servidor crescendo = relógio do cliente adiantado: desacelera um pouco.
     this.tickScale = s.queued > 2 ? 0.97 : 1
@@ -362,6 +401,7 @@ export class Match {
           this.hits++
           this.lastHit = { damage: e.damage, head: e.head, targetKind: e.targetKind }
           const structure = e.targetKind === TargetKind.Structure
+          if (e.targetKind === TargetKind.Player) this.damageDealt += e.damage
           hud.hitMarker(e.head, e.eliminated && !structure)
           this.effects.damageNumber(tmpA.set(e.x, e.y, e.z), e.damage, structure ? 'build' : e.head ? 'head' : e.shield ? 'shield' : 'body')
           if (!structure) audio.play(e.head ? 'headshot' : 'hit')
@@ -414,12 +454,14 @@ export class Match {
           hud.killFeed(`${killer}<span class="feed-cause">${escapeHtml(cause)}</span> <b>${escapeHtml(this.nameOf(e.victim))}</b>`, e.victim === this.playerId || e.killer === this.playerId)
           if (e.victim === this.playerId) {
             this.death = { killer: e.killer, respawnAt: e.respawnIn > 0 ? performance.now() + e.respawnIn * 1000 : null }
+            this.spectateId = e.killer
             hud.setDeath({
               text: e.killer ? `por <b>${escapeHtml(this.nameOf(e.killer))}</b> (${escapeHtml(cause)})` : `(${escapeHtml(cause)})`,
               respawnAt: this.death.respawnAt,
               spectating: e.killer && e.killer !== this.playerId ? this.nameOf(e.killer) : null,
             })
             audio.play('eliminated')
+            if (e.place > 0) this.finish(false, e.place)
           } else if (e.killer === this.playerId) {
             hud.banner(`Eliminou ${this.nameOf(e.victim)}`, 'kill')
             audio.play('eliminated')
@@ -454,6 +496,17 @@ export class Match {
           tmpA.set(e.x, e.y, e.z)
           this.effects.explosion(tmpA, e.radius)
           audio.play('explosion', { pos: tmpA })
+          break
+        case 'zone':
+          this.stage = e
+          break
+        case 'airship':
+          this.route = e
+          this.startedTick = e.startTick
+          break
+        case 'matchEnd':
+          if (e.winner === this.playerId) this.finish(true, 1)
+          else if (e.winner) hud.banner(`${this.nameOf(e.winner)} venceu`, 'kill')
           break
         case 'respawn':
           if (e.player === this.playerId) {
@@ -505,6 +558,86 @@ export class Match {
       else if (e.type === 'throw') audio.play('throw')
       else if (e.type === 'fall') audio.play('hurt')
     }
+  }
+
+  /** Resultado da partida para este jogador (uma vez). */
+  private finish(victory: boolean, place: number): void {
+    if (this.result || this.gameMode !== GameMode.BattleRoyale) return
+    const seconds = this.startedTick >= 0 ? Math.max(0, (this.serverTick - this.startedTick) / this.tickRate) : 0
+    this.result = { victory, place, total: Math.max(this.participants, place), kills: this.kills, damage: this.damageDealt, seconds }
+    if (victory) this.deps.audio.play('chest')
+    this.deps.hud.setDeath(null)
+    this.onResult?.(this.result)
+  }
+
+  /** Texto da faixa de fase/zona do HUD. */
+  private battleHud(state: PlayerState): BattleHud | null {
+    if (this.gameMode !== GameMode.BattleRoyale) return null
+    const tick = this.estimatedServerTick(performance.now())
+    const c = state.char
+    const secs = (t: number) => fmtClock((t - tick) / this.tickRate)
+    let title = ''
+    let timer: string | null = null
+    let hint: string | null = null
+    switch (this.phase) {
+      case MatchPhase.Warmup:
+        title = 'A partida começa em'
+        timer = this.phaseEnd > 0 ? secs(this.phaseEnd) : null
+        hint = 'Aquecimento: sem dano'
+        break
+      case MatchPhase.Airship:
+      case MatchPhase.Playing: {
+        const st = this.stage
+        if (c.flags & CharFlag.Riding) {
+          title = 'Dirigível'
+          timer = this.route ? secs(this.route.endTick) : null
+          hint = '<kbd>Espaço</kbd> saltar'
+        } else if (st && tick < st.shrinkStart) {
+          title = st.index === 0 ? 'A zona fecha em' : 'A zona fecha de novo em'
+          timer = secs(st.shrinkStart)
+        } else if (st && tick < st.shrinkEnd) {
+          title = 'A zona está fechando'
+          timer = secs(st.shrinkEnd)
+        } else title = 'Zona final'
+        if (c.flags & CharFlag.Skydiving) hint = '<kbd>Espaço</kbd> abrir o planador'
+        break
+      }
+      case MatchPhase.Ended:
+        title = this.result?.victory ? 'Vitória!' : 'Fim de partida'
+        break
+    }
+    const z = this.zoneNow
+    const d = z && state.alive ? distanceOutside(z, c.x, c.z) : null
+    const falling = (c.flags & (CharFlag.Skydiving | CharFlag.Gliding)) !== 0
+    return {
+      title,
+      timer,
+      zoneDistance: d,
+      outside: d !== null && d > 0,
+      hint,
+      altitude: falling ? c.y - Math.max(this.map.terrain.heightAt(c.x, c.z), this.map.def.waterLevel) : null,
+    }
+  }
+
+  /** Quem assistir: quem eliminou, senão qualquer um ainda em jogo. */
+  private spectateTarget(): CharacterModel | null {
+    const pick = this.remotes.get(this.spectateId)?.model
+    if (pick) return pick
+    for (const [id, r] of this.remotes) {
+      if (r.model) {
+        this.spectateId = id
+        return r.model
+      }
+    }
+    return null
+  }
+
+  /** Assistir o próximo jogador (clique no modo espectador). */
+  spectateNext(): void {
+    const ids = [...this.remotes.keys()]
+    if (ids.length === 0) return
+    const k = ids.indexOf(this.spectateId)
+    this.spectateId = ids[(k + 1) % ids.length]
   }
 
   /** Lascas e som de um golpe de picareta, conforme o material atingido. */
@@ -752,13 +885,13 @@ export class Match {
       r.model.update(this.sampled, frameDt)
     }
 
-    // Câmera: o próprio personagem, ou quem eliminou você (espectador)
+    // Câmera: o próprio personagem, ou alguém em jogo (espectador)
     let camTarget: { x: number; y: number; z: number } = p
     let camFlags = c.flags
-    if (!state.alive && this.death) {
-      const killer = this.death.killer ? this.remotes.get(this.death.killer)?.model : null
-      if (killer) {
-        camTarget = killer.root.position
+    if (!state.alive) {
+      const other = this.spectateTarget()
+      if (other) {
+        camTarget = other.root.position
         camFlags = CharFlag.Grounded
       }
     }
@@ -768,7 +901,16 @@ export class Match {
     this.focus.set(camTarget.x, camTarget.y, camTarget.z)
     this.world.update(this.focus, this.cam.camera, this.elapsed)
     this.items.update(frameDt, this.focus, this.elapsed)
-    this.buildings.update(this.estimatedServerTick(now), this.predictor.builds.version)
+    const serverTickNow = this.estimatedServerTick(now)
+    this.buildings.update(serverTickNow, this.predictor.builds.version)
+    this.zoneNow = this.stage ? zoneCircleAt(this.stage, serverTickNow, this.zoneScratch) : null
+    this.zoneView.update(this.zoneNow, this.map.def.waterLevel, this.elapsed)
+    this.airship.update(this.route, serverTickNow, frameDt)
+    const overlay = this.gameMode === GameMode.BattleRoyale
+      ? { zone: this.zoneNow, next: this.stage ? { x: this.stage.toX, z: this.stage.toZ, r: this.stage.toR } : null, route: this.phase <= MatchPhase.Airship || (c.flags & CharFlag.Riding) !== 0 ? this.route : null }
+      : null
+    this.minimap.battle = overlay
+    this.fullmap.battle = overlay
     this.updateGhost(state)
     this.updateTarget()
     const size = this.deps.renderer.getSize(tmpSize)
@@ -856,6 +998,7 @@ export class Match {
       scoped: aiming && w?.category === 'sniper',
       build: this.buildMode && state.alive ? { kind: this.buildMode.kind, material: this.buildMode.material, blocked: this.ghostBlocked } : null,
       target: this.target,
+      br: this.battleHud(state),
       debug: {
         modo: this.modeLabel,
         mapa: this.map.def.id,
@@ -919,6 +1062,13 @@ export class Match {
       destroyedProps: this.destroyedProps,
       harvested: this.harvested,
       target: this.target,
+      gameMode: this.gameMode,
+      phase: this.phase,
+      zone: this.zoneNow ? { ...this.zoneNow } : null,
+      outsideZone: !!this.zoneNow && distanceOutside(this.zoneNow, s.x, s.z) > 0,
+      airship: (s.flags & CharFlag.Riding) !== 0,
+      result: this.result,
+      spectating: st.alive ? null : this.remotes.get(this.spectateId)?.name ?? null,
     }
   }
 
@@ -929,6 +1079,8 @@ export class Match {
     this.local.dispose()
     this.items.dispose()
     this.buildings.dispose()
+    this.zoneView.dispose()
+    this.airship.dispose()
     this.effects.dispose()
     this.minimap.el.remove()
     this.fullmap.el.remove()

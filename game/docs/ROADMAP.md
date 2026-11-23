@@ -10,8 +10,8 @@ termina com uma entrega que pode ser jogada.
 | 1 — Fundação | personagem, câmera, movimentação, mapa de testes, servidor autoritativo e rede básica | 1 semana | **concluída** |
 | 2 — Gameplay | armas, tiros, vida/escudo, inventário, coleta, baús, mapa principal (1ª versão), HUD completa | 2–3 semanas | **concluída** |
 | 3 — Construção | paredes, rampas, pisos, telhados; pré-visualização, recursos, vida e destruição sincronizadas | 2 semanas | **concluída** |
-| 4 — IA | bots com navegação, loot, combate, fuga, abrigo, construção e zona; níveis de dificuldade; zona segura; partida BR completa offline | 2–3 semanas | próxima |
-| 5 — Multijogador local | lobby LAN, equipes, descoberta na rede, reconexão, tela dividida, testes com vários jogadores | 1–2 semanas | |
+| 4 — IA | bots com navegação, loot, combate, fuga, abrigo, construção e zona; níveis de dificuldade; zona segura; partida BR completa offline | 2–3 semanas | **concluída** |
+| 5 — Multijogador local | lobby LAN, equipes, descoberta na rede, reconexão, tela dividida, testes com vários jogadores | 1–2 semanas | próxima |
 | 6 — Online | plataforma (contas, amigos, convites, grupos, matchmaking, salas públicas/privadas, código de convite), alocação de servidores, segurança, gerência de interesse e compressão | 3–4 semanas | |
 | 7 — Polimento | arte final (GLTF, animações esqueléticas), sons, efeitos, pós-processamento, otimização, acessibilidade, correção de bugs | 3 semanas | |
 | 8 — Lançamento | app desktop (Electron/Tauri), instaladores, servidor em container, documentação de operação, testes de carga e finais | 1–2 semanas | |
@@ -138,15 +138,47 @@ Decisões de projeto:
 - Editar peças (abrir janelas/portas) fica para depois da Fase 4, se os testes
   de jogo pedirem.
 
-## Fase 4 — Inteligência artificial
+## Fase 4 — Inteligência artificial ✅ (M2: primeira versão jogável de battle royale)
 
-- Bots como "clientes" do servidor (mesmos comandos de entrada que um jogador).
-- Navegação: grade de navegação gerada do mapa + A*; desvio local; uso de rampas.
-- Árvore de comportamento: explorar, saquear, buscar alvo, combater, fugir,
-  curar, procurar abrigo, construir defesa, respeitar a zona.
-- Dificuldades: tempo de reação, precisão, consciência, agressividade, construção.
-- Zona segura dinâmica: fases com espera/encolhimento e dano crescente.
-- Partida completa: lobby → ônibus/salto → paraquedas → combate → vencedor.
+Entregue:
+
+- **Partida completa**: aquecimento → dirigível (salto quando quiser) → queda
+  livre com mergulho → planador automático → pouso → zona em 7 etapas →
+  vencedor. Eliminados recebem a colocação e assistem os outros (clique troca
+  quem assistir).
+- **Zona segura** ("nuvem de cinzas"): círculos aninhados com centro em terra,
+  espera e fechamento, dano crescente direto na vida; parede animada no mundo,
+  contorno no minimapa e no mapa, próxima zona tracejada, aviso e tela
+  arroxeada fora dela.
+- **Bots** no servidor, pelos mesmos comandos dos jogadores: grade de
+  navegação com portas + A*, percepção com campo e linha de visão, saque
+  (itens, baús, munição, cura, materiais), combate com reação e erro de mira,
+  escolha de arma por distância, deslocamento lateral, pulos, paredes de
+  construção, cura, fuga, coleta com a picareta, zona e salto do dirigível
+  rumo a pontos de loot. Três dificuldades.
+- **Offline configurável**: modo (battle royale ou treino), 0–99 bots,
+  dificuldade, zona normal ou rápida, mapa.
+- **Servidor dedicado/LAN**: `--mode`, `--bots`, `--bot-difficulty`,
+  `--warmup`, `--zone-speed`; recomeça sozinho e os clientes reconectam.
+- **Telas**: resultado de vitória/derrota (colocação, eliminações, dano,
+  tempo), "Jogar de novo", histórico local de partidas com totais.
+- **Desempenho**: 40 bots custam 0,2–0,4 ms por tick no mapa principal.
+- **Testes**: queda livre e planador, zona, fases, colocação, vencedor,
+  servidor em modo BR com espectador e reinício, partida inteira só de bots
+  (24 bots, com vencedor e maioria das eliminações em combate), e no navegador:
+  salto/planador/pouso offline e uma partida até o fim no servidor dedicado com
+  resultado, histórico e reconexão.
+
+Decisões de projeto:
+
+- **Bots no servidor, não no cliente**: valem para offline, LAN e online sem
+  código extra, e não podem trapacear além do que o servidor já permite (a
+  percepção é limitada por distância, campo e linha de visão).
+- **Grade 2D no térreo**: os bots não sobem escadas de prédios (andares de
+  cima ficam para jogadores); construções e adereços quebrados são tratados
+  pelo próprio bot (desvia, pula, quebra).
+- **Zona começa a contar no fim do dirigível** e o último círculo fecha por
+  completo: a partida sempre termina.
 
 ## Fase 5 — Multijogador local
 

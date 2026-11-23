@@ -148,7 +148,8 @@ export class BattleRoyale {
     }
     sim.emit({ type: 'airship', ...route })
     const isLand = (x: number, z: number) => map.terrain.heightAt(x, z) > map.def.waterLevel + 0.5
-    this.stages = planZone({ x: 0, z: 0, r: map.world.bound }, tick, sim.tickRate, this.opts.zoneSpeed, this.rng.fork(7), isLand)
+    // a zona começa a contar quando o dirigível termina a rota (todos já saltaram)
+    this.stages = planZone({ x: 0, z: 0, r: map.world.bound }, route.endTick, sim.tickRate, this.opts.zoneSpeed, this.rng.fork(7), isLand)
     this.stageIndex = 0
     sim.emit({ type: 'zone', ...this.stages[0] })
     this.startTick = tick

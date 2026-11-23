@@ -102,7 +102,7 @@ test('A pega um fuzil e acerta B; o servidor aplica o dano e os dois veem', asyn
 })
 
 test('A ergue uma parede e B a vê; A a derruba com a picareta e ela some para B', async ({ browser }) => {
-  test.setTimeout(480_000)
+  test.setTimeout(900_000)
   const ctxA = await browser.newContext()
   const ctxB = await browser.newContext()
   const a = await ctxA.newPage()

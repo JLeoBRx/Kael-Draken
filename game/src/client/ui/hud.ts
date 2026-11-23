@@ -51,7 +51,32 @@ export interface HudInfo {
   build: BuildHud | null
   /** Construção sob a mira: vida atual e máxima. */
   target: { name: string; health: number; max: number } | null
+  /** Battle royale: fase, contagem e zona (null no treino). */
+  br: BattleHud | null
   debug: Record<string, string | number>
+}
+
+export interface BattleHud {
+  /** Texto principal ("A zona fecha em", "Dirigível"…). */
+  title: string
+  /** Contagem (mm:ss) ou null. */
+  timer: string | null
+  /** Distância até a zona segura (m; ≤ 0 = dentro). */
+  zoneDistance: number | null
+  outside: boolean
+  /** Dica de ação ("Espaço — saltar"). */
+  hint: string | null
+  /** Altura em queda livre/planando (m). */
+  altitude: number | null
+}
+
+export interface MatchResult {
+  victory: boolean
+  place: number
+  total: number
+  kills: number
+  damage: number
+  seconds: number
 }
 
 /** Tecla de cada peça (mesma ordem de BuildKind). */
@@ -113,6 +138,9 @@ export class Hud {
   private readonly deathEl: HTMLElement
   private readonly deathText: HTMLElement
   private readonly deathCount: HTMLElement
+  private readonly phaseEl: HTMLElement
+  private readonly stormEl: HTMLElement
+  private readonly resultsEl: HTMLElement
   private debugVisible = false
   private lastText = 0
   private lastSlotsKey = ''
@@ -205,9 +233,15 @@ export class Hud {
     this.deathEl = h('div', { class: 'death', 'data-hud': 'death' }, h('div', { class: 'death-title' }, 'Eliminado'), this.deathText, this.deathCount)
     this.deathEl.hidden = true
     this.fx = h('div', { class: 'hud-fx' })
+    this.phaseEl = h('div', { class: 'phase', 'data-hud': 'phase' })
+    this.phaseEl.hidden = true
+    this.stormEl = h('div', { class: 'storm-vignette' })
+    this.resultsEl = h('div', { class: 'results', 'data-hud': 'results' })
+    this.resultsEl.hidden = true
 
     this.el = h('div', { class: 'hud', 'data-hud': '' },
       this.scopeEl,
+      this.stormEl,
       this.vignetteEl,
       this.fx,
       this.crossEl,
@@ -216,12 +250,14 @@ export class Hud {
       this.dirLayer,
       h('div', { class: 'compass' }, this.strip, h('div', { class: 'needle' })),
       this.headingEl,
+      this.phaseEl,
       h('div', { class: 'hud-tr' }, this.minimapSlot, this.regionEl, this.matchEl, this.mapEl, h('div', { class: 'row', style: 'justify-content:flex-end;gap:6px' }, this.connEl), this.feedEl),
       h('div', { class: 'hud-bl' }, h('div', { class: 'stance' }, ...Object.values(this.stanceEls)), this.speedEl, this.helpEl),
       h('div', { class: 'hud-bc' }, this.promptEl, this.progressEl, vitals),
       h('div', { class: 'hud-br' }, this.toastsEl, this.buildEl, loadout),
       this.bannerEl,
       this.deathEl,
+      this.resultsEl,
       this.debugEl,
       this.fpsEl)
     this.el.hidden = true
@@ -292,6 +328,32 @@ export class Hud {
     this.deathEl.dataset.respawnAt = info.respawnAt ? String(info.respawnAt) : ''
   }
 
+  /** Tela de fim de partida (vitória ou colocação). Botões: ações disponíveis. */
+  showResults(r: MatchResult | null, actions: { label: string; action: string; primary?: boolean; run: () => void }[] = []): void {
+    this.resultsEl.hidden = !r
+    if (!r) {
+      this.resultsEl.replaceChildren()
+      return
+    }
+    const mm = Math.floor(r.seconds / 60)
+    const ss = String(Math.floor(r.seconds % 60)).padStart(2, '0')
+    this.resultsEl.className = `results ${r.victory ? 'victory' : 'defeat'}`
+    this.resultsEl.replaceChildren(
+      h('div', { class: 'results-panel' },
+        h('div', { class: 'results-place', 'data-result': r.victory ? 'vitoria' : 'derrota' }, r.victory ? 'Vitória!' : `#${r.place}`),
+        h('div', { class: 'results-sub' }, r.victory ? `A última chama de ${r.total}` : `Você ficou em ${r.place}º de ${r.total}`),
+        h('div', { class: 'results-stats' },
+          h('div', {}, h('b', {}, String(r.kills)), h('span', {}, r.kills === 1 ? 'eliminação' : 'eliminações')),
+          h('div', {}, h('b', {}, String(Math.round(r.damage))), h('span', {}, 'de dano')),
+          h('div', {}, h('b', {}, `${mm}:${ss}`), h('span', {}, 'sobrevivendo'))),
+        h('div', { class: 'row', style: 'justify-content:center;gap:10px;margin-top:14px' },
+          ...actions.map((a) => h('button', { class: `btn small${a.primary ? ' primary' : ''}`, 'data-action': a.action, onclick: a.run }, h('span', { class: 'label' }, a.label))))))
+  }
+
+  get resultsVisible(): boolean {
+    return !this.resultsEl.hidden
+  }
+
   private renderSlots(slots: Slot[], selected: number, building: boolean): void {
     const key = JSON.stringify(slots) + selected + building
     if (key === this.lastSlotsKey) return
@@ -334,6 +396,16 @@ export class Hud {
       const reason = b.blocked ?? (have < BUILD.cost ? `Falta ${BUILD_MATERIALS[b.material].name.toLowerCase()}` : null)
       this.buildInfo.className = `build-info${reason ? ' bad' : ''}`
       this.buildInfo.innerHTML = `<i class="m${b.material}"></i>${BUILD_MATERIALS[b.material].name} · ${BUILD.cost}${reason ? ` · <b>${reason}</b>` : ''}`
+    }
+    // Battle royale: fase, contagem, zona
+    const br = info.br
+    this.phaseEl.hidden = !br
+    this.stormEl.classList.toggle('on', !!br?.outside)
+    if (br) {
+      const zone = br.zoneDistance === null ? '' : br.outside ? `<em class="out">Fora da zona · ${Math.ceil(br.zoneDistance)} m</em>` : '<em>Dentro da zona</em>'
+      const alt = br.altitude !== null ? `<em>${Math.round(br.altitude)} m</em>` : ''
+      const html = `<b>${br.title}</b>${br.timer ? `<span>${br.timer}</span>` : ''}${zone}${alt}${br.hint ? `<small>${br.hint}</small>` : ''}`
+      if (this.phaseEl.innerHTML !== html) this.phaseEl.innerHTML = html
     }
     this.targetEl.hidden = !info.target
     if (info.target) {

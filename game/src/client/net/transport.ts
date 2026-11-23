@@ -1,3 +1,5 @@
+import type { BotDifficulty } from '../../server/core/bots/profiles'
+import { GameMode } from '../../shared/match/zone'
 /**
  * Transportes do cliente. A partida não sabe se fala com um Worker local
  * (offline), com um host na rede local ou com um servidor dedicado na
@@ -78,7 +80,7 @@ export function connectWebSocket(url: string, timeoutMs = 8000): Promise<Transpo
 
 /** Mensagens entre a página e o Worker do servidor local. */
 export type WorkerRequest =
-  | { t: 'start'; mapId: string; maxPlayers: number }
+  | { t: 'start'; mapId: string; maxPlayers: number; match: LocalMatchOptions }
   | { t: 'connect'; cid: number }
   | { t: 'data'; cid: number; buf: ArrayBuffer }
   | { t: 'disconnect'; cid: number }
@@ -99,7 +101,17 @@ function ownBuffer(data: Uint8Array): ArrayBuffer {
  * Sobe o servidor autoritativo num Web Worker (sem rede, sem internet) e
  * conecta a ele. É o mesmo GameHost do servidor dedicado.
  */
-export function startLocalServer(mapId: string, timeoutMs = 15000): Promise<Transport> {
+/** Partida offline: modo, bots e velocidade da zona. */
+export interface LocalMatchOptions {
+  mode: number
+  bots: number
+  difficulty: BotDifficulty
+  zoneSpeed: number
+}
+
+export const TRAINING_MATCH: LocalMatchOptions = { mode: GameMode.Training, bots: 0, difficulty: 'normal', zoneSpeed: 1 }
+
+export function startLocalServer(mapId: string, match: LocalMatchOptions = TRAINING_MATCH, timeoutMs = 20000): Promise<Transport> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('../worker/local-host.worker.ts', import.meta.url), { type: 'module', name: 'servidor-local' })
     const cid = 1
@@ -155,6 +167,6 @@ export function startLocalServer(mapId: string, timeoutMs = 15000): Promise<Tran
       if (!ready) reject(new Error(message))
       else transport.onClose?.(message)
     }
-    worker.postMessage({ t: 'start', mapId, maxPlayers: 16 } satisfies WorkerRequest)
+    worker.postMessage({ t: 'start', mapId, maxPlayers: Math.max(16, match.bots + 1), match } satisfies WorkerRequest)
   })
 }

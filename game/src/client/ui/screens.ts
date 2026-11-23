@@ -1,7 +1,9 @@
 import { GAME } from '../../shared/config/game'
 import { MOVE } from '../../shared/config/movement'
 import { PROTOCOL_VERSION } from '../../shared/net/protocol'
-import { QUALITY, type Quality, type Settings } from '../settings'
+import { QUALITY, type OfflinePrefs, type Quality, type Settings } from '../settings'
+import { BOT_DIFFICULTIES, BOT_PROFILES } from '../../server/core/bots/profiles'
+import { historyTotals, type MatchRecord } from '../history'
 import { EMBLEM_SVG, h } from './dom'
 
 /**
@@ -15,6 +17,7 @@ export interface MainMenuActions {
   join(): void
   settings(): void
   controls(): void
+  history(): void
 }
 
 export class Screens {
@@ -67,7 +70,7 @@ export class Screens {
     const emblem = h('div', { html: EMBLEM_SVG })
     const playBtn = h('button', { class: 'btn primary', 'data-action': 'offline', onclick: () => a.playOffline() },
       h('span', { class: 'label' }, 'Jogar offline'),
-      h('span', { class: 'sub' }, 'Ilha de Brasa ou Campo de Provas · servidor local no navegador, sem internet'))
+      h('span', { class: 'sub' }, 'Battle royale contra bots ou treino livre · servidor local no navegador, sem internet'))
     const joinBtn = h('button', { class: 'btn', 'data-action': 'join', onclick: () => a.join() },
       h('span', { class: 'label' }, 'Entrar em servidor'),
       h('span', { class: 'sub' }, 'Rede local (LAN) ou servidor dedicado online'))
@@ -81,17 +84,18 @@ export class Screens {
           emblem,
           h('h1', { class: 'title' }, GAME.title),
           h('p', { class: 'tagline' }, GAME.tagline),
-          h('span', { class: 'badge' }, h('span', { class: 'dot' }), `${GAME.phase} · armas, loot, combate e mapa principal`),
+          h('span', { class: 'badge' }, h('span', { class: 'dot' }), `${GAME.phase} · bots, zona e partida completa`),
           webglError ? h('p', { class: 'status error' }, webglError) : null),
         h('div', { class: 'actions' },
           playBtn,
           joinBtn,
           h('div', { class: 'row' },
             h('button', { class: 'btn small', 'data-action': 'settings', onclick: () => a.settings() }, h('span', { class: 'label' }, 'Configurações')),
-            h('button', { class: 'btn small', 'data-action': 'controls', onclick: () => a.controls() }, h('span', { class: 'label' }, 'Controles'))))),
+            h('button', { class: 'btn small', 'data-action': 'controls', onclick: () => a.controls() }, h('span', { class: 'label' }, 'Controles')),
+            h('button', { class: 'btn small', 'data-action': 'history', onclick: () => a.history() }, h('span', { class: 'label' }, 'Histórico'))))),
       h('div', { class: 'footer' },
         h('span', {}, `v${GAME.version} · protocolo ${PROTOCOL_VERSION}`),
-        h('span', {}, 'Próximas fases: construção, bots e zona, lobby e matchmaking'))))
+        h('span', {}, 'Próximas fases: lobby LAN e equipes, contas e matchmaking online'))))
     playBtn.focus()
   }
 
@@ -145,17 +149,74 @@ export class Screens {
   }
 
   /** Seleção de mapa (modo offline). */
-  mapSelect(maps: { id: string; name: string; description: string; tag: string }[], onPick: (id: string) => void, onBack: () => void): void {
+  mapSelect(maps: { id: string; name: string; description: string; tag: string }[], prefs: OfflinePrefs, onPick: (id: string, prefs: OfflinePrefs) => void, onBack: () => void): void {
+    const p: OfflinePrefs = { ...prefs }
+    const hint = h('p', { class: 'hint', style: 'margin:0' })
+    const modeBtns = (['br', 'treino'] as const).map((m) => h('button', { class: 'btn small', 'data-mode': m }, h('span', { class: 'label' }, m === 'br' ? 'Battle royale' : 'Treino')))
+    const botsLabel = h('b')
+    const bots = h('input', { type: 'range', min: 0, max: 99, step: 1, 'data-field': 'bots' }) as HTMLInputElement
+    bots.value = String(p.bots)
+    const difficulty = h('select', { 'data-field': 'difficulty' }, ...BOT_DIFFICULTIES.map((d) => h('option', { value: d }, BOT_PROFILES[d].label))) as HTMLSelectElement
+    difficulty.value = p.difficulty
+    const zone = h('select', { 'data-field': 'zone' }, h('option', { value: 'normal' }, 'Normal (~9 min)'), h('option', { value: 'rapida' }, 'Rápida (~4 min)')) as HTMLSelectElement
+    zone.value = p.zone
+    const zoneField = h('label', { class: 'field' }, 'Zona', zone)
+    const refresh = () => {
+      modeBtns.forEach((b) => b.classList.toggle('on', b.dataset.mode === p.mode))
+      botsLabel.textContent = String(p.bots)
+      zoneField.hidden = p.mode !== 'br'
+      hint.textContent = p.mode === 'br'
+        ? `Battle royale: você e ${p.bots} ${p.bots === 1 ? 'bot' : 'bots'} saltam do dirigível; a zona fecha e vence o último de pé. Sem renascimento.`
+        : `Treino livre${p.bots > 0 ? ` com ${p.bots} ${p.bots === 1 ? 'bot' : 'bots'}` : ''}: sem zona, quem é eliminado renasce em 5 s.`
+    }
+    modeBtns.forEach((b) => b.addEventListener('click', () => { p.mode = b.dataset.mode as OfflinePrefs['mode']; refresh() }))
+    bots.addEventListener('input', () => { p.bots = Number(bots.value); refresh() })
+    difficulty.addEventListener('change', () => { p.difficulty = difficulty.value as OfflinePrefs['difficulty'] })
+    zone.addEventListener('change', () => { p.zone = zone.value as OfflinePrefs['zone'] })
+    refresh()
     this.show(h('div', { class: 'screen', 'data-screen': 'map-select' },
-      h('div', { class: 'panel', style: 'width:min(720px,100%)' },
-        h('h2', {}, 'Escolha o mapa'),
-        h('p', { class: 'hint' }, 'Partida offline: o servidor roda no seu navegador. Modo treino livre — quem é eliminado renasce em 5 s. A partida completa de battle royale (zona, bots e vencedor) chega na Fase 4.'),
-        h('div', { class: 'map-cards' }, ...maps.map((m) => h('button', { class: 'btn map-card', 'data-map': m.id, onclick: () => onPick(m.id) },
+      h('div', { class: 'panel', style: 'width:min(760px,100%)' },
+        h('h2', {}, 'Partida offline'),
+        h('div', { class: 'match-options' },
+          h('div', { class: 'field' }, 'Modo', h('div', { class: 'seg' }, ...modeBtns)),
+          h('label', { class: 'field' }, h('span', {}, 'Bots: ', botsLabel), bots),
+          h('label', { class: 'field' }, 'Dificuldade dos bots', difficulty),
+          zoneField),
+        hint,
+        h('p', { class: 'hint', style: 'margin:14px 0 6px' }, 'Escolha o mapa para começar (o servidor roda no seu navegador):'),
+        h('div', { class: 'map-cards' }, ...maps.map((m) => h('button', { class: 'btn map-card', 'data-map': m.id, onclick: () => onPick(m.id, { ...p }) },
           h('span', { class: 'tag' }, m.tag),
           h('span', { class: 'label' }, m.name),
           h('span', { class: 'sub' }, m.description)))),
         h('div', { class: 'row', style: 'margin-top:16px' },
           h('button', { class: 'btn small', onclick: onBack }, h('span', { class: 'label' }, 'Voltar'))))))
+  }
+
+  history(list: readonly MatchRecord[], onClose: () => void): void {
+    const t = historyTotals(list)
+    const stat = (v: string | number, label: string) => h('div', {}, h('b', {}, String(v)), h('span', {}, label))
+    const rows = list.map((r) => {
+      const d = new Date(r.date)
+      const when = Number.isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+      const mm = Math.floor(r.seconds / 60)
+      const ss = String(Math.floor(r.seconds % 60)).padStart(2, '0')
+      return h('div', { class: `history-row${r.victory ? ' win' : ''}` },
+        h('b', {}, r.victory ? '#1 🏆' : `#${r.place}`),
+        h('span', {}, `${r.mapName} · ${r.where} · ${r.kills} ${r.kills === 1 ? 'eliminação' : 'eliminações'} · ${Math.round(r.damage)} de dano · ${mm}:${ss}`),
+        h('small', {}, `${when} · de ${r.total}`))
+    })
+    this.showModal(h('div', { class: 'screen overlay', 'data-screen': 'history', onclick: (e: Event) => { if (e.target === e.currentTarget) onClose() } },
+      h('div', { class: 'panel', style: 'width:min(680px,100%)' },
+        h('h2', {}, 'Histórico de partidas'),
+        h('div', { class: 'history-totals' },
+          stat(t.matches, 'partidas'), stat(t.wins, 'vitórias'), stat(t.top5, 'no top 5'), stat(t.kills, 'eliminações'),
+          stat(t.bestPlace === null ? '—' : `#${t.bestPlace}`, 'melhor colocação')),
+        list.length === 0
+          ? h('p', { class: 'hint' }, 'Nenhuma partida de battle royale ainda. Jogue uma offline contra bots!')
+          : h('div', { class: 'history-list' }, ...rows),
+        h('p', { class: 'hint', style: 'margin-top:10px' }, 'Salvo só neste navegador. Contas e estatísticas online chegam na Fase 6.'),
+        h('div', { class: 'row', style: 'margin-top:12px' },
+          h('button', { class: 'btn primary small', onclick: onClose }, h('span', { class: 'label' }, 'Fechar'))))))
   }
 
   clickToPlay(onClick: () => void): void {

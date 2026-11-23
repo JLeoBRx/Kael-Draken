@@ -97,6 +97,9 @@ export class CharacterModel {
   private airW = 0
   private aimW = 0
   private swimW = 0
+  private skyW = 0
+  private glideW = 0
+  private readonly glider: THREE.Group
   private bodyYaw = 0
   private legYaw = 0
   private initialized = false
@@ -110,6 +113,31 @@ export class CharacterModel {
 
     this.root.add(this.body)
     this.body.add(this.hips)
+    // Planador (aparece ao abrir): asa em arco sobre a cabeça, presa por cabos
+    this.glider = new THREE.Group()
+    const canopy = this.track(new THREE.MeshStandardMaterial({ color: skin.armor, roughness: 0.55, side: THREE.DoubleSide }))
+    const stripe = this.track(new THREE.MeshStandardMaterial({ color: skin.accent, roughness: 0.5, side: THREE.DoubleSide }))
+    const wing = new THREE.CylinderGeometry(2.3, 2.3, 1.5, 20, 1, true, -1.0, 2.0).rotateX(Math.PI / 2).rotateZ(Math.PI / 2)
+    this.geometries.push(wing)
+    const wingMesh = new THREE.Mesh(wing, canopy)
+    wingMesh.position.y = 0.2
+    const band = new THREE.CylinderGeometry(2.32, 2.32, 0.3, 20, 1, true, -1.0, 2.0).rotateX(Math.PI / 2).rotateZ(Math.PI / 2)
+    this.geometries.push(band)
+    const bandMesh = new THREE.Mesh(band, stripe)
+    bandMesh.position.y = 0.2
+    this.glider.add(wingMesh, bandMesh)
+    const cableMat = this.track(new THREE.MeshStandardMaterial({ color: 0x222222 }))
+    for (const side of [-1, 1]) {
+      const g = new THREE.CylinderGeometry(0.012, 0.012, 1.9, 4)
+      this.geometries.push(g)
+      const cable = new THREE.Mesh(g, cableMat)
+      cable.position.set(side * 0.75, -0.75, 0)
+      cable.rotation.z = side * 0.45
+      this.glider.add(cable)
+    }
+    this.glider.position.set(0, 2.9, 0)
+    this.glider.visible = false
+    this.root.add(this.glider)
     this.hips.position.set(0, 0.98, 0)
 
     // Quadril e cinto
@@ -244,6 +272,14 @@ export class CharacterModel {
     this.toolW = damp(this.toolW, this.heldIsTool ? 1 : 0, 10, dt)
     if (this.swingT < 1) this.swingT = Math.min(1, this.swingT + dt / SWING_TIME)
     this.swimW = damp(this.swimW, swimming ? 1 : 0, 6, dt)
+    const riding = (p.flags & CharFlag.Riding) !== 0
+    this.skyW = damp(this.skyW, p.flags & CharFlag.Skydiving ? 1 : 0, 6, dt)
+    this.glideW = damp(this.glideW, p.flags & CharFlag.Gliding ? 1 : 0, 6, dt)
+    // a bordo do dirigível o personagem não aparece (está dentro)
+    this.body.visible = !riding
+    if (this.nameplate) this.nameplate.visible = !riding
+    this.glider.visible = this.glideW > 0.02
+    this.glider.scale.setScalar(Math.max(0.01, this.glideW))
 
     // Orientação: o corpo acompanha a mira; parado, só gira quando a diferença é grande
     const moving = hs > 0.4
@@ -367,10 +403,38 @@ export class CharacterModel {
     elbowX[1] = elbowX[1] * (1 - mw) + 0.2 * mw
     elbowX[0] = elbowX[0] * (1 - mw) + 0.65 * mw
 
+    // ---- queda livre: de bruços, braços e pernas abertos
+    const kw = this.skyW
+    if (kw > 0.001) {
+      armX[0] = armX[0] * (1 - kw) + 0.5 * kw
+      armX[1] = armX[1] * (1 - kw) + 0.5 * kw
+      armZ[0] = armZ[0] * (1 - kw) - 1.35 * kw
+      armZ[1] = armZ[1] * (1 - kw) + 1.35 * kw
+      elbowX[0] = elbowX[0] * (1 - kw) + 0.3 * kw
+      elbowX[1] = elbowX[1] * (1 - kw) + 0.3 * kw
+      thigh[0] = thigh[0] * (1 - kw) - 0.15 * kw
+      thigh[1] = thigh[1] * (1 - kw) - 0.15 * kw
+      kneeB[0] = kneeB[0] * (1 - kw) - 0.5 * kw
+      kneeB[1] = kneeB[1] * (1 - kw) - 0.5 * kw
+    }
+    // ---- planando: braços para cima segurando o planador
+    const gw = this.glideW
+    if (gw > 0.001) {
+      armX[0] = armX[0] * (1 - gw) + 2.8 * gw
+      armX[1] = armX[1] * (1 - gw) + 2.8 * gw
+      armZ[0] = armZ[0] * (1 - gw) - 0.35 * gw
+      armZ[1] = armZ[1] * (1 - gw) + 0.35 * gw
+      elbowX[0] = elbowX[0] * (1 - gw) + 0.2 * gw
+      elbowX[1] = elbowX[1] * (1 - gw) + 0.2 * gw
+      thigh[0] = thigh[0] * (1 - gw) + 0.25 * gw
+      thigh[1] = thigh[1] * (1 - gw) + 0.1 * gw
+    }
+
     // ---- aplica
     this.hips.position.y = hipsY
-    this.body.rotation.x = -1.25 * ww
-    this.body.position.y = 0
+    this.body.rotation.x = -1.25 * ww - 1.3 * kw
+    // de bruços na queda livre: gira em torno do meio do corpo
+    this.body.position.y = 0.9 * kw
     this.hips.rotation.y = this.legYaw
     this.spine.rotation.y = -this.legYaw * 0.8
     this.spine.rotation.x = spineX + p.pitch * 0.25 * mw

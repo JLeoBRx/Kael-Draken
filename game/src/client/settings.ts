@@ -4,7 +4,17 @@
  * o jogo funciona mesmo com o armazenamento bloqueado.
  */
 
+import { isBotDifficulty, type BotDifficulty } from '../server/core/bots/profiles'
+
 export type Quality = 'baixa' | 'media' | 'alta'
+
+/** Última configuração usada na partida offline. */
+export interface OfflinePrefs {
+  mode: 'br' | 'treino'
+  bots: number
+  difficulty: BotDifficulty
+  zone: 'normal' | 'rapida'
+}
 
 export interface Settings {
   playerName: string
@@ -18,6 +28,7 @@ export interface Settings {
   crouchToggle: boolean
   showFps: boolean
   serverAddress: string
+  offline: OfflinePrefs
   /** Volume geral (0–1). */
   volume: number
 }
@@ -50,6 +61,7 @@ export const DEFAULT_SETTINGS: Settings = {
   crouchToggle: true,
   showFps: false,
   serverAddress: '',
+  offline: { mode: 'br', bots: 23, difficulty: 'normal', zone: 'normal' },
   volume: 0.7,
 }
 
@@ -79,6 +91,17 @@ export function loadSettings(): Settings {
     showFps: typeof raw.showFps === 'boolean' ? raw.showFps : d.showFps,
     serverAddress: typeof raw.serverAddress === 'string' ? raw.serverAddress.slice(0, 200) : d.serverAddress,
     volume: num(raw.volume, 0, 1, d.volume),
+    offline: loadOffline(raw.offline, d.offline),
+  }
+}
+
+function loadOffline(v: unknown, d: OfflinePrefs): OfflinePrefs {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
+  return {
+    mode: o.mode === 'br' || o.mode === 'treino' ? o.mode : d.mode,
+    bots: Math.round(num(o.bots, 0, 99, d.bots)),
+    difficulty: isBotDifficulty(o.difficulty) ? o.difficulty : d.difficulty,
+    zone: o.zone === 'normal' || o.zone === 'rapida' ? o.zone : d.zone,
   }
 }
 

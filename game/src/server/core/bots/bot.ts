@@ -72,7 +72,7 @@ function suitability(w: WeaponDef, dist: number): number {
 
 /** Faixa de distância preferida no combate por tipo de arma. */
 function preferredRange(w: WeaponDef | null): [number, number] {
-  if (!w) return [0, 2]
+  if (!w) return [1.3, 2.3] // picareta: nem colado (o golpe sai do ombro), nem longe
   switch (w.category) {
     case 'shotgun': return [3, 8]
     case 'smg': return [5, 16]

@@ -10,6 +10,8 @@ import { defineConfig, devices } from '@playwright/test'
  * qualidade gráfica dos testes é "baixa".
  */
 const PORT = Number(process.env.E2E_PORT ?? 7361)
+/** Segundo servidor: battle royale curto (zona 30× mais rápida) com 2 bots fáceis. */
+export const BR_PORT = PORT + 1
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -25,10 +27,19 @@ export default defineConfig({
     launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 960, height: 540 } } }],
-  webServer: {
-    command: `npx vite build && npx tsx src/server/node/main.ts --port ${PORT} --host 127.0.0.1 --map campo-de-provas --name "Servidor de testes"`,
-    url: `http://127.0.0.1:${PORT}/api/info`,
-    timeout: 120_000,
-    reuseExistingServer: false,
-  },
+  webServer: [
+    {
+      command: `npx vite build && npx tsx src/server/node/main.ts --port ${PORT} --host 127.0.0.1 --map campo-de-provas --mode treino --name "Servidor de testes"`,
+      url: `http://127.0.0.1:${PORT}/api/info`,
+      timeout: 120_000,
+      reuseExistingServer: false,
+    },
+    {
+      // espera o primeiro servidor compilar o cliente (dist/client) antes de subir
+      command: `npx tsx src/server/node/main.ts --port ${BR_PORT} --host 127.0.0.1 --map campo-de-provas --mode br --bots 2 --bot-difficulty facil --warmup 4 --zone-speed 30 --name "BR de testes"`,
+      url: `http://127.0.0.1:${BR_PORT}/api/info`,
+      timeout: 120_000,
+      reuseExistingServer: false,
+    },
+  ],
 })

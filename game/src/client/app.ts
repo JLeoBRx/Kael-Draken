@@ -2,17 +2,31 @@ import * as THREE from 'three'
 import { GAME } from '../shared/config/game'
 import { MAIN_MAP_ID, MAPS, TRAINING_MAP_ID } from '../shared/maps'
 import { AudioEngine } from './audio/audio'
-import { sanitizeName } from '../shared/net/protocol'
+import { KICK_NEW_MATCH, sanitizeName } from '../shared/net/protocol'
+import { GameMode } from '../shared/match/zone'
+import { addToHistory, loadHistory } from './history'
 import { Match, type DebugState } from './game/match'
 import { InputManager } from './input/input'
-import { connectWebSocket, normalizeServerUrl, startLocalServer, type Transport } from './net/transport'
-import { QUALITY, loadSettings, saveSettings, type Settings } from './settings'
+import { TRAINING_MATCH, connectWebSocket, normalizeServerUrl, startLocalServer, type LocalMatchOptions, type Transport } from './net/transport'
+import { QUALITY, loadSettings, saveSettings, type OfflinePrefs, type Settings } from './settings'
+import type { MatchResult } from './ui/hud'
 import { h } from './ui/dom'
 import { Hud } from './ui/hud'
 import { InventoryScreen } from './ui/inventory-screen'
 import { Screens } from './ui/screens'
 
-type AppState = 'menu' | 'loading' | 'ready' | 'playing' | 'paused' | 'inventory'
+type AppState = 'menu' | 'loading' | 'ready' | 'playing' | 'paused' | 'inventory' | 'results'
+
+/** Como (re)abrir a partida atual: para "Jogar de novo" e para a reconexão entre partidas. */
+interface StartRecipe {
+  make: () => Promise<Transport>
+  title: string
+  offline: boolean
+}
+
+function toLocalMatch(p: OfflinePrefs): LocalMatchOptions {
+  return { mode: p.mode === 'br' ? GameMode.BattleRoyale : GameMode.Training, bots: p.bots, difficulty: p.difficulty, zoneSpeed: p.zone === 'rapida' ? 2.2 : 1 }
+}
 
 /**
  * Casca da aplicação: estados (menu → carregando → jogando ⇄ pausa),
@@ -31,6 +45,7 @@ export class App {
   private lastFrame = 0
   private readonly audio = new AudioEngine()
   private readonly inventory: InventoryScreen
+  private recipe: StartRecipe | null = null
 
   constructor(root: HTMLElement) {
     this.settings = loadSettings()
@@ -63,6 +78,8 @@ export class App {
     this.input.onToggleHelp = () => this.hud.toggleHelp()
     this.canvas.addEventListener('click', () => {
       if (this.state === 'playing' && !this.input.pointerLocked) void this.input.requestPointerLock()
+      // eliminado: clique troca quem está sendo assistido
+      else if (this.state === 'playing' && this.match && !this.match.state.alive) this.match.spectateNext()
     })
     window.addEventListener('resize', () => this.resize())
   }
@@ -123,6 +140,7 @@ export class App {
       join: () => this.showJoin(),
       settings: () => this.showSettings(),
       controls: () => this.showControls(),
+      history: () => this.screens.history(loadHistory(), () => this.screens.closeModal()),
     }, this.webglError)
   }
 
@@ -135,12 +153,16 @@ export class App {
     if (this.webglError) return
     this.screens.mapSelect([
       { id: MAIN_MAP_ID, name: MAPS[MAIN_MAP_ID].name, description: 'Mapa principal, 1,6 km: cidade, floresta, montanhas, indústria, vilarejo, lago, base militar, farol.', tag: 'Principal' },
-      { id: TRAINING_MAP_ID, name: MAPS[TRAINING_MAP_ID].name, description: 'Treino: arsenal com todas as armas, estande de tiro com bonecos e pista de movimentação.', tag: 'Treino' },
-    ], (id) => void this.playOffline(id), () => this.showMenu())
+      { id: TRAINING_MAP_ID, name: MAPS[TRAINING_MAP_ID].name, description: 'Mapa pequeno: arsenal com todas as armas, estande de tiro, pista de movimentação e pátio de construção.', tag: 'Treino' },
+    ], this.settings.offline, (id, prefs) => {
+      this.settings = { ...this.settings, offline: prefs }
+      saveSettings(this.settings)
+      void this.playOffline(id, toLocalMatch(prefs))
+    }, () => this.showMenu())
   }
 
-  async playOffline(mapId: string = TRAINING_MAP_ID): Promise<void> {
-    await this.begin(() => startLocalServer(mapId), MAPS[mapId]?.name ?? 'Partida offline')
+  async playOffline(mapId: string = TRAINING_MAP_ID, match: LocalMatchOptions = TRAINING_MATCH): Promise<void> {
+    await this.begin({ make: () => startLocalServer(mapId, match), title: MAPS[mapId]?.name ?? 'Partida offline', offline: true })
   }
 
   private showJoin(): void {
@@ -157,24 +179,30 @@ export class App {
       this.input.updateSettings(this.settings)
       ui.setBusy(true)
       ui.setStatus(`Conectando a ${url}…`)
-      void this.begin(() => connectWebSocket(url), 'Servidor', (err) => {
+      void this.begin({ make: () => connectWebSocket(url), title: 'Servidor', offline: false }, (err) => {
         this.showJoin()
         this.screens.toast(err, 'error', 7000)
       })
     }, () => this.showMenu())
   }
 
-  private async begin(makeTransport: () => Promise<Transport>, title: string, onFail?: (message: string) => void): Promise<void> {
+  private async begin(recipe: StartRecipe, onFail?: (message: string) => void): Promise<void> {
     if (this.state === 'loading' || this.webglError) return
     this.state = 'loading'
-    const loading = this.screens.loading(title)
+    this.recipe = recipe
+    const loading = this.screens.loading(recipe.title)
     try {
       const renderer = this.ensureRenderer()
       loading.step('Iniciando conexão…')
-      const transport = await makeTransport()
+      const transport = await recipe.make()
       const match = await Match.start(transport, { renderer, input: this.input, hud: this.hud, settings: this.settings, audio: this.audio }, this.playerName(), (s) => loading.step(s))
       this.match = match
-      match.onClosed = (reason) => this.quitToMenu(`Partida encerrada: ${reason}`)
+      match.onClosed = (reason) => {
+        // o servidor recomeçou a partida: reconecta sozinho
+        if (reason === KICK_NEW_MATCH && this.recipe) this.restart('Nova partida começando…')
+        else this.quitToMenu(`Partida encerrada: ${reason}`)
+      }
+      match.onResult = (r) => this.showResult(r)
       this.resize()
       this.state = 'ready'
       this.hud.show()
@@ -194,8 +222,56 @@ export class App {
     }
   }
 
+  /** Fim de partida para este jogador: salva no histórico e mostra o resultado. */
+  private showResult(r: MatchResult): void {
+    const match = this.match
+    if (!match) return
+    addToHistory({
+      date: new Date().toISOString(),
+      mapId: match.map.def.id,
+      mapName: match.map.def.name,
+      where: match.modeLabel,
+      place: r.place,
+      total: r.total,
+      kills: r.kills,
+      damage: r.damage,
+      seconds: r.seconds,
+      victory: r.victory,
+    })
+    this.inventory.hide()
+    this.screens.clear()
+    this.state = 'results'
+    this.input.enabled = false
+    this.input.clear()
+    this.input.releasePointerLock()
+    const actions: { label: string; action: string; primary?: boolean; run: () => void }[] = []
+    if (this.recipe?.offline) actions.push({ label: 'Jogar de novo', action: 'again', primary: true, run: () => this.restart() })
+    if (!r.victory) actions.push({ label: 'Assistir', action: 'spectate', run: () => { this.hud.showResults(null); void this.resume() } })
+    actions.push({ label: 'Voltar ao menu', action: 'menu', run: () => this.quitToMenu() })
+    this.hud.showResults(r, actions)
+  }
+
+  /** Abre de novo a mesma partida (offline) ou reconecta ao mesmo servidor. */
+  private restart(notice?: string): void {
+    const recipe = this.recipe
+    this.hud.showResults(null)
+    this.inventory.hide()
+    this.input.enabled = false
+    this.input.releasePointerLock()
+    this.match?.dispose()
+    this.match = null
+    this.state = 'menu'
+    if (!recipe) {
+      this.showMenu()
+      return
+    }
+    if (notice) this.screens.toast(notice, 'info', 4000)
+    void this.begin(recipe)
+  }
+
   async resume(): Promise<void> {
     if (!this.match) return
+    this.hud.showResults(null)
     this.audio.resume()
     this.inventory.hide()
     this.screens.clear()
@@ -234,6 +310,8 @@ export class App {
   }
 
   quitToMenu(notice?: string): void {
+    this.hud.showResults(null)
+    this.recipe = null
     this.inventory.hide()
     this.input.enabled = false
     this.input.releasePointerLock()

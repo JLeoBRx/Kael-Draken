@@ -85,6 +85,13 @@ export interface CombatState extends MatchState {
   destroyedProps: number
   harvested: number
   target: { name: string; health: number; max: number } | null
+  gameMode: number
+  phase: number
+  zone: { x: number; z: number; r: number } | null
+  outsideZone: boolean
+  airship: boolean
+  result: { victory: boolean; place: number; total: number; kills: number; damage: number; seconds: number } | null
+  spectating: string | null
 }
 
 export async function combat(page: Page): Promise<CombatState> {
@@ -145,10 +152,21 @@ export async function mouseButton(page: Page, button: number, down: boolean): Pr
   }, [button, down] as const)
 }
 
-/** Menu → Jogar offline → mapa → clique para jogar. */
-export async function startOffline(page: Page, mapId: string): Promise<void> {
+export interface OfflineOptions {
+  mode?: 'br' | 'treino'
+  bots?: number
+  difficulty?: 'facil' | 'normal' | 'dificil'
+  zone?: 'normal' | 'rapida'
+}
+
+/** Menu → Jogar offline → modo/bots → mapa → clique para jogar (padrão: treino sem bots). */
+export async function startOffline(page: Page, mapId: string, opts: OfflineOptions = {}): Promise<void> {
   await page.goto('/')
   await page.click('[data-action="offline"]')
+  await page.click(`[data-mode="${opts.mode ?? 'treino'}"]`)
+  await page.locator('[data-field="bots"]').fill(String(opts.bots ?? 0))
+  if (opts.difficulty) await page.locator('[data-field="difficulty"]').selectOption(opts.difficulty)
+  if (opts.zone) await page.locator('[data-field="zone"]').selectOption(opts.zone)
   await page.click(`[data-map="${mapId}"]`)
   await enterGame(page)
 }

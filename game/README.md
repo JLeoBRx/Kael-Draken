@@ -5,16 +5,15 @@ Battle royale 3D em terceira pessoa, com partidas **offline**, em **rede local
 armas, mapas e interface originais. *(Título provisório — definido em
 `src/shared/config/game.ts`.)*
 
-> **Estado: Fase 3 concluída (Construção).** Paredes, pisos, rampas e
-> telhados de madeira, pedra e metal, com fantasma de pré-visualização,
-> construção prevista no cliente e validada pelo servidor, vida que cresce
-> durante a obra, destruição e desabamento do que fica sem apoio; picareta
-> para coletar materiais e quebrar árvores, rochas e caixotes. Somam-se às armas
-> com raridade, tiro com compensação de latência, vida e escudo, inventário,
-> loot, explosivos e ao mapa principal **Ilha de Brasa** — offline ou com outras
-> pessoas no mesmo servidor, em modo treino (quem é eliminado renasce). Bots,
-> zona segura e a partida completa de battle royale vêm na Fase 4 — veja o
-> [roteiro](docs/ROADMAP.md) e a [arquitetura](docs/ARQUITETURA.md).
+> **Estado: Fase 4 concluída — primeira versão jogável de battle royale.**
+> Partida completa offline contra até 99 bots (ou com amigos num servidor):
+> aquecimento, salto do dirigível, queda livre e planador, saque, combate,
+> construção, zona que fecha em 7 etapas e vencedor, com tela de resultado e
+> histórico. Bots em três dificuldades navegam pelo mapa, saqueiam, lutam,
+> se curam, constroem paredes e fogem da zona usando os mesmos comandos de um
+> jogador. Somam-se à construção (Fase 3), às armas, inventário e loot
+> (Fase 2) e ao mapa principal **Ilha de Brasa**. Próximo: lobby LAN e equipes
+> — veja o [roteiro](docs/ROADMAP.md) e a [arquitetura](docs/ARQUITETURA.md).
 
 ![Forte de madeira, pedra e metal com o fantasma de uma rampa e a barra de construção](docs/imagens/construcao.webp)
 
@@ -52,7 +51,9 @@ npm install
 npm run host
 ```
 
-Abra `http://localhost:7350`, clique em **Jogar offline** e escolha o mapa:
+Abra `http://localhost:7350`, clique em **Jogar offline**, escolha o modo —
+**Battle royale** (você contra 0–99 bots, zona normal ou rápida, bots fáceis,
+normais ou difíceis) ou **Treino** (sem zona, com renascimento) — e o mapa:
 
 - **Ilha de Brasa** — mapa principal (1,6 km): cidade, floresta, montanhas,
   distrito industrial, vilarejo, lago, base militar, farol, mansão e torre.
@@ -71,8 +72,9 @@ Para desenvolvimento com recarga automática: `npm run dev` e abra
 No computador anfitrião:
 
 ```bash
-npm run host                               # Ilha de Brasa
-npm run host -- --map campo-de-provas      # ou o mapa de treino
+npm run host                                     # battle royale na Ilha de Brasa
+npm run host -- --bots 20 --bot-difficulty dificil   # completa com 20 bots
+npm run host -- --map campo-de-provas --mode treino  # treino livre
 ```
 
 O terminal mostra os endereços, por exemplo:
@@ -99,7 +101,11 @@ npm run server -- --port 7350 --max-players 32 --name "Servidor BR-1"
 Em produção, coloque-o atrás de um proxy com TLS (o cliente conecta por
 `wss://seu-dominio/ws`). Matchmaking, contas e convites chegam na Fase 6.
 
-Opções do servidor: `npm run server -- --help`.
+Opções do servidor: `npm run server -- --help` (modo, bots e dificuldade,
+aquecimento, velocidade da zona, reinício automático). Em battle royale, a
+contagem do aquecimento começa quando a primeira pessoa entra; quem chega com a
+partida em andamento assiste até a próxima, e no fim todos reconectam sozinhos
+para a partida seguinte.
 
 ## Controles
 
@@ -120,7 +126,7 @@ Opções do servidor: `npm run server -- --help`.
 | Mapa | M | — |
 | Correr (sprint) | Shift | L3 |
 | Caminhar devagar | Alt ou X | — |
-| Pular | Espaço | A |
+| Pular / saltar do dirigível / abrir o planador | Espaço | A |
 | Agachar / deslizar (correndo) | C | B |
 | Pausa / liberar o mouse | Esc | Start |
 | Painel técnico | F3 | — |
@@ -130,10 +136,14 @@ O agachar usa **C** (e não Ctrl) porque Ctrl+W fecha a aba no navegador. No
 modo construção a roda do mouse troca a peça e qualquer tecla de espaço (1–6)
 volta às armas.
 
-## O que há no jogo (Fases 2 e 3)
+## O que há no jogo (Fases 2, 3 e 4)
 
 | Sistema | Detalhes |
 | --- | --- |
+| Partida | aquecimento (sem dano) → dirigível → queda livre e planador → combate → vencedor; colocação final, espectador de quem eliminou você (clique troca), tela de resultado e "Jogar de novo" |
+| Zona | 7 etapas (~9 min, ou ~4 min na rápida), centro sempre em terra, dano de 1 a 25 por segundo direto na vida; parede animada, contorno no minimapa e no mapa, próxima zona tracejada, aviso fora dela |
+| Bots | 0–99, Fácil/Normal/Difícil; navegam (A* com portas), saqueiam itens e baús, escolhem arma pela distância, miram com reação e erro, constroem paredes, se curam, fogem, coletam materiais e respeitam a zona |
+| Histórico | partidas salvas no navegador com colocação, eliminações, dano e tempo; totais (vitórias, top 5, melhor colocação) |
 | Armas | Vespa P9 (pistola), Enxame M7 (submetralhadora), Tormenta AR-4 (fuzil), Trovão 12 (escopeta, 9 bagos), Falcão de Ferrolho (sniper com luneta), Rojão RL (lança-foguetes) — dano, cadência, dispersão, coice, pente, recarga, alcance e queda de dano por distância |
 | Raridade | Comum, Incomum, Raro, Épico, Lendário (mais dano e recarga mais rápida) |
 | Explosivos | foguete (explode no impacto) e granada (quica, pavio de 2,4 s), dano em área com linha de visão |
@@ -165,7 +175,11 @@ Para os testes de navegador em uma máquina nova: `npx playwright install chromi
 
 ## Testes
 
-- **Unitários e integração (116)**: colisão, movimentação, mapas (geração
+- **Unitários e integração (129)**: dirigível, queda livre e planador; zona
+  (círculos aninhados em terra, tempos), fases, colocação e vencedor; servidor
+  em modo battle royale (espectador atrasado, reinício e reconexão); uma partida
+  inteira só de bots no mapa principal (24 bots, com vencedor e a maior parte das
+  eliminações em combate); colisão, movimentação, mapas (geração
   determinística, todos os pontos de surgimento seguros, subida da escada de
   um prédio de 4 andares até a laje), catálogo de itens, armas (cadência,
   recarga, dispersão determinística), consumíveis, inventário, caixas de
@@ -176,7 +190,9 @@ Para os testes de navegador em uma máquina nova: `npx playwright install chromi
   autoritativa, custo e intervalo, paredes bloqueando tiros, explosões,
   picareta, coleta, sincronização), predição sem correções com 100 ms de
   latência (inclusive construindo) e servidor WebSocket real.
-- **Navegador (7)**: menu e configurações; partida offline (movimento, pulo,
+- **Navegador (9)**: battle royale offline (aquecimento, dirigível, salto,
+  planador, pouso, zona e bots) e uma partida até o fim num servidor dedicado
+  (resultado, histórico e reconexão para a partida seguinte); menu e configurações; partida offline (movimento, pulo,
   deslize, mira, pausa); arsenal → acerto no boneco → inventário → soltar;
   **construção offline** (pegar madeira, erguer parede e rampa, subir,
   derrubar com a picareta, coletar pedra); dois jogadores se vendo no servidor
@@ -210,9 +226,12 @@ Variáveis de ambiente do servidor: `PORT` e `HOST` (equivalem a `--port` e
 `--host`). Configurações do jogador ficam no navegador (`localStorage`),
 inclusive o volume.
 
-## Limitações conhecidas (Fase 3)
+## Limitações conhecidas (Fase 4)
 
-- Modo treino: ainda não há zona segura, bots nem vencedor (Fase 4).
+- Partidas solo (sem equipes); lobby, prontos e equipes chegam na Fase 5.
+- Bots ficam no térreo dos prédios (não sobem escadas) e constroem só paredes
+  defensivas; não usam granadas.
+- O histórico fica no navegador; contas, XP e estatísticas online são da Fase 6.
 - Ainda não há edição de peças (abrir portas e janelas em paredes).
 - A grade de construção é absoluta: em encostas, peças podem ficar
   parcialmente enterradas (como em outros jogos do gênero).

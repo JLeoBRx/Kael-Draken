@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { smoothstep } from '../../shared/math/scalar'
 import type { GameMap } from '../../shared/maps/types'
+import type { AirshipRoute, ZoneCircle } from '../../shared/match/zone'
 import { h } from './dom'
 
 /**
@@ -87,7 +88,62 @@ export function renderMapImage(map: GameMap, size = 512): HTMLCanvasElement {
   return c
 }
 
+/** Zona atual, próxima zona e rota do dirigível (para desenhar nos mapas). */
+export interface BattleOverlay {
+  zone: ZoneCircle | null
+  next: ZoneCircle | null
+  route: AirshipRoute | null
+}
+
+/**
+ * Desenha a nuvem (fora da zona) escurecida, a borda da zona atual, a
+ * próxima tracejada e a rota do dirigível. `toPx` converte metros em pixels.
+ */
+function drawBattle(ctx: CanvasRenderingContext2D, W: number, o: BattleOverlay | null, toPx: (x: number, z: number) => [number, number], scale: number): void {
+  if (!o) return
+  if (o.route) {
+    const [ax, az] = toPx(o.route.x0, o.route.z0)
+    const [bx, bz] = toPx(o.route.x1, o.route.z1)
+    ctx.save()
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'
+    ctx.lineWidth = 2
+    ctx.setLineDash([8, 6])
+    ctx.beginPath()
+    ctx.moveTo(ax, az)
+    ctx.lineTo(bx, bz)
+    ctx.stroke()
+    ctx.restore()
+  }
+  if (o.zone) {
+    const [cx, cz] = toPx(o.zone.x, o.zone.z)
+    ctx.save()
+    ctx.fillStyle = 'rgba(110,50,120,0.38)'
+    ctx.beginPath()
+    ctx.rect(0, 0, W, W)
+    ctx.arc(cx, cz, Math.max(0.5, o.zone.r * scale), 0, Math.PI * 2, true)
+    ctx.fill('evenodd')
+    ctx.strokeStyle = '#d79cff'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.arc(cx, cz, Math.max(0.5, o.zone.r * scale), 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.restore()
+  }
+  if (o.next && (!o.zone || Math.abs(o.next.r - o.zone.r) > 0.5)) {
+    const [nx, nz] = toPx(o.next.x, o.next.z)
+    ctx.save()
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([5, 4])
+    ctx.beginPath()
+    ctx.arc(nx, nz, Math.max(0.5, o.next.r * scale), 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.restore()
+  }
+}
+
 export class MinimapView {
+  battle: BattleOverlay | null = null
   readonly el: HTMLElement
   private readonly canvas: HTMLCanvasElement
   private readonly ctx: CanvasRenderingContext2D
@@ -110,6 +166,8 @@ export class MinimapView {
     ctx.fillStyle = '#1c4f6e'
     ctx.fillRect(0, 0, W, W)
     ctx.drawImage(this.image, (x - this.range - t.min) * s, (z - this.range - t.min) * s, this.range * 2 * s, this.range * 2 * s, 0, 0, W, W)
+    const k = W / (this.range * 2)
+    drawBattle(ctx, W, this.battle, (wx, wz) => [(wx - x + this.range) * k, (wz - z + this.range) * k], k)
     // marcador do jogador
     ctx.save()
     ctx.translate(W / 2, W / 2)
@@ -131,6 +189,7 @@ export class MinimapView {
 }
 
 export class FullMapView {
+  battle: BattleOverlay | null = null
   readonly el: HTMLElement
   private readonly canvas: HTMLCanvasElement
   private readonly ctx: CanvasRenderingContext2D
@@ -182,6 +241,7 @@ export class FullMapView {
       ctx.fillText(r.name.toUpperCase(), rx, rz)
     }
     ctx.textAlign = 'start'
+    drawBattle(ctx, W, this.battle, (wx, wz) => [(wx - t.min) * s, (wz - t.min) * s], s)
     ctx.save()
     ctx.translate((x - t.min) * s, (z - t.min) * s)
     ctx.rotate((heading * Math.PI) / 180)
