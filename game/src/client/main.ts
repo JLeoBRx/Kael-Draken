@@ -1,10 +1,10 @@
 import './ui/styles.css'
 import { App } from './app'
+import { startPhotoMode } from './photo'
 
 const root = document.getElementById('app')
 if (!root) throw new Error('Elemento #app ausente')
-const app = new App(root)
-app.start()
+const params = new URLSearchParams(location.search)
 
 declare global {
   interface Window {
@@ -12,4 +12,12 @@ declare global {
     __ULTIMA__?: { state: App['debugState']; playOffline: (mapId?: string) => Promise<void>; dropConnection: () => void }
   }
 }
-window.__ULTIMA__ = { state: () => app.debugState(), playOffline: (mapId?: string) => app.playOffline(mapId), dropConnection: () => app.debugDropConnection() }
+
+if (params.has('foto')) {
+  // modo foto (ferramenta de desenvolvimento): só o mapa, sem partida
+  startPhotoMode(root, params)
+} else {
+  const app = new App(root)
+  app.start()
+  window.__ULTIMA__ = { state: () => app.debugState(), playOffline: (mapId?: string) => app.playOffline(mapId), dropConnection: () => app.debugDropConnection() }
+}

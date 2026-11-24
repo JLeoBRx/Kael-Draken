@@ -12,10 +12,17 @@ import type { Heightfield } from '../../shared/world/heightfield'
 
 const CHUNK = 64
 
-export function buildTerrainMeshes(hf: Heightfield, biome: Biome, waterLevel: number, material: THREE.Material): THREE.Mesh[] {
+/** Cor do bioma, normal e pesos das camadas de detalhe em cada amostra do relevo. */
+export interface TerrainFields {
+  n: number
+  colors: Float32Array
+  normals: Float32Array
+  /** terra, rocha, areia, neve (o resto é grama) */
+  splat: Float32Array
+}
+
+export function computeTerrainFields(hf: Heightfield, biome: Biome, waterLevel: number): TerrainFields {
   const n = hf.n
-  const cells = n - 1
-  const meshes: THREE.Mesh[] = []
   const col = {
     sand: new THREE.Color(biome.sand),
     grass: new THREE.Color(biome.grass),
@@ -37,6 +44,12 @@ export function buildTerrainMeshes(hf: Heightfield, biome: Biome, waterLevel: nu
     return target.set(hl - hr, 2 * hf.cell, hd - hu).normalize()
   }
 
+  // pesos das camadas de detalhe (terra, rocha, areia, neve; o resto é grama), na mesma ordem da cor
+  const weights = new THREE.Vector4()
+  const blend = (layer: number, t: number) => {
+    weights.multiplyScalar(1 - t)
+    if (layer >= 0) weights.setComponent(layer, weights.getComponent(layer) + t)
+  }
   const colorAt = (x: number, z: number, h: number, slope: number) => {
     const n1 = fbm2(x / 55, z / 55, 77, 3) * 0.5 + 0.5
     const n2 = fbm2(x / 13, z / 13, 78, 2) * 0.5 + 0.5
@@ -44,19 +57,56 @@ export function buildTerrainMeshes(hf: Heightfield, biome: Biome, waterLevel: nu
     out.copy(col.grass).lerp(col.grassDry, smoothstep(0.55, 0.8, n1))
     out.lerp(tmp.copy(col.forest), smoothstep(-80, -130, x) * 0.8)
     out.lerp(col.dirt, smoothstep(0.72, 0.9, n2) * 0.55)
+    weights.set(0, 0, 0, 0)
+    blend(0, smoothstep(0.66, 0.9, n2) * 0.85 + smoothstep(0.62, 0.85, n1) * 0.25)
     // areia na praia
-    out.lerp(col.sand, 1 - smoothstep(biome.sandLevel - 0.3, biome.sandLevel + 0.6, h))
+    const sandT = 1 - smoothstep(biome.sandLevel - 0.3, biome.sandLevel + 0.6, h)
+    out.lerp(col.sand, sandT)
+    blend(2, sandT)
     // fundo submerso
-    out.lerp(col.seabed, 1 - smoothstep(waterLevel - 2.5, waterLevel - 0.3, h))
+    const bedT = 1 - smoothstep(waterLevel - 2.5, waterLevel - 0.3, h)
+    out.lerp(col.seabed, bedT)
+    blend(2, bedT)
     // rocha nas encostas
-    out.lerp(col.rock, smoothstep(0.2, 0.42, slope))
+    const rockT = smoothstep(0.2, 0.42, slope)
+    out.lerp(col.rock, rockT)
+    blend(1, rockT)
     // neve nos picos (só onde não é íngreme)
-    out.lerp(col.snow, smoothstep(biome.snowLevel - 4, biome.snowLevel + 3, h + n2 * 4) * (1 - smoothstep(0.35, 0.6, slope)))
+    const snowT = smoothstep(biome.snowLevel - 4, biome.snowLevel + 3, h + n2 * 4) * (1 - smoothstep(0.35, 0.6, slope))
+    out.lerp(col.snow, snowT)
+    blend(3, snowT)
     const jitter = 0.94 + n2 * 0.12
     return out.multiplyScalar(jitter)
   }
 
   const normal = new THREE.Vector3()
+  const colors = new Float32Array(n * n * 3)
+  const normals = new Float32Array(n * n * 3)
+  const splat = new Float32Array(n * n * 4)
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const k = j * n + i
+      normalAt(i, j, normal)
+      normals[k * 3] = normal.x
+      normals[k * 3 + 1] = normal.y
+      normals[k * 3 + 2] = normal.z
+      const c = colorAt(hf.worldX(i), hf.worldZ(j), hf.get(i, j), 1 - normal.y)
+      colors[k * 3] = c.r
+      colors[k * 3 + 1] = c.g
+      colors[k * 3 + 2] = c.b
+      splat[k * 4] = weights.x
+      splat[k * 4 + 1] = weights.y
+      splat[k * 4 + 2] = weights.z
+      splat[k * 4 + 3] = weights.w
+    }
+  }
+  return { n, colors, normals, splat }
+}
+
+export function buildTerrainMeshes(hf: Heightfield, fields: TerrainFields, material: THREE.Material): THREE.Mesh[] {
+  const n = hf.n
+  const cells = n - 1
+  const meshes: THREE.Mesh[] = []
   for (let cj = 0; cj < cells; cj += CHUNK) {
     for (let ci = 0; ci < cells; ci += CHUNK) {
       const ni = Math.min(CHUNK, cells - ci)
@@ -66,6 +116,7 @@ export function buildTerrainMeshes(hf: Heightfield, biome: Biome, waterLevel: nu
       const positions = new Float32Array(vw * vh * 3)
       const normals = new Float32Array(vw * vh * 3)
       const colors = new Float32Array(vw * vh * 3)
+      const splat = new Float32Array(vw * vh * 4)
       const uvs = new Float32Array(vw * vh * 2)
       for (let j = 0; j < vh; j++) {
         for (let i = 0; i < vw; i++) {
@@ -75,17 +126,13 @@ export function buildTerrainMeshes(hf: Heightfield, biome: Biome, waterLevel: nu
           const z = hf.worldZ(gj)
           const h = hf.get(gi, gj)
           const k = j * vw + i
+          const g = gj * n + gi
           positions[k * 3] = x
           positions[k * 3 + 1] = h
           positions[k * 3 + 2] = z
-          normalAt(gi, gj, normal)
-          normals[k * 3] = normal.x
-          normals[k * 3 + 1] = normal.y
-          normals[k * 3 + 2] = normal.z
-          const c = colorAt(x, z, h, 1 - normal.y)
-          colors[k * 3] = c.r
-          colors[k * 3 + 1] = c.g
-          colors[k * 3 + 2] = c.b
+          normals.set(fields.normals.subarray(g * 3, g * 3 + 3), k * 3)
+          colors.set(fields.colors.subarray(g * 3, g * 3 + 3), k * 3)
+          splat.set(fields.splat.subarray(g * 4, g * 4 + 4), k * 4)
           uvs[k * 2] = x
           uvs[k * 2 + 1] = z
         }
@@ -107,6 +154,7 @@ export function buildTerrainMeshes(hf: Heightfield, biome: Biome, waterLevel: nu
       g.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
       g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
       g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+      g.setAttribute('splat', new THREE.BufferAttribute(splat, 4))
       g.setIndex(new THREE.BufferAttribute(index, 1))
       g.computeBoundingSphere()
       g.computeBoundingBox()

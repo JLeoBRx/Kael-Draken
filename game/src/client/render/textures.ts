@@ -107,22 +107,6 @@ export function gridTexture(base: number, line: number): THREE.CanvasTexture {
   return finish(c)
 }
 
-/** Ruído claro para detalhe do relevo (multiplica a cor dos vértices). */
-export function terrainDetailTexture(): THREE.CanvasTexture {
-  const size = 256
-  const [c, ctx] = canvas(size)
-  const img = ctx.createImageData(size, size)
-  const coarse = periodicNoise(size, 6, 11, 3)
-  const fine = periodicNoise(size, 32, 23, 3)
-  for (let k = 0; k < coarse.length; k++) {
-    const v = 200 + (coarse[k] - 0.5) * 70 + (fine[k] - 0.5) * 60
-    img.data[k * 4] = img.data[k * 4 + 1] = img.data[k * 4 + 2] = Math.max(0, Math.min(255, v + 30))
-    img.data[k * 4 + 3] = 255
-  }
-  ctx.putImageData(img, 0, 0)
-  return finish(c)
-}
-
 /** Concreto com juntas a cada 2 m. 1 tile = 2 m. */
 export function concreteTexture(base: number): THREE.CanvasTexture {
   const size = 256

@@ -57,12 +57,24 @@ export interface QualityPreset {
   fogScale: number
   /** Distância máxima de desenho (m). */
   drawDistance: number
+  /** Pós-processamento: nenhum, básico (brilho + cor + MSAA) ou completo (+ oclusão ambiente). */
+  post: 'nenhum' | 'basico' | 'completo'
+  /** Tufos de grama (3 lâminas cada) perto da câmera (0 = sem grama). */
+  grass: number
+  /** Raio da grama em volta da câmera (m). */
+  grassRadius: number
+  /** Nuvens no céu. */
+  clouds: boolean
+  /** Partículas por efeito (multiplicador). */
+  particles: number
+  /** Até onde a vegetação usa o modelo detalhado (e projeta sombra), em m. */
+  treeDetail: number
 }
 
 export const QUALITY: Record<Quality, QualityPreset> = {
-  baixa: { label: 'Baixa', maxPixelRatio: 0.75, antialias: false, shadows: false, shadowMapSize: 1024, shadowRange: 30, fogScale: 1.6, drawDistance: 450 },
-  media: { label: 'Média', maxPixelRatio: 1, antialias: true, shadows: true, shadowMapSize: 2048, shadowRange: 45, fogScale: 1.15, drawDistance: 900 },
-  alta: { label: 'Alta', maxPixelRatio: 2, antialias: true, shadows: true, shadowMapSize: 4096, shadowRange: 70, fogScale: 1, drawDistance: 1600 },
+  baixa: { label: 'Baixa', maxPixelRatio: 0.75, antialias: false, shadows: false, shadowMapSize: 1024, shadowRange: 30, fogScale: 1.6, drawDistance: 450, post: 'nenhum', grass: 0, grassRadius: 0, clouds: false, particles: 0.4, treeDetail: 70 },
+  media: { label: 'Média', maxPixelRatio: 1, antialias: true, shadows: true, shadowMapSize: 2048, shadowRange: 45, fogScale: 1.15, drawDistance: 900, post: 'basico', grass: 22_000, grassRadius: 28, clouds: true, particles: 0.75, treeDetail: 110 },
+  alta: { label: 'Alta', maxPixelRatio: 2, antialias: true, shadows: true, shadowMapSize: 4096, shadowRange: 70, fogScale: 1, drawDistance: 1600, post: 'completo', grass: 48_000, grassRadius: 40, clouds: true, particles: 1, treeDetail: 160 },
 }
 
 export const DEFAULT_SETTINGS: Settings = {

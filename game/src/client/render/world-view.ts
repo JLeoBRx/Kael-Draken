@@ -3,10 +3,12 @@ import { DEG } from '../../shared/math/scalar'
 import type { GameMap } from '../../shared/maps/types'
 import type { QualityPreset } from '../settings'
 import { MaterialLibrary } from './materials'
-import { buildPropMeshes, type PropMeshes } from './props'
-import { createSky } from './sky'
+import { buildPropMeshes, windUniform, type PropMeshes } from './props'
+import { createSky, updateSky } from './sky'
 import { buildStaticMeshes } from './static-geometry'
-import { buildTerrainMeshes } from './terrain-mesh'
+import { createTerrainMaterial } from './terrain-material'
+import { buildTerrainMeshes, computeTerrainFields } from './terrain-mesh'
+import { GrassField } from './grass'
 import { textTexture, waterNormalTexture } from './textures'
 
 /**
@@ -21,10 +23,14 @@ export class WorldView {
   private readonly sky: THREE.Mesh
   private readonly water: THREE.Mesh
   private readonly waterNormal: THREE.Texture
+  private readonly heightTex: THREE.DataTexture
+  private readonly waterTime = { value: 0 }
   private readonly disposables: { dispose(): void }[] = []
   private readonly envTarget: THREE.WebGLRenderTarget
   private readonly shadowRange: number
   private readonly props: PropMeshes
+  private readonly terrainMaterial: THREE.MeshStandardMaterial
+  private readonly grass: GrassField | null
 
   constructor(readonly map: GameMap, renderer: THREE.WebGLRenderer, quality: QualityPreset) {
     const atm = map.def.atmosphere
@@ -35,7 +41,7 @@ export class WorldView {
     const skyTop = new THREE.Color(atm.skyTop)
     const horizon = new THREE.Color(atm.skyHorizon)
 
-    this.sky = createSky(skyTop, horizon, this.sunDir)
+    this.sky = createSky(skyTop, horizon, this.sunDir, { clouds: quality.clouds })
     this.scene.add(this.sky)
     this.scene.background = horizon.clone()
     this.scene.fog = new THREE.FogExp2(horizon.clone(), atm.fogDensity * quality.fogScale)
@@ -71,12 +77,17 @@ export class WorldView {
     this.scene.add(this.sun)
     this.scene.add(this.sun.target)
 
-    for (const mesh of buildTerrainMeshes(map.terrain, map.def.biome, map.def.waterLevel, this.materials.terrain())) this.add(mesh)
+    this.terrainMaterial = createTerrainMaterial(quality.post === 'nenhum')
+    const fields = computeTerrainFields(map.terrain, map.def.biome, map.def.waterLevel)
+    for (const mesh of buildTerrainMeshes(map.terrain, fields, this.terrainMaterial)) this.add(mesh)
+    this.grass = quality.grass > 0 ? new GrassField(map.terrain, fields, map.boxes, map.def.waterLevel, quality.grass, quality.grassRadius) : null
+    if (this.grass) this.scene.add(this.grass.mesh)
     for (const mesh of buildStaticMeshes(map.boxes, this.materials)) this.add(mesh)
-    this.props = buildPropMeshes(map.props, this.materials)
+    this.props = buildPropMeshes(map.props, this.materials, quality.treeDetail)
     for (const mesh of this.props.meshes) this.add(mesh)
 
-    // Água: plano extenso até o horizonte com normais animadas
+    // Água: plano extenso até o horizonte com normais animadas; cor pela
+    // profundidade (raso turquesa → fundo azul-escuro) e espuma na beira
     this.waterNormal = waterNormalTexture()
     this.waterNormal.repeat.set(220, 220)
     const waterMat = new THREE.MeshStandardMaterial({
@@ -88,6 +99,45 @@ export class WorldView {
       normalMap: this.waterNormal,
       normalScale: new THREE.Vector2(0.35, 0.35),
     })
+    const hf = map.terrain
+    this.heightTex = new THREE.DataTexture(hf.heights, hf.n, hf.n, THREE.RedFormat, THREE.FloatType)
+    this.heightTex.needsUpdate = true
+    const waterUniforms = {
+      uHeight: { value: this.heightTex }, uN: { value: hf.n }, uCell: { value: hf.cell }, uMin: { value: hf.min },
+      uLevel: { value: map.def.waterLevel }, uTime: this.waterTime,
+    }
+    waterMat.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, waterUniforms)
+      shader.vertexShader = 'varying vec3 vWaterPos;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vWaterPos = (modelMatrix * vec4(transformed, 1.0)).xyz;')
+      shader.fragmentShader = /* glsl */ `
+        uniform sampler2D uHeight;
+        uniform float uN;
+        uniform float uCell;
+        uniform float uMin;
+        uniform float uLevel;
+        uniform float uTime;
+        varying vec3 vWaterPos;
+        float wh(vec2 g) { return texelFetch(uHeight, ivec2(clamp(g, vec2(0.0), vec2(uN - 1.0))), 0).r; }
+        float groundAt(vec2 w) {
+          vec2 g = (w - uMin) / uCell;
+          if (g.x < 0.0 || g.y < 0.0 || g.x > uN - 1.0 || g.y > uN - 1.0) return uLevel - 30.0;
+          vec2 i = floor(g);
+          vec2 f = g - i;
+          return mix(mix(wh(i), wh(i + vec2(1.0, 0.0)), f.x), mix(wh(i + vec2(0.0, 1.0)), wh(i + vec2(1.0, 1.0)), f.x), f.y);
+        }
+      ` + shader.fragmentShader.replace('#include <color_fragment>', /* glsl */ `
+        #include <color_fragment>
+        float depth = max(0.0, uLevel - groundAt(vWaterPos.xz));
+        vec3 shallow = vec3(0.10, 0.42, 0.42);
+        vec3 deep = vec3(0.018, 0.11, 0.2);
+        diffuseColor.rgb = mix(shallow, deep, smoothstep(0.2, 7.0, depth));
+        float wave = sin(uTime * 1.6 - depth * 9.0 + sin(vWaterPos.x * 0.35 + uTime * 0.4) * 1.5) * 0.5 + 0.5;
+        float foam = (1.0 - smoothstep(0.0, 0.55, depth)) * (0.55 + 0.45 * wave);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.96, 0.97), foam * 0.85);
+        diffuseColor.a = mix(0.55, 0.9, smoothstep(0.0, 3.5, depth)) + foam * 0.3;
+      `).replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.6, foam);')
+    }
+    waterMat.customProgramCacheKey = () => 'agua-profundidade'
     this.water = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000).rotateX(-Math.PI / 2), waterMat)
     this.water.position.y = map.def.waterLevel
     this.water.receiveShadow = true
@@ -136,6 +186,10 @@ export class WorldView {
   /** Chamar a cada quadro com a posição do jogador e da câmera. */
   update(focus: THREE.Vector3, camera: THREE.Camera, elapsed: number): void {
     this.sky.position.copy(camera.position)
+    updateSky(this.sky, elapsed)
+    this.grass?.update(camera, elapsed)
+    windUniform.value = elapsed
+    this.props.update(camera.position.x, camera.position.z)
     // Sombras: câmera do sol centrada no jogador, presa à grade de texels para não tremeluzir
     const texel = (this.shadowRange * 2) / this.sun.shadow.mapSize.x
     const fx = Math.round(focus.x / texel) * texel
@@ -144,12 +198,16 @@ export class WorldView {
     this.sun.position.set(fx + this.sunDir.x * 150, focus.y + this.sunDir.y * 150, fz + this.sunDir.z * 150)
     this.sun.target.updateMatrixWorld()
     this.waterNormal.offset.set((elapsed * 0.004) % 1, (elapsed * 0.0027) % 1)
+    this.waterTime.value = elapsed
   }
 
   dispose(): void {
     for (const d of this.disposables) d.dispose()
     this.materials.dispose()
+    this.terrainMaterial.dispose()
+    this.grass?.dispose()
     this.waterNormal.dispose()
+    this.heightTex.dispose()
     ;(this.water.material as THREE.Material).dispose()
     ;(this.sky.material as THREE.Material).dispose()
     this.sky.geometry.dispose()

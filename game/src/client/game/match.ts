@@ -24,6 +24,7 @@ import { AirshipView } from '../render/airship-view'
 import { BuildingsView } from '../render/buildings-view'
 import { ZoneView } from '../render/zone-view'
 import { WorldView } from '../render/world-view'
+import { PostPipeline } from '../render/post'
 import { QUALITY, type Settings } from '../settings'
 import type { BattleHud, Hud, MatchResult } from '../ui/hud'
 import { FullMapView, MinimapView, gridRef, renderMapImage } from '../ui/minimap'
@@ -158,6 +159,8 @@ function escapeHtml(s: string): string {
 }
 
 export class Match {
+  /** Pós-processamento (null na qualidade baixa). */
+  private readonly post: PostPipeline | null
   readonly session: NetSession
   readonly tickRate: number
   readonly dt: number
@@ -269,6 +272,7 @@ export class Match {
     this.world = new WorldView(map, deps.renderer, quality)
     const size = deps.renderer.getSize(new THREE.Vector2())
     this.cam = new ThirdPersonCamera(size.x / Math.max(1, size.y), deps.settings.fov, quality.drawDistance)
+    this.post = quality.post !== 'nenhum' ? new PostPipeline(deps.renderer, this.world.scene, this.cam.camera, quality.post) : null
     this.predictor = new Predictor(map.world, this.dt, playerId)
     this.local = new CharacterModel(SKINS[0])
     this.world.scene.add(this.local.root)
@@ -970,7 +974,10 @@ export class Match {
       r.setViewport(vp.x, vp.y, vp.w, vp.h)
       r.setScissor(vp.x, vp.y, vp.w, vp.h)
     }
-    r.render(this.world.scene, this.cam.camera)
+    if (this.post) {
+      this.post.setSize(size.x, size.y)
+      this.post.render(frameDt)
+    } else r.render(this.world.scene, this.cam.camera)
     if (vp) r.setScissorTest(false)
   }
 
@@ -1148,6 +1155,7 @@ export class Match {
     this.minimap.el.remove()
     this.fullmap.el.remove()
     this.deps.hud.setDeath(null)
+    this.post?.dispose()
     this.world.dispose()
   }
 }

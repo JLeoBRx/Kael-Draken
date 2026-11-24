@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { MaterialId } from '../../shared/maps/types'
-import { brickTexture, concreteTexture, gridTexture, metalTexture, plasterTexture, terrainDetailTexture, woodTexture } from './textures'
+import { brickTexture, concreteTexture, gridTexture, metalTexture, plasterTexture, woodTexture } from './textures'
 
 /**
  * Registro de materiais do mundo. É o ÚNICO lugar que liga um MaterialId do
@@ -49,19 +49,6 @@ export class MaterialLibrary {
       m = new THREE.MeshStandardMaterial({ map, roughness: spec.roughness, metalness: spec.metalness })
       m.name = id
       this.cache.set(id, m)
-    }
-    return m
-  }
-
-  terrain(): THREE.MeshStandardMaterial {
-    let m = this.cache.get('__terrain') as THREE.MeshStandardMaterial | undefined
-    if (!m) {
-      const map = terrainDetailTexture()
-      map.repeat.set(1 / 7, 1 / 7)
-      this.textures.push(map)
-      m = new THREE.MeshStandardMaterial({ vertexColors: true, map, roughness: 0.97, metalness: 0 })
-      m.name = 'terreno'
-      this.cache.set('__terrain', m)
     }
     return m
   }
