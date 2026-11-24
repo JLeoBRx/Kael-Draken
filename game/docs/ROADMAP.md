@@ -14,7 +14,7 @@ termina com uma entrega que pode ser jogada.
 | 5 — Multijogador local | lobby LAN, equipes, descoberta na rede, reconexão, tela dividida, testes com vários jogadores | 1–2 semanas | **concluída** |
 | 6 — Online | plataforma (contas, amigos, convites, grupos, matchmaking, salas públicas/privadas, código de convite), alocação de servidores, segurança, gerência de interesse e compressão | 3–4 semanas | **concluída** |
 | 7 — Polimento | arte final (GLTF, animações esqueléticas), sons, efeitos, pós-processamento, otimização, acessibilidade, correção de bugs | 3 semanas | **concluída** |
-| 8 — Lançamento | app desktop (Electron/Tauri), instaladores, servidor em container, documentação de operação, testes de carga e finais | 1–2 semanas | |
+| 8 — Lançamento | app desktop (Electron/Tauri), instaladores, servidor em container, documentação de operação, testes de carga e finais | 1–2 semanas | **concluída — versão 1.0.0** |
 
 **Marcos jogáveis**
 
@@ -23,7 +23,7 @@ termina com uma entrega que pode ser jogada.
   completa contra bots, com zona, loot, construção e vencedor.
 - **M3 (fim da Fase 5)** — a mesma partida com amigos na LAN.
 - **M4 (fim da Fase 6)** — partidas online entre redes diferentes, com matchmaking. ✅
-- **M5 (fim da Fase 8)** — versão de lançamento.
+- **M5 (fim da Fase 8)** — versão de lançamento. ✅ (1.0.0)
 
 ---
 
@@ -327,8 +327,62 @@ Decisões de projeto:
   (modo foto) e por tempo de CPU. A meta de 60 FPS em GPU integrada fica
   para conferir em hardware real (Fase 8).
 
-## Fase 8 — Lançamento
+## Fase 8 — Lançamento ✅ (M5: versão 1.0.0)
 
-- Aplicativo desktop com servidor embutido (LAN sem terminal) e instalador.
-- Imagem Docker do servidor de jogo e da plataforma; guia de operação.
-- Testes finais, testes de carga, documentação de instalação e de jogo.
+Entregue:
+
+- **Aplicativo para computador** (Electron 45, pasta `desktop/`): a janela
+  carrega o jogo de um site local (127.0.0.1, origem fixa — as configurações
+  ficam salvas), escuta a descoberta UDP e **hospeda partidas** de rede local
+  com o servidor de verdade num processo separado (`utilityProcess`), que
+  fecha com o aplicativo. Ponte mínima pelo preload (página isolada, sem
+  Node; o processo principal confere a origem de cada pedido). Instalador e
+  zip para Windows, AppImage e .deb para Linux (o .deb instala num Ubuntu
+  24.04 limpo, com perfil do AppArmor); configuração do .dmg pronta.
+- **Nós de servidor de jogo** em outras máquinas: registro com desafio HMAC,
+  alocação por região e ocupação, relatórios a cada 2 s, resultados com
+  entrega garantida (guardados enquanto a plataforma está fora), readoção
+  depois de queda do nó ou reinício da plataforma, desligamento sem derrubar
+  partidas (drain). Os servidores da plataforma viram reserva.
+- **Produção**: pacotes `.mjs` autossuficientes (esbuild), imagem Docker
+  única (333 MB, sem `node_modules`, usuário sem privilégios, healthcheck),
+  docker compose com plataforma + 2 nós e sobreposição com Caddy (HTTPS/WSS
+  automático, nós atrás do mesmo domínio por prefixo). `/api/health` e
+  `/metrics` (Prometheus) em todos os programas.
+- **Teste de desempenho no jogo**: percurso fixo (cidade, mata, vista do
+  salto) com personagens e explosões, por qualidade; quadros por segundo, 1%
+  piores, p95, CPU por quadro, chamadas e triângulos; recomenda e aplica.
+- **Documentação**: [instalação](INSTALACAO.md), [operação](OPERACAO.md),
+  [guia do jogador](GUIA-DO-JOGADOR.md) e o [histórico de versões](../CHANGELOG.md).
+- **Testes**: 182 unitários/integração (nós remotos com nó simulado e em
+  rede de verdade, inclusive plataforma caindo e voltando; recomendação do
+  teste de desempenho; site local do aplicativo), 13 no navegador (teste de desempenho de ponta a
+  ponta), teste de fumaça do aplicativo (fonte e pacote pronto), teste de
+  carga pela pilha Docker (60 pessoas em 3 servidores de 3 máquinas lógicas).
+
+Decisões de projeto:
+
+- **Electron em vez de Tauri**: o servidor de jogo é Node; o Electron já traz
+  o Node (o `utilityProcess` roda o mesmo `servidor.mjs` da imagem Docker) e
+  o Chromium garante o mesmo WebGL em todos os sistemas. O custo é o tamanho
+  (~100–150 MB por pacote).
+- **Site local em vez de `file://` ou protocolo próprio**: Workers, `fetch` e
+  WebSocket para a rede (`ws://`) funcionam como no navegador, sem regras de
+  conteúdo misto; a porta fixa mantém o `localStorage`.
+- **Nó remoto conecta na plataforma** (e não o contrário): os nós podem ficar
+  atrás de NAT/firewall sem porta de administração aberta; só a porta dos
+  jogadores precisa ser pública.
+- **Resultados com entrega garantida no nó**, e não na plataforma: quem
+  conhece o resultado é o nó; a plataforma só grava uma vez por partida e
+  pessoa (repetições depois de uma queda são ignoradas).
+- **Sem assinatura de código** (certificado pago): o Windows mostra o aviso
+  do SmartScreen; documentado na instalação.
+
+## Depois da 1.0
+
+- Conta com código pessoal ou e-mail (hoje: só o nome, por decisão do projeto).
+- Arte final por artistas (o pipeline GLB/texturas/sons já aceita a troca).
+- Atualização automática do aplicativo e assinatura de código.
+- Transporte por datagramas (WebTransport) e taxa adaptativa para conexões
+  lentas; detecção estatística de mira automática.
+- "Derrubado e reanimar" em equipes; bots que sobem escadas e usam granadas.

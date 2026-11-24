@@ -1,0 +1,39 @@
+# Sobreposição para produção com domínio: Caddy na frente (HTTPS/WSS com
+# certificado automático), plataforma e nós sem portas expostas.
+#
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.tls.yml up -d --build
+#
+# Requer UC_DOMAIN no .env, apontando (DNS) para esta máquina, e as portas 80/443 livres.
+services:
+  plataforma:
+    ports: !reset []
+    environment:
+      TRUST_PROXY: "1"
+  no-1:
+    ports: !reset []
+    environment:
+      TRUST_PROXY: "1"
+      NODE_PUBLIC_URL: wss://${UC_DOMAIN:?defina UC_DOMAIN no .env}/n/no-1
+  no-2:
+    ports: !reset []
+    environment:
+      TRUST_PROXY: "1"
+      NODE_PUBLIC_URL: wss://${UC_DOMAIN}/n/no-2
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    depends_on: [plataforma]
+    environment:
+      UC_DOMAIN: ${UC_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-dados:/data
+      - caddy-config:/config
+
+volumes:
+  caddy-dados:
+  caddy-config:

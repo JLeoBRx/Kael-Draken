@@ -227,7 +227,7 @@ function service(opts: { maxHumans?: number; lobbySize?: number; maxWaitMs?: num
     matchmaker: { maxHumans: opts.maxHumans ?? 2, lobbySize: opts.lobbySize ?? 4, maxWaitMs: opts.maxWaitMs ?? 60_000 },
     pool: { maxServers: 4, autoStart: false, mapFactory: () => testMap(() => {}), botDifficulty: 'facil', publicBr: { warmup: 1, zoneSpeed: 50, endDelay: 1 }, reconnectSeconds: 0 },
   })
-  return { svc, store, advance: (ms: number) => (now += ms), tickServers: (n = 1) => { for (let k = 0; k < n; k++) for (const s of [...svc.pool.servers.values()]) s.host.tick() } }
+  return { svc, store, advance: (ms: number) => (now += ms), tickServers: (n = 1) => { for (let k = 0; k < n; k++) for (const s of [...svc.pool.servers.values()]) s.host!.tick() } }
 }
 
 function login(svc: PlatformService, id: number, name: string): Link {
@@ -323,17 +323,17 @@ describe('plataforma: partidas', () => {
     stranger.connect(sc)
     stranger.receive(9, encodeHello('Ana', '', ta.ticket))
     expect(sc.closed).toMatch(/Bilhete/)
-    const ga = joinGame(server.host, 1, ta)
-    const gb = joinGame(server.host, 2, tb)
+    const ga = joinGame(server.host!, 1, ta)
+    const gb = joinGame(server.host!, 2, tb)
     const wa = ga.inbox.find((m) => m.type === 'welcome')!
     expect(wa).toBeTruthy()
     tickServers(40)
-    expect(server.host.phase).not.toBe(MatchPhase.Warmup)
+    expect(server.host!.phase).not.toBe(MatchPhase.Warmup)
     // a dupla ficou na mesma equipe; bots completam o lobby
-    const pa = server.host.sim.players.get(wa.type === 'welcome' ? wa.playerId : 0)!
-    const team = [...server.host.sim.players.values()].filter((p) => p.team === pa.team)
+    const pa = server.host!.sim.players.get(wa.type === 'welcome' ? wa.playerId : 0)!
+    const team = [...server.host!.sim.players.values()].filter((p) => p.team === pa.team)
     expect(team.filter((p) => !p.bot).map((p) => p.name).sort()).toEqual(['Ana', 'Bia'])
-    expect([...server.host.sim.players.values()].filter((p) => p.bot)).toHaveLength(2)
+    expect([...server.host!.sim.players.values()].filter((p) => p.bot)).toHaveLength(2)
     svc.refreshPresence()
     expect(ana.last('friends')!.friends[0].presence).toBe('match')
     // a zona (50×) termina a partida; cada uma recebe XP e o servidor é liberado
@@ -370,7 +370,7 @@ describe('plataforma: partidas', () => {
     advance(3000)
     svc.step()
     const t = ana.last('matchFound')!.match
-    expect(svc.pool.get(t.path.split('/')[2])!.host.config.bots).toBe(5)
+    expect(svc.pool.get(t.path.split('/')[2])!.host!.config.bots).toBe(5)
   })
 
   it('sala privada: código, entrar pelo código, dono configura e inicia', () => {
@@ -384,13 +384,13 @@ describe('plataforma: partidas', () => {
     expect(joined.path).toBe(room.path)
     const server = svc.pool.get(room.path.split('/')[2])!
     // Bia chega antes, mas quem criou a sala é a anfitriã
-    const gb = joinGame(server.host, 2, joined)
-    const ga = joinGame(server.host, 1, room)
+    const gb = joinGame(server.host!, 2, joined)
+    const ga = joinGame(server.host!, 1, room)
     const lobby = gb.inbox.filter((m) => m.type === 'lobby').pop()!
     if (lobby.type !== 'lobby') throw new Error('tipo')
     expect(lobby.state.members.map((m) => m.name)).toEqual(['Bia', 'Ana'])
     expect(lobby.state.owner).toBe(ga.id)
-    expect(server.host.info().lobby).toBe(true)
+    expect(server.host!.info().lobby).toBe(true)
     svc.refreshPresence()
     expect(svc.presenceOf(bia.last('welcome')!.me.id)).toBe('room')
     void ga

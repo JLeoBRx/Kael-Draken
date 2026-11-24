@@ -5,6 +5,7 @@ import { QUALITY, type OfflinePrefs, type Quality, type Settings } from '../sett
 import { ACTIONS, ACTION_LABEL, COLOR_VISION_LABEL, DEFAULT_KEYS, RESERVED_KEYS, keyLabel, rebind, type Action, type ColorVision } from '../accessibility'
 import { BOT_DIFFICULTIES, BOT_PROFILES } from '../../server/core/bots/profiles'
 import { historyTotals, type MatchRecord } from '../history'
+import type { BenchmarkResult } from '../benchmark'
 import { EMBLEM_SVG, h } from './dom'
 
 /**
@@ -28,6 +29,18 @@ export interface LobbyActions {
   leave(): void
 }
 
+/** Hospedar pela tela "Rede local" (aplicativo de computador). */
+export interface HostPanel {
+  start(name: string): void
+  enter(name: string): void
+  stop(): void
+}
+
+export interface HostingView {
+  /** "ip:porta" para os outros digitarem. */
+  addresses: string[]
+}
+
 export interface MainMenuActions {
   playOffline(): void
   online(): void
@@ -36,6 +49,8 @@ export interface MainMenuActions {
   settings(): void
   controls(): void
   history(): void
+  /** Só no aplicativo de computador. */
+  quit?(): void
 }
 
 export class Screens {
@@ -115,7 +130,7 @@ export class Screens {
           emblem,
           h('h1', { class: 'title' }, GAME.title),
           h('p', { class: 'tagline' }, GAME.tagline),
-          h('span', { class: 'badge' }, h('span', { class: 'dot' }), `${GAME.phase} · gráficos, animação, som e acessibilidade`),
+          h('span', { class: 'badge' }, h('span', { class: 'dot' }), `${GAME.phase} · offline, rede local e online`),
           webglError ? h('p', { class: 'status error' }, webglError) : null),
         h('div', { class: 'actions' },
           playBtn,
@@ -125,10 +140,11 @@ export class Screens {
             h('button', { class: 'btn small', 'data-action': 'locker', onclick: () => a.locker() }, h('span', { class: 'label' }, 'Armário')),
             h('button', { class: 'btn small', 'data-action': 'settings', onclick: () => a.settings() }, h('span', { class: 'label' }, 'Configurações')),
             h('button', { class: 'btn small', 'data-action': 'controls', onclick: () => a.controls() }, h('span', { class: 'label' }, 'Controles')),
-            h('button', { class: 'btn small', 'data-action': 'history', onclick: () => a.history() }, h('span', { class: 'label' }, 'Histórico'))))),
+            h('button', { class: 'btn small', 'data-action': 'history', onclick: () => a.history() }, h('span', { class: 'label' }, 'Histórico')),
+            a.quit ? h('button', { class: 'btn small', 'data-action': 'quit', onclick: () => a.quit!() }, h('span', { class: 'label' }, 'Sair do jogo')) : null))),
       h('div', { class: 'footer' },
         h('span', {}, `v${GAME.version} · protocolo ${PROTOCOL_VERSION}`),
-        h('span', {}, 'Próxima fase: lançamento (app desktop, instaladores e servidor em container)'))))
+        h('span', {}, a.quit ? 'Aplicativo para computador' : 'Também disponível como aplicativo para computador (Windows e Linux)'))))
     playBtn.focus()
   }
 
@@ -155,12 +171,33 @@ export class Screens {
         h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn small', 'data-action': 'back', onclick: () => a.back() }, h('span', { class: 'label' }, 'Voltar'))))))
   }
 
-  join(defaults: { name: string; address: string }, onConnect: (name: string, address: string) => void, onBack: () => void): { setStatus(text: string, error?: boolean): void; setBusy(busy: boolean): void; setLan(list: LanEntry[] | null): void } {
+  join(defaults: { name: string; address: string }, onConnect: (name: string, address: string) => void, onBack: () => void, host?: HostPanel): { setStatus(text: string, error?: boolean): void; setBusy(busy: boolean): void; setLan(list: LanEntry[] | null): void; setHosting(h: HostingView | null): void } {
     const name = h('input', { class: 'text-input', name: 'nome', maxlength: 16, value: defaults.name, placeholder: 'Jogador', autocomplete: 'nickname' })
     const address = h('input', { class: 'text-input', name: 'endereco', value: defaults.address, placeholder: 'ex.: 192.168.0.10:7350 (vazio = este servidor)', autocomplete: 'off', spellcheck: 'false' })
     const status = h('div', { class: 'status', 'aria-live': 'polite' })
     const lan = h('div', { class: 'lan', 'data-screen': 'lan' })
     lan.hidden = true
+    const hostBox = h('div', { class: 'lan host-box', 'data-screen': 'host' })
+    hostBox.hidden = !host
+    const setHosting = (v: HostingView | null) => {
+      if (!host) return
+      if (!v) {
+        hostBox.replaceChildren(
+          h('h3', { style: 'margin:6px 0 4px;font-size:15px' }, 'Hospedar neste computador'),
+          h('p', { class: 'hint', style: 'margin:0 0 8px' }, 'Abre uma sala de espera na rede local: você escolhe mapa, modo e bots e inicia quando todos chegarem.'),
+          h('button', { class: 'btn primary small', type: 'button', 'data-action': 'host', onclick: () => host.start(name.value) }, h('span', { class: 'label' }, 'Hospedar partida')))
+        return
+      }
+      hostBox.replaceChildren(
+        h('h3', { style: 'margin:6px 0 4px;font-size:15px' }, 'Você está hospedando'),
+        h('p', { class: 'hint', style: 'margin:0 0 8px' }, v.addresses.length
+          ? h('span', {}, 'Outros jogadores entram por ', ...v.addresses.flatMap((a, k) => [k ? ' ou ' : '', h('b', { 'data-host-address': a }, a)]), ' (no aplicativo ou no navegador).')
+          : 'Sem rede local detectada: só este computador consegue entrar.'),
+        h('div', { class: 'row' },
+          h('button', { class: 'btn primary small', type: 'button', 'data-action': 'enter-host', onclick: () => host.enter(name.value) }, h('span', { class: 'label' }, 'Entrar na minha sala')),
+          h('button', { class: 'btn small', type: 'button', 'data-action': 'stop-host', onclick: () => host.stop() }, h('span', { class: 'label' }, 'Parar de hospedar'))))
+    }
+    setHosting(null)
     const connect = h('button', { class: 'btn primary small', type: 'submit', 'data-action': 'connect' }, h('span', { class: 'label' }, 'Conectar'))
     const form = h('form', { class: 'stack', onsubmit: (e: Event) => { e.preventDefault(); onConnect(name.value, address.value) } },
       h('label', {}, 'Seu nome', name),
@@ -172,11 +209,15 @@ export class Screens {
     this.show(h('div', { class: 'screen', 'data-screen': 'join' },
       h('div', { class: 'panel' },
         h('h2', {}, 'Rede local'),
-        h('p', { class: 'hint' }, `Na rede local, o anfitrião roda "npm run host" e informa o endereço exibido no terminal (porta ${GAME.defaultPort}). Para servidores online, use o endereço wss:// do servidor dedicado.`),
+        h('p', { class: 'hint' }, host
+          ? 'Hospede uma partida neste computador ou entre numa da rede. Quem não tem o aplicativo pode entrar pelo navegador no endereço mostrado.'
+          : `Na rede local, o anfitrião hospeda pelo aplicativo do jogo (ou roda "npm run host") e informa o endereço (porta ${GAME.defaultPort}). Para servidores online, use o endereço wss:// do servidor dedicado.`),
+        hostBox,
         lan,
         form)))
     ;(defaults.name ? address : name).focus()
     return {
+      setHosting,
       setLan(list) {
         lan.hidden = !list
         if (!list) return
@@ -394,7 +435,7 @@ export class Screens {
         h('button', { class: 'btn primary small', onclick: onBack }, h('span', { class: 'label' }, 'Voltar ao menu')))))
   }
 
-  settings(s: Settings, onChange: (s: Settings) => void, onClose: () => void): void {
+  settings(s: Settings, onChange: (s: Settings) => void, onClose: () => void, onBenchmark?: () => void): void {
     const next = { ...s }
     const commit = () => onChange({ ...next })
     const range = (key: 'sensitivity' | 'aimSensitivity' | 'fov' | 'volume' | 'uiScale' | 'crosshairSize' | 'renderScale', label: string, min: number, max: number, step: number, fmt: (v: number) => string, hint?: string) => {
@@ -455,6 +496,9 @@ export class Screens {
         h('div', { class: 'field' }, h('label', {}, 'Qualidade gráfica'), h('span'), quality,
           h('small', {}, 'Baixa: sem pós-processamento nem grama (computadores fracos). Média: brilho, cores e grama. Alta: + oclusão ambiente, sombras e grama mais longe. Vale na próxima partida; antisserrilhamento ao recarregar a página.')),
         range('renderScale', 'Escala da resolução', 0.5, 1, 0.05, (v) => `${Math.round(v * 100)}%`, 'Menos pixels = mais quadros por segundo em placas de vídeo fracas (a interface continua nítida).'),
+        onBenchmark ? h('div', { class: 'field' }, h('label', {}, 'Teste de desempenho'), h('span'),
+          h('button', { class: 'btn small', type: 'button', 'data-action': 'benchmark', onclick: onBenchmark }, h('span', { class: 'label' }, 'Testar este computador')),
+          h('small', {}, 'Percorre a ilha com cada qualidade (cerca de 45 s) e recomenda a melhor que fica fluida.')) : null,
         h('h3', { class: 'settings-section' }, 'Acessibilidade'),
         selectField('colorVision', 'Daltonismo', (Object.keys(COLOR_VISION_LABEL) as ColorVision[]).map((k): [string, string] => [k, COLOR_VISION_LABEL[k]]), 'Corrige as cores da imagem e troca as cores de raridade e dos colegas.'),
         check('soundCues', 'Mostrar de onde vêm os sons', 'Arcos em volta da mira: tiros (vermelho), passos (branco), explosões (laranja), baús (amarelo), construções (azul).'),
@@ -467,6 +511,58 @@ export class Screens {
   }
 
   /** Controles: teclas de cada ação (clique e aperte a nova tecla) e a referência do controle. */
+  /** Teste de desempenho em andamento (o mundo é desenhado atrás desta tela). */
+  benchmarkProgress(onCancel: () => void): { update(text: string, fraction: number): void } {
+    const text = h('div', { class: 'status', 'aria-live': 'polite' }, 'Carregando…')
+    const bar = h('div', { class: 'bench-bar' }, h('div', { class: 'bench-fill' }))
+    this.show(h('div', { class: 'screen bench-overlay', 'data-screen': 'benchmark' },
+      h('div', { class: 'bench-panel' },
+        h('b', {}, 'Teste de desempenho'),
+        text,
+        bar,
+        h('button', { class: 'btn small', type: 'button', 'data-action': 'cancel-benchmark', onclick: onCancel }, h('span', { class: 'label' }, 'Cancelar')))))
+    const fill = bar.firstElementChild as HTMLElement
+    return {
+      update(t, f) {
+        text.textContent = t
+        fill.style.width = `${Math.round(f * 100)}%`
+      },
+    }
+  }
+
+  benchmarkResults(r: BenchmarkResult, current: Quality, a: { apply(q: Quality, scale: number | null): void; again(): void; back(): void }): void {
+    const fmt = (v: number, d = 0) => v.toLocaleString('pt-BR', { maximumFractionDigits: d, minimumFractionDigits: d })
+    const rows = r.results.map((x) => {
+      // sem quadros medidos (máquina lenta demais para o tempo do teste): traço em vez de zero
+      const ok = x.frames > 1
+      const v = (text: string) => (ok ? text : '—')
+      return h('tr', { class: x.quality === r.recommended ? 'me' : '', 'data-quality': x.quality, 'data-frames': x.frames },
+        h('td', {}, x.label + (x.quality === current ? ' (atual)' : '')),
+        h('td', {}, v(fmt(x.avgFps, 1))),
+        h('td', {}, v(fmt(x.low1Fps, 1))),
+        h('td', {}, v(`${fmt(x.p95Ms, 1)} ms`)),
+        h('td', {}, v(`${fmt(x.cpuMs, 2)} ms`)),
+        h('td', {}, v(fmt(x.drawCalls))),
+        h('td', {}, v(`${fmt(x.triangles / 1e6, 2)} mi`)),
+        h('td', {}, `${x.width}×${x.height}`))
+    })
+    const skipped = (r.skipped ?? []).map((q) => h('tr', { 'data-quality': q, class: 'skipped' },
+      h('td', {}, QUALITY[q].label), h('td', { colspan: 7 }, 'não testada: a qualidade anterior já ficou abaixo de 12 quadros/s')))
+    const rec = r.results.find((x) => x.quality === r.recommended)
+    this.show(h('div', { class: 'screen', 'data-screen': 'benchmark-results' },
+      h('div', { class: 'panel wide' },
+        h('h2', {}, 'Resultado do teste'),
+        h('p', { class: 'hint' }, `Placa de vídeo: ${r.gpu} · escala da resolução ${Math.round(r.renderScale * 100)}%. Quadros por segundo limitados pela taxa do monitor; o tempo de CPU mostra a folga.`),
+        h('div', { class: 'table-wrap' }, h('table', { class: 'history' },
+          h('thead', {}, h('tr', {}, ...['Qualidade', 'Quadros/s', '1% piores', 'Quadro p95', 'CPU/quadro', 'Desenhos', 'Triângulos', 'Resolução'].map((t) => h('th', {}, t)))),
+          h('tbody', {}, ...rows, ...skipped))),
+        h('p', { class: 'status', 'data-recommended': r.recommended }, `Recomendado: ${rec?.label ?? r.recommended}` + (r.suggestScale ? ` com escala da resolução em ${Math.round(r.suggestScale * 100)}%` : '') + '.'),
+        h('div', { class: 'row', style: 'margin-top:14px' },
+          h('button', { class: 'btn primary small', 'data-action': 'apply-benchmark', onclick: () => a.apply(r.recommended, r.suggestScale) }, h('span', { class: 'label' }, 'Usar a recomendação')),
+          h('button', { class: 'btn small', onclick: () => a.again() }, h('span', { class: 'label' }, 'Testar de novo')),
+          h('button', { class: 'btn small', 'data-action': 'back', onclick: () => a.back() }, h('span', { class: 'label' }, 'Voltar'))))))
+  }
+
   controls(s: Settings, onChange: (s: Settings) => void, onClose: () => void): void {
     let keys = s.keys
     let listening: { action: Action; btn: HTMLButtonElement } | null = null

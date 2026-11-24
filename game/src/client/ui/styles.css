@@ -507,3 +507,12 @@ table.history td.ok { color: var(--ok); font-weight: 700; }
 @keyframes rays { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .results.victory .results-panel::before { animation: none; } }
 .results-panel { isolation: isolate; }
+
+/* ---- teste de desempenho ---- */
+canvas.benchmark-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; }
+.screen.bench-overlay { background: none; align-items: flex-end; justify-content: flex-start; pointer-events: none; }
+.screen.bench-overlay::before { display: none; }
+.bench-panel { pointer-events: auto; margin: 24px; padding: 14px 16px; min-width: 300px; display: grid; gap: 8px; background: rgba(11, 15, 20, 0.78); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(6px); }
+.bench-bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.bench-fill { height: 100%; width: 0; background: linear-gradient(90deg, #ff6a2f, #ffd36b); transition: width 0.2s linear; }
+.panel.wide { width: min(980px, calc(100vw - 32px)); }

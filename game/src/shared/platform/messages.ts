@@ -11,7 +11,7 @@ import type { XpBreakdown } from '../progression'
  * Welcome permite voltar sem digitar o nome de novo.
  */
 
-export const PLATFORM_VERSION = 1
+export const PLATFORM_VERSION = 2
 
 /** Onde cada pessoa está, como os amigos veem. */
 export type Presence = 'offline' | 'online' | 'searching' | 'match' | 'room'
@@ -95,8 +95,10 @@ export interface QueueState {
 }
 
 export interface MatchTicket {
-  /** Caminho do servidor de jogo no mesmo endereço (ex.: /game/s3). */
+  /** Caminho do servidor de jogo no mesmo endereço (ex.: /game/3fa1c2-4). */
   path: string
+  /** Endereço completo quando o servidor roda em outra máquina (nó remoto). */
+  url?: string
   ticket: string
   kind: 'publico' | 'privado'
   teamSize: number

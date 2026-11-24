@@ -5,40 +5,32 @@ Battle royale 3D em terceira pessoa, com partidas **offline**, em **rede local
 armas, mapas e interface originais. *(Título provisório — definido em
 `src/shared/config/game.ts`.)*
 
-> **Estado: Fase 7 concluída — polimento.** Mundo com pós-processamento
-> (brilho, gradação de cor, oclusão ambiente), nuvens, relevo com camadas de
-> detalhe, **grama 3D** e árvores com vento (com níveis de detalhe), água pela
-> profundidade; **personagem com esqueleto** e animações misturadas (clipes em
-> GLB, trocáveis por arte final); partículas, explosões, marcas de tiro;
-> **som** com passos por superfície, ambiente (vento, ondas, pássaros), reverb e
-> distância; vitrine 3D no menu, **armário** de visuais; **acessibilidade**
-> (daltonismo, indicador visual de sons, tamanho da interface, mira, reduzir
-> movimento) e **teclas configuráveis**. Próximo: lançamento (app desktop,
-> instaladores, servidor em container) — veja o [roteiro](docs/ROADMAP.md).
->
-> **Fase 6 — online.** Plataforma online (`npm run online`)
-> com entrada **só pelo nome** (o nome é a conta), amigos com presença, grupos
-> com convite, **matchmaking** de partidas públicas (solo, dupla, trio ou
-> esquadrão, por região e habilidade, completando com bots), **salas privadas
-> com código**, servidores de jogo alocados sob demanda com **bilhetes
-> assinados**, resultados reportados pelo servidor de jogo, **XP, níveis,
-> estatísticas, histórico, classificação, desafios do dia e visuais/títulos
-> desbloqueáveis** guardados em banco (SQLite). A rede ficou ~10× mais leve:
-> snapshots em delta por conexão e gerência de interesse.
->
-> **Fase 5 — multijogador local.** Sala de espera na rede local, descoberta
-> automática das partidas, duplas/trios/esquadrões com fogo amigo opcional,
-> reconexão ao mesmo personagem e tela dividida para 2 jogadores.
->
-> **Fase 4 — primeira versão jogável de battle royale.**
-> Partida completa offline contra até 99 bots (ou com amigos num servidor):
-> aquecimento, salto do dirigível, queda livre e planador, saque, combate,
-> construção, zona que fecha em 7 etapas e vencedor, com tela de resultado e
-> histórico. Bots em três dificuldades navegam pelo mapa, saqueiam, lutam,
-> se curam, constroem paredes e fogem da zona usando os mesmos comandos de um
-> jogador. Somam-se à construção (Fase 3), às armas, inventário e loot
-> (Fase 2) e ao mapa principal **Ilha de Brasa**. Próximo: lobby LAN e equipes
-> — veja o [roteiro](docs/ROADMAP.md) e a [arquitetura](docs/ARQUITETURA.md).
+> **Versão 1.0.0 — lançamento.** Battle royale completo contra até 99 bots,
+> com amigos na rede local (sala de espera, equipes, tela dividida) ou online
+> (contas só pelo nome, amigos, grupos, matchmaking, salas com código, XP e
+> desafios). **Aplicativo para computador** (Windows e Linux) que também
+> hospeda partidas na rede local; **servidor online em Docker** com nós de jogo
+> em várias máquinas, HTTPS automático, saúde e métricas; **teste de
+> desempenho** dentro do jogo. Histórico completo em [CHANGELOG.md](CHANGELOG.md).
+
+| Para… | Leia |
+| --- | --- |
+| jogar: modos, controles, construção, progressão, dicas | [Guia do jogador](docs/GUIA-DO-JOGADOR.md) |
+| instalar: aplicativo, navegador, código-fonte, instaladores | [Instalação](docs/INSTALACAO.md) |
+| pôr online: Docker, nós, HTTPS, métricas, cópias, atualizações | [Operação](docs/OPERACAO.md) |
+| entender o código: rede, simulação, plataforma, aplicativo | [Arquitetura](docs/ARQUITETURA.md) · [Roteiro](docs/ROADMAP.md) |
+
+| Aplicativo para computador | Hospedando pela rede local (sala de espera) |
+| --- | --- |
+| ![Menu do aplicativo com o botão "Sair do jogo"](docs/imagens/app-menu.webp) | ![Sala de espera aberta pelo aplicativo com a anfitriã e uma visita que entrou pelo navegador](docs/imagens/app-hospedar.webp) |
+
+| Teste de desempenho (vista do salto) | Resultado e recomendação |
+| --- | --- |
+| ![Teste de desempenho sobrevoando a Ilha de Brasa, com o painel de progresso](docs/imagens/desempenho.webp) | ![Tabela do teste: quadros por segundo, 1% piores, CPU, chamadas e triângulos por qualidade, com a recomendação](docs/imagens/desempenho-resultado.webp) |
+
+*O resultado acima é desta máquina de desenvolvimento, sem placa de vídeo
+(renderização por software): por isso a qualidade baixa a 3 quadros/s e as
+mais pesadas puladas.*
 
 ![Campo da Ilha de Brasa com grama 3D, árvores, nuvens e montanhas nevadas](docs/imagens/fase7-campo.webp)
 
@@ -75,15 +67,22 @@ texturas e sons são placeholders procedurais — veja "Limitações conhecidas"
 
 ## Requisitos
 
-- **Node.js 22.12+** e npm (para compilar e rodar o servidor).
-- Navegador com **WebGL 2** (Chrome, Edge, Firefox ou Safari atuais) e, de
-  preferência, placa de vídeo dedicada ou integrada recente.
+- **Para jogar**: o aplicativo (Windows 10/11 64 bits ou Linux x86-64) ou um
+  navegador atual com **WebGL 2**; de preferência placa de vídeo dedicada ou
+  integrada recente (use *Configurações → Testar este computador*).
+- **Para compilar ou hospedar pelo terminal**: **Node.js 22.12+** e npm.
+- **Para o servidor online**: Docker (ou Node 22 com os pacotes `.mjs`).
 
 ## Instalação
+
+Aplicativo: veja [docs/INSTALACAO.md](docs/INSTALACAO.md) (instalador do
+Windows, zip, AppImage, .deb). A partir do código-fonte:
 
 ```bash
 cd game
 npm install
+npm run host          # abre o jogo em http://localhost:7350
+npm run desktop       # ou: o aplicativo para computador
 ```
 
 ## Como jogar
@@ -112,7 +111,12 @@ Para desenvolvimento com recarga automática: `npm run dev` e abra
 
 ### Rede local (LAN)
 
-No computador anfitrião:
+**Pelo aplicativo**: *Rede local → Hospedar partida*. O aplicativo abre a sala
+de espera neste computador e mostra o endereço para os outros; quem tem o
+aplicativo vê a partida na lista, quem não tem abre `http://ENDEREÇO:7350` no
+navegador. O servidor fecha junto com o aplicativo.
+
+**Pelo terminal**, no computador anfitrião:
 
 ```bash
 npm run host
@@ -178,9 +182,20 @@ no navegador e clica em **Jogar online**:
 
 Opções: `npm run platform -- --help` (porta, arquivo do banco, segredo dos
 bilhetes, mapa, servidores simultâneos, tamanho do lobby, espera da fila,
-aquecimento, zona, dificuldade dos bots, `--trust-proxy`). Em produção,
-coloque-a atrás de um proxy com TLS (`wss://`) e defina `PLATFORM_SECRET`
-(segredo dos bilhetes). O banco fica em `data/plataforma.db`.
+aquecimento, zona, dificuldade dos bots, `--trust-proxy`). O banco fica em
+`data/plataforma.db`.
+
+**Em produção**, use o Docker Compose (plataforma + nós de jogo, HTTPS com
+Caddy, saúde e métricas):
+
+```bash
+cp deploy/env.example .env      # defina PLATFORM_SECRET
+docker compose up -d --build
+```
+
+Mais máquinas para as partidas: `npm run game-node -- --platform <url>
+--secret <segredo> --public-url <endereço dos jogadores>` (ou a mesma imagem
+Docker). Tudo em [docs/OPERACAO.md](docs/OPERACAO.md).
 
 ### Servidor dedicado sem plataforma
 
@@ -223,7 +238,7 @@ O agachar usa **C** (e não Ctrl) porque Ctrl+W fecha a aba no navegador. No
 modo construção a roda do mouse troca a peça e qualquer tecla de espaço (1–6)
 volta às armas.
 
-## Gráficos, som e acessibilidade (Fase 7)
+## Gráficos, som e acessibilidade
 
 | Área | O que há |
 | --- | --- |
@@ -242,7 +257,14 @@ mais longe). **Escala da resolução** (50–100%) desenha menos pixels em
 placas de vídeo fracas sem borrar a interface. Os testes de navegador rodam na
 qualidade baixa a 50%.
 
-## O que há no jogo (Fases 2, 3 e 4)
+**Teste de desempenho** (*Configurações → Testar este computador*, ou
+`?desempenho=baixa,media,alta&s=12` no endereço): percorre a cidade no nível
+da rua, a mata na altura dos olhos e a vista do salto, com personagens
+correndo e explosões, em cada qualidade; mostra quadros por segundo, 1%
+piores, quadro p95, CPU por quadro, chamadas de desenho e triângulos, e aplica
+a maior qualidade fluida (ou sugere uma escala menor).
+
+## O que há no jogo
 
 | Sistema | Detalhes |
 | --- | --- |
@@ -270,23 +292,38 @@ qualidade baixa a 50%.
 | Comando | O que faz |
 | --- | --- |
 | `npm run dev` | cliente em modo desenvolvimento (Vite, :5173; repassa `/ws` ao servidor em :7350 e `/platform`/`/game` à plataforma em :7370) |
-| `npm run server` | servidor dedicado/LAN (serve `dist/client` se existir) |
 | `npm run host` | compila o cliente e sobe o servidor servindo o jogo (sala de espera de LAN) |
+| `npm run server` | servidor dedicado/LAN (serve `dist/client` se existir) |
 | `npm run online` | compila o cliente e sobe a plataforma online (:7370) |
 | `npm run platform` | só a plataforma (usa o `dist/client` existente) |
+| `npm run game-node` | nó de servidor de jogo para a plataforma (outra máquina) |
 | `npm run build` | verificação de tipos + build do cliente em `dist/client` |
+| `npm run build:server` | pacotes de produção `dist/server/{plataforma,no-de-jogo,servidor}.mjs` |
+| `npm run build:all` | os dois acima |
+| `npm run start:platform` · `start:node` · `start:server` | rodam os pacotes de produção com `node` puro |
+| `npm run desktop` | compila e abre o aplicativo para computador |
+| `npm run desktop:dist` | instaladores (Windows e Linux) em `desktop/release/` |
 | `npm test` | testes unitários e de integração (Vitest) |
 | `npm run test:e2e` | testes no navegador (Playwright) |
 | `npm run check` | tipos + testes unitários |
 | `npm run assets` | gera o personagem em GLB (`public/arte/personagens/personagem.glb`) a partir do código |
+| `npx tsx scripts/load-test.ts --pessoas 100 --segundos 120 [--url …]` | teste de carga pela plataforma (local ou já rodando) |
 | `npx tsx scripts/bench-net.ts` | banda por cliente numa partida de bots |
-| `npx tsx scripts/load-test.ts 100 120` | teste de carga: 100 pessoas simuladas pela plataforma |
 
 Para os testes de navegador em uma máquina nova: `npx playwright install chromium`.
 
 ## Testes
 
-- **Unitários e integração (171)**: personagem com esqueleto (pesos da
+- **Unitários e integração (182)**: **nós de servidor de jogo** (só entra
+  quem prova o segredo e fala a mesma versão; partida pública num nó com
+  bilhete só depois da confirmação e com o endereço do nó; região, ocupação e
+  reserva; nó cheio e nó que recusa; sala esperando o nó; desligamento; nó que
+  cai e é readotado ou dado como perdido; plataforma reiniciada readotando
+  salas; descrição adulterada recusada; **plataforma e nó de verdade em rede**,
+  com o jogador conectando direto no nó, saúde, métricas e a plataforma
+  caindo e voltando sem derrubar a sala); recomendação do teste de
+  desempenho; site local do aplicativo (porta ocupada, lista da rede sem
+  repetir a própria sala); personagem com esqueleto (pesos da
   malha, clipes, ida e volta pelo GLB com o GLTFLoader, GLB publicado igual ao
   gerado, mistura de clipes por estado, passada); acessibilidade (troca de
   teclas sem conflito, correção de cores, paleta); plataforma online (entrada pelo nome,
@@ -318,7 +355,8 @@ Para os testes de navegador em uma máquina nova: `npx playwright install chromi
   autoritativa, custo e intervalo, paredes bloqueando tiros, explosões,
   picareta, coleta, sincronização), predição sem correções com 100 ms de
   latência (inclusive construindo) e servidor WebSocket real.
-- **Navegador (12)**: menu, configurações, **opções de acessibilidade,
+- **Navegador (13)**: **teste de desempenho** (percurso, resultado,
+  recomendação aplicada); menu, configurações, **opções de acessibilidade,
   troca de teclas e armário** salvos; **plataforma online com dois navegadores** (nome curto
   recusado, entrada pelo nome, amizade e presença, convite para o grupo, dupla
   pelo matchmaking na mesma equipe, partida até o fim com XP e estatísticas,
@@ -334,15 +372,28 @@ Para os testes de navegador em uma máquina nova: `npx playwright install chromi
   dedicado; **combate entre dois navegadores**; **construção entre dois
   navegadores** (A ergue uma parede, B a vê; A a derruba e ela some para B).
 
+- **Aplicativo** (`desktop/tests/smoke.mjs`, Playwright + Electron sob Xvfb,
+  no código-fonte e no pacote pronto): ponte isolada (sem Node na página),
+  hospedar pela tela, outro "computador" (navegador) entrando na sala, servidor
+  fechando junto com o aplicativo. O `.deb` instalado num Ubuntu 24.04 limpo.
+- **Implantação** (manual, documentada): imagem Docker construída, compose com
+  plataforma + 2 nós saudável, teste de carga com 60 pessoas pela pilha,
+  desligamento de nó com partidas, banco sobrevivendo ao reinício, HTTPS/WSS
+  pelo Caddy até a sala num nó.
+
 ## Estrutura
 
 ```
 src/shared   simulação determinística compartilhada (movimento, combate, itens, mapas, protocolo)
 src/server   Simulation/GameHost (autoridade, loot, dano) e o servidor Node (HTTP + WebSocket)
-src/platform plataforma online: banco, contas, amigos, grupos, matchmaking, salas, servidores de jogo
-src/client   renderização (three.js), personagem, armas, efeitos, áudio, câmera, entrada, rede, HUD
+src/platform plataforma online: banco, contas, amigos, grupos, matchmaking, salas, servidores de jogo, nós remotos
+src/client   renderização (three.js), personagem, armas, efeitos, áudio, câmera, entrada, rede, HUD, teste de desempenho
+src/desktop  site local e descoberta do aplicativo para computador
+desktop      aplicativo Electron (processo principal, preload, ícone, instaladores, teste de fumaça)
+deploy       sobreposição TLS do compose, Caddyfile, .env de exemplo
+scripts      pacotes de produção, teste de carga, medição de banda, exportação do GLB
 tests        unit (Vitest) e e2e (Playwright)
-docs         ARQUITETURA.md, ROADMAP.md, imagens/
+docs         ARQUITETURA, ROADMAP, INSTALACAO, OPERACAO, GUIA-DO-JOGADOR, imagens/
 ```
 
 Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
@@ -355,64 +406,47 @@ Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 | `ws` | WebSocket no servidor |
 | `node:sqlite` (embutido no Node 22) | banco da plataforma online — nenhuma instalação extra |
 | `tsx` | executa o servidor TypeScript |
-| `vite` (dev) | build do cliente |
+| `vite`, `esbuild` (dev) | build do cliente e pacotes do servidor |
+| `electron`, `electron-builder` (em `desktop/`) | aplicativo para computador e instaladores |
 | `vitest`, `@playwright/test` (dev) | testes |
 | `typescript`, `@types/*` (dev) | tipos |
 
-Variáveis de ambiente do servidor: `PORT` e `HOST` (equivalem a `--port` e
-`--host`). Da plataforma: `PORT`, `HOST`, `PLATFORM_DB` (arquivo do banco) e
-`PLATFORM_SECRET` (segredo dos bilhetes de entrada). Configurações do jogador ficam no navegador (`localStorage`),
-inclusive o volume.
+Variáveis de ambiente (plataforma, nós e servidor dedicado): tabela completa
+em [docs/OPERACAO.md](docs/OPERACAO.md#variáveis-de-ambiente). Configurações do
+jogador ficam no navegador ou no aplicativo (`localStorage`), inclusive o volume.
 
-## Limitações conhecidas (Fase 7)
+## Limitações conhecidas (1.0)
 
+- **Conta só pelo nome, sem senha** (decisão do projeto): quem souber o nome
+  de alguém entra na conta dessa pessoa. Para uso aberto ao público, o próximo
+  passo é um código pessoal ou login por e-mail (a sessão já é um token
+  separado do nome).
 - A arte continua gerada em código (personagem, armas, árvores, texturas e
   sons): o pipeline de troca está pronto (GLB do personagem com ossos,
   materiais e clipes por nome; texturas e sons por receita), mas não há
   modelos ou gravações feitos por artista.
-- Sem placa de vídeo nesta máquina de desenvolvimento, o desempenho foi medido
-  em chamadas de desenho e triângulos (modo foto, `?foto=…`), não em quadros
-  por segundo numa GPU real: Ilha de Brasa, campo aberto — baixa 37 chamadas e
-  0,34 M triângulos; média 73 e 0,70 M; alta 135 e 2,0 M (a oclusão ambiente
-  desenha a cena duas vezes). Animação de 50 personagens: 0,8 ms de CPU por
-  quadro. A meta de 60 quadros por segundo em GPU integrada na qualidade
-  média ainda precisa ser conferida em hardware real.
-- Na tela dividida, cada metade tem o próprio pós-processamento (o dobro do
-  custo); em computadores fracos, use a qualidade baixa.
-
-### Herdadas das fases anteriores
-
-- **Conta só pelo nome, sem senha** (decisão do projeto): quem souber o nome
-  de alguém entra na conta dessa pessoa. Para uso público, o próximo passo é
-  um código pessoal ou login por e-mail (a sessão já é um token separado do
-  nome).
-- A plataforma roda os servidores de jogo no mesmo processo (até
-  `--max-servers` partidas simultâneas). O bilhete assinado já permite
-  servidores em outras máquinas com o mesmo segredo; o registro automático de
-  nós e a imagem de container ficam para a Fase 8.
-- Regiões são rótulos da fila (separam quem joga junto); com um único
-  processo, todas as partidas rodam na mesma máquina.
-- O transporte é WebSocket (TCP). WebTransport/datagramas e detecção
-  estatística de mira automática ficam para as Fases 7–8. O teste de carga
-  usa 100 clientes simulados na mesma máquina, não 100 computadores.
-
-- Em equipes não há "derrubado e reanimar": quem perde a vida é eliminado e
-  assiste os colegas.
-- A tela dividida é offline e para 2 jogadores; ela desenha o mundo duas
-  vezes (precisa de uma placa de vídeo razoável no mapa principal).
-- Bots ficam no térreo dos prédios (não sobem escadas) e constroem só paredes
-  defensivas; não usam granadas.
+- Esta máquina de desenvolvimento não tem placa de vídeo: o desempenho foi
+  controlado por chamadas de desenho, triângulos e tempo de CPU (Ilha de
+  Brasa, campo aberto — baixa 37 chamadas e 0,34 M triângulos; média 73 e
+  0,70 M; alta 135 e 2,0 M). Os quadros por segundo numa GPU real ficam com o
+  **teste de desempenho** de cada computador.
+- Aplicativo **sem assinatura de código** (o Windows mostra o aviso do
+  SmartScreen) e **sem atualização automática**; o `.dmg` do macOS precisa ser
+  gerado num Mac (a configuração está pronta).
+- O instalador do Windows foi gerado com a imagem `electronuserland/builder:wine`
+  (o Wine desta máquina não funciona); o conteúdo é o mesmo do zip, conferido.
+  O aplicativo foi executado e testado no Linux; no Windows, não.
+- O transporte é WebSocket (TCP); ainda não há taxa adaptativa para conexões
+  lentas nem detecção estatística de mira automática. Os testes de carga usam
+  clientes simulados numa mesma máquina, não computadores separados.
+- Em equipes não há "derrubado e reanimar"; bots ficam no térreo dos prédios,
+  constroem só paredes defensivas e não usam granadas.
+- A tela dividida é offline e para 2 jogadores e desenha o mundo duas vezes.
 - Offline e na LAN, o histórico fica no navegador (só as partidas online
   contam XP e estatísticas da conta).
-- Ainda não há edição de peças (abrir portas e janelas em paredes).
-- A grade de construção é absoluta: em encostas, peças podem ficar
-  parcialmente enterradas (como em outros jogos do gênero).
+- Ainda não há edição de peças (abrir portas e janelas em paredes); em
+  encostas, peças podem ficar parcialmente enterradas (grade absoluta).
 - O coice da arma é aplicado no cliente (como na maioria dos jogos); o servidor
   valida dispersão, cadência, munição e acertos.
-- Banda medida: ~3,4 KB/s por cliente numa partida espalhada (60 bots +
-  8 clientes; antes da Fase 6: 35 KB/s) e ~15 KB/s por pessoa no pior caso
-  (100 pessoas agrupadas, `scripts/load-test.ts`; servidor a 4,5 ms por tick).
-  Ainda não há taxa adaptativa para conexões lentas.
-- A descoberta de partidas na LAN funciona pela página servida por um host
-  (o navegador não escuta UDP); quem abre o jogo de outro lugar entra pelo
-  endereço exibido no terminal do host.
+- No navegador comum, a lista de partidas da rede local vem do host que serviu
+  a página (o navegador não escuta UDP); o aplicativo escuta direto.

@@ -35,7 +35,8 @@ export interface LanServer {
 export interface DiscoveryOptions {
   /** Porta HTTP/WebSocket deste servidor (vai no anúncio). */
   httpPort: number
-  info: () => HostInfo
+  /** Situação anunciada; null = só escuta (o aplicativo de computador procurando partidas). */
+  info: (() => HostInfo) | null
   /** Porta UDP em que escuta. */
   listenPort?: number
   /** Para onde anuncia (padrão: broadcast na porta de descoberta). */
@@ -92,7 +93,7 @@ export class LanDiscovery {
 
   private announce(): void {
     const s = this.socket
-    if (!s) return
+    if (!s || !this.opts.info) return
     const i = this.opts.info()
     const msg = Buffer.from(JSON.stringify({
       app: MAGIC, id: this.id, port: this.opts.httpPort, name: i.name, mapName: i.mapName, players: i.players, bots: i.bots,

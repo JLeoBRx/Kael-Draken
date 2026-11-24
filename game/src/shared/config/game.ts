@@ -2,8 +2,8 @@
 export const GAME = {
   title: 'Última Chama',
   tagline: 'Battle royale em terceira pessoa',
-  version: '0.7.0',
-  phase: 'Fase 7 — Polimento',
+  version: '1.0.0',
+  phase: 'Versão 1.0',
   tickRate: 30,
   defaultPort: 7350,
 } as const

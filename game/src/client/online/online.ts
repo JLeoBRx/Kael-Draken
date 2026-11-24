@@ -3,6 +3,7 @@ import type { HistoryEntry, LeaderRow, MatchReward, MatchTicket, ServerPush } fr
 import type { OnlinePrefs, Settings } from '../settings'
 import type { Screens } from '../ui/screens'
 import { OnlineHome, historyModal, leaderboardModal, loginScreen } from './online-screens'
+import { desktop } from '../desktop'
 import { PlatformClient, platformUrls } from './platform-client'
 
 /**
@@ -58,7 +59,8 @@ export class OnlineController {
   constructor(private readonly shell: OnlineShell) {}
 
   private get base(): { http: string; ws: string } {
-    return platformUrls(this.shell.settings().online.address)
+    // aplicativo de computador: a página vem de 127.0.0.1, então o padrão é a plataforma configurada nele
+    return platformUrls(this.shell.settings().online.address || desktop()?.platform || '')
   }
 
   /** "Jogar online" no menu principal. */
@@ -189,7 +191,7 @@ export class OnlineController {
     this.home = null
     this.pendingReward = null
     this.shell.startOnlineMatch({
-      url: `${c.wsBase}${t.path}`,
+      url: t.url ?? `${c.wsBase}${t.path}`,
       ticket: t.ticket,
       name: c.state.me.name,
       title: t.kind === 'privado' ? `Sala ${t.code ?? ''}` : 'Partida online',

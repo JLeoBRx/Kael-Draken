@@ -1,10 +1,11 @@
-import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { DEFAULT_MAP_ID, MAPS } from '../../shared/maps'
 import { GameMode } from '../../shared/match/zone'
 import { BOT_DIFFICULTIES, isBotDifficulty } from '../core/bots/profiles'
 import { startServer } from './server'
+import { gameRoot } from './paths'
+import { exitOnListenError } from './listen-error'
 
 /**
  * Linha de comando do servidor dedicado / host de LAN.
@@ -13,8 +14,7 @@ import { startServer } from './server'
  *   npm run host                      (compila o cliente e serve tudo)
  */
 
-const here = dirname(fileURLToPath(import.meta.url))
-const gameRoot = resolve(here, '../../..')
+const root = gameRoot(import.meta.url)
 
 const { values } = parseArgs({
   options: {
@@ -35,7 +35,7 @@ const { values } = parseArgs({
     'friendly-fire': { type: 'boolean', default: false },
     reconnect: { type: 'string', default: '60' },
     'no-discovery': { type: 'boolean', default: false },
-    static: { type: 'string', default: resolve(gameRoot, 'dist/client') },
+    static: { type: 'string', default: resolve(root, 'dist/client') },
     'no-static': { type: 'boolean', default: false },
     help: { type: 'boolean', short: 'h', default: false },
   },
@@ -115,7 +115,7 @@ const server = await startServer({
     reconnectSeconds: int('reconnect', values.reconnect, 0, 600),
   },
   discovery: !values['no-discovery'],
-})
+}).catch((err: unknown) => exitOnListenError(err, values.port))
 
 const modeText = values.lobby ? 'sala de espera' : values.mode === 'br' ? `battle royale, ${values.bots} bots` : 'treino'
 console.log(`\nÚltima Chama — servidor em execução (mapa "${values.map}", ${modeText}, ${values['tick-rate']} ticks/s)`)

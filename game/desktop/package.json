@@ -1,0 +1,98 @@
+{
+  "name": "ultima-chama-desktop",
+  "productName": "Última Chama",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Battle royale 3D em terceira pessoa: offline com bots, rede local e online.",
+  "author": {
+    "name": "Equipe Última Chama",
+    "email": "jogo@ultimachama.invalid"
+  },
+  "homepage": "https://github.com/JLeoBRx/Kael-Draken",
+  "main": "build/main.mjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "npm run build && electron .",
+    "dist:linux": "npm run build && electron-builder --linux --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist": "npm run build && electron-builder --linux --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "br.ultimachama.jogo",
+    "productName": "Última Chama",
+    "artifactName": "ultima-chama-${version}-${os}-${arch}.${ext}",
+    "copyright": "© 2026 Equipe Última Chama",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "build/**/*",
+      "assets/icon.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist/client",
+        "to": "client"
+      },
+      {
+        "from": "../dist/server",
+        "to": "server",
+        "filter": [
+          "*.mjs"
+        ]
+      }
+    ],
+    "asar": true,
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Game",
+      "icon": "assets/icon.png",
+      "synopsis": "Battle royale 3D em terceira pessoa"
+    },
+    "deb": {
+      "packageName": "ultima-chama",
+      "depends": [
+        "libgtk-3-0",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "libgbm1",
+        "libasound2t64 | libasound2 (>= 1.0.16)"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "assets/icon.png",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Última Chama"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.action-games",
+      "icon": "assets/icon.png"
+    },
+    "executableName": "ultima-chama",
+    "publish": null
+  }
+}

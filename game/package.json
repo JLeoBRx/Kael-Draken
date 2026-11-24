@@ -1,6 +1,6 @@
 {
   "name": "ultima-chama",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Última Chama — battle royale 3D em terceira pessoa com modos offline, LAN e online sobre servidor autoritativo.",
@@ -10,15 +10,23 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:server": "tsx scripts/build-server.ts",
+    "build:all": "npm run build && npm run build:server",
     "assets": "tsx scripts/export-assets.ts",
     "server": "tsx src/server/node/main.ts",
     "host": "vite build && tsx src/server/node/main.ts --lobby --static dist/client",
     "platform": "tsx --disable-warning=ExperimentalWarning src/platform/main.ts",
     "online": "vite build && tsx --disable-warning=ExperimentalWarning src/platform/main.ts",
+    "game-node": "tsx src/platform/node-main.ts",
+    "start:platform": "node --enable-source-maps --disable-warning=ExperimentalWarning dist/server/plataforma.mjs",
+    "start:node": "node --enable-source-maps dist/server/no-de-jogo.mjs",
+    "start:server": "node --enable-source-maps dist/server/servidor.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "desktop": "npm run build:all && npm --prefix desktop run start",
+    "desktop:dist": "npm run build:all && npm --prefix desktop run dist"
   },
   "dependencies": {
     "three": "^0.187.0",
@@ -30,6 +38,7 @@
     "@types/node": "^22.20.5",
     "@types/three": "^0.187.0",
     "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2",
     "typescript": "~5.9.3",
     "vite": "^8.3.8",
     "vitest": "^5.1.1"

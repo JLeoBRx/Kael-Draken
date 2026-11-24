@@ -1,0 +1,76 @@
+# Última Chama — plataforma online + dois nós de servidor de jogo.
+#
+#   cp deploy/env.example .env        (defina PLATFORM_SECRET)
+#   docker compose up -d --build
+#   abra http://localhost:7370
+#
+# Com domínio e TLS (Caddy, certificado automático):
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.tls.yml up -d --build
+#
+# Guia completo: docs/OPERACAO.md
+name: ultima-chama
+
+x-node: &node
+  image: ultima-chama:${UC_VERSION:-1.0.0}
+  restart: unless-stopped
+  command: ["node", "--enable-source-maps", "dist/server/no-de-jogo.mjs"]
+  depends_on:
+    plataforma:
+      condition: service_healthy
+  # no "docker compose down"/atualização, o nó espera as partidas terminarem (até DRAIN_TIMEOUT)
+  stop_grace_period: 16m
+  init: true
+
+services:
+  plataforma:
+    build: .
+    image: ultima-chama:${UC_VERSION:-1.0.0}
+    restart: unless-stopped
+    init: true
+    environment:
+      PORT: "7370"
+      PLATFORM_SECRET: ${PLATFORM_SECRET:?defina PLATFORM_SECRET no arquivo .env (veja deploy/env.example)}
+      # servidores de jogo na própria plataforma (reserva para quando os nós estiverem cheios)
+      MAX_SERVERS: ${LOCAL_SERVERS:-2}
+      LOCAL_REGION: ${NODE_REGION:-sa}
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+    ports:
+      - "${PLATFORM_PORT:-7370}:7370"
+    volumes:
+      - dados:/app/data
+
+  no-1:
+    <<: *node
+    environment:
+      PORT: "7380"
+      PLATFORM_URL: http://plataforma:7370
+      PLATFORM_SECRET: ${PLATFORM_SECRET}
+      NODE_NAME: no-1
+      NODE_REGION: ${NODE_REGION:-sa}
+      NODE_CAPACITY: ${NODE_CAPACITY:-4}
+      NODE_PUBLIC_URL: ${NODE1_PUBLIC_URL:-ws://localhost:7381}
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      DRAIN_TIMEOUT: ${DRAIN_TIMEOUT:-900}
+    ports:
+      - "7381:7380"
+
+  no-2:
+    <<: *node
+    environment:
+      PORT: "7380"
+      PLATFORM_URL: http://plataforma:7370
+      PLATFORM_SECRET: ${PLATFORM_SECRET}
+      NODE_NAME: no-2
+      NODE_REGION: ${NODE_REGION:-sa}
+      NODE_CAPACITY: ${NODE_CAPACITY:-4}
+      NODE_PUBLIC_URL: ${NODE2_PUBLIC_URL:-ws://localhost:7382}
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      DRAIN_TIMEOUT: ${DRAIN_TIMEOUT:-900}
+    ports:
+      - "7382:7380"
+
+volumes:
+  dados:

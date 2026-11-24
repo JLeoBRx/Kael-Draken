@@ -13,8 +13,10 @@ import { loadCharacterAsset } from './character/character-assets'
 import { SKINS } from './character/character-model'
 import { MenuStage } from './render/menu-stage'
 import { mateCss, setColorVision } from './accessibility'
+import { runBenchmark, type BenchmarkResult } from './benchmark'
+import { desktop } from './desktop'
 import { TRAINING_MATCH, connectWebSocket, normalizeServerUrl, startLocalServer, startLocalServers, type LocalMatchOptions, type Transport } from './net/transport'
-import { QUALITY, loadSettings, saveSettings, type OfflinePrefs, type Settings } from './settings'
+import { QUALITY, loadSettings, saveSettings, type OfflinePrefs, type Quality, type Settings } from './settings'
 import type { MatchResult } from './ui/hud'
 import { h } from './ui/dom'
 import { Hud } from './ui/hud'
@@ -88,12 +90,16 @@ export class App {
   private readonly online: OnlineController
   /** Vitrine 3D atrás do menu, do armário e da entrada online. */
   private stage: MenuStage | null = null
+  /** Último teste de desempenho (para os testes automáticos). */
+  benchmarkResult: BenchmarkResult | null = null
+  private readonly root: HTMLElement
 
   constructor(root: HTMLElement) {
     this.settings = loadSettings()
     this.canvas = h('canvas', { class: 'game', tabindex: 0, 'aria-label': 'Jogo' })
     const layer = h('div', { class: 'ui-layer' })
     this.layer = layer
+    this.root = root
     root.append(this.canvas, layer)
     this.hud = new Hud(layer)
     this.screens = new Screens(layer)
@@ -223,6 +229,7 @@ export class App {
       settings: () => this.showSettings(),
       controls: () => this.showControls(),
       history: () => this.screens.history(loadHistory(), () => this.screens.closeModal()),
+      quit: desktop() ? () => desktop()!.quit() : undefined,
     }, this.webglError)
   }
 
@@ -348,7 +355,8 @@ export class App {
 
   private showJoin(): void {
     this.stopLan()
-    const ui = this.screens.join({ name: this.settings.playerName, address: this.settings.serverAddress }, (name, address) => {
+    const bridge = desktop()
+    const connect = (name: string, address: string) => {
       this.stopLan()
       let url: string
       try {
@@ -366,22 +374,53 @@ export class App {
         this.showJoin()
         this.screens.toast(err, 'error', 7000)
       })
-    }, () => {
+    }
+    // aplicativo de computador: hospeda aqui (servidor de verdade em outro processo) e entra como dono da sala
+    const hostAt = (port: number) => `127.0.0.1:${port}`
+    const panel = bridge
+      ? {
+          start: (name: string) => {
+            ui.setBusy(true)
+            ui.setStatus('Abrindo o servidor neste computador…')
+            bridge.host({ name: sanitizeName(name) || 'Jogador' }).then(
+              (hs) => {
+                ui.setHosting({ addresses: hs.addresses.map((ip) => `${ip}:${hs.port}`) })
+                connect(name, hostAt(hs.port))
+              },
+              (err: unknown) => {
+                ui.setBusy(false)
+                ui.setStatus(`Não foi possível hospedar: ${err instanceof Error ? err.message : String(err)}`, true)
+              },
+            )
+          },
+          enter: (name: string) => {
+            void bridge.hosting().then((hs) => (hs ? connect(name, hostAt(hs.port)) : ui.setHosting(null)))
+          },
+          stop: () => {
+            void bridge.stopHost().then(() => {
+              ui.setHosting(null)
+              ui.setStatus('Servidor encerrado.')
+            })
+          },
+        }
+      : undefined
+    const ui = this.screens.join({ name: this.settings.playerName, address: this.settings.serverAddress }, connect, () => {
       this.stopLan()
       this.showMenu()
-    })
+    }, panel)
+    if (bridge) void bridge.hosting().then((hs) => ui.setHosting(hs ? { addresses: hs.addresses.map((ip) => `${ip}:${hs.port}`) } : null))
     // Partidas na rede local: o servidor que serviu esta página lista as que ele ouve
     const refresh = async () => {
       try {
         const res = await fetch('/api/lan', { cache: 'no-store' })
         if (!res.ok) throw new Error(String(res.status))
-        const data = (await res.json()) as { self: { name: string; port: number; players: number; maxPlayers: number; lobby: boolean; running: boolean; mapName: string }; servers: { address: string; port: number; name: string; players: number; maxPlayers: number; lobby: boolean; running: boolean; mapName: string }[] }
-        const fmt = (e: { players: number; maxPlayers: number; lobby: boolean; running: boolean; mapName: string }) =>
+        type Entry = { name: string; port: number; players: number; maxPlayers: number; lobby: boolean; running: boolean; mapName: string; hosted?: boolean }
+        const data = (await res.json()) as { self: Entry | null; servers: (Entry & { address: string })[] }
+        const fmt = (e: Entry) =>
           `${e.mapName} · ${e.players}/${e.maxPlayers} ${e.players === 1 ? 'pessoa' : 'pessoas'} · ${e.lobby ? (e.running ? 'partida em andamento' : 'sala de espera aberta') : 'partida contínua'}`
-        ui.setLan([
-          { name: `${data.self.name} (este servidor)`, address: '', detail: fmt(data.self) },
-          ...data.servers.map((e) => ({ name: e.name, address: `${e.address}:${e.port}`, detail: fmt(e) })),
-        ])
+        // aplicativo de computador: a sala hospedada aqui já aparece no quadro de cima
+        const self = data.self && !data.self.hosted ? [{ name: `${data.self.name} (este servidor)`, address: '', detail: fmt(data.self) }] : []
+        ui.setLan([...self, ...data.servers.map((e) => ({ name: e.name, address: `${e.address}:${e.port}`, detail: fmt(e) }))])
       } catch {
         ui.setLan(null) // página não servida por um host (ex.: modo de desenvolvimento)
       }
@@ -660,6 +699,41 @@ export class App {
     root.setProperty('--mate-color', mateCss())
   }
 
+  /** Teste de desempenho (menu → Configurações): mede cada qualidade e recomenda. */
+  async showBenchmark(qualities: Quality[] = ['baixa', 'media', 'alta'], seconds = 12): Promise<BenchmarkResult | null> {
+    if (this.webglError || this.match) return null
+    this.screens.closeModal()
+    const abort = new AbortController()
+    // a vitrine do menu para de desenhar (esta tela não é "stage")
+    const ui = this.screens.benchmarkProgress(() => abort.abort())
+    try {
+      const r = await runBenchmark({
+        qualities, seconds, renderScale: this.settings.renderScale, container: this.root, signal: abort.signal,
+        onProgress: (p) => ui.update(`${QUALITY[p.quality].label} (${p.index + 1}/${p.total}) · ${p.shot}`, (p.index + p.fraction) / p.total),
+      })
+      this.benchmarkResult = r
+      this.screens.benchmarkResults(r, this.settings.quality, {
+        apply: (q, scale) => {
+          this.settings = { ...this.settings, quality: q, renderScale: scale ?? this.settings.renderScale }
+          saveSettings(this.settings)
+          if (this.renderer) {
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY[q].maxPixelRatio) * this.settings.renderScale)
+            this.resize()
+          }
+          this.showMenu()
+          this.screens.toast(`Qualidade ${QUALITY[q].label}${scale ? ` com escala ${Math.round(scale * 100)}%` : ''} aplicada`, 'info')
+        },
+        again: () => void this.showBenchmark(qualities, seconds),
+        back: () => this.showMenu(),
+      })
+      return r
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') this.screens.toast(`Teste de desempenho falhou: ${err instanceof Error ? err.message : String(err)}`, 'error', 8000)
+      this.showMenu()
+      return null
+    }
+  }
+
   private showSettings(): void {
     this.screens.settings(this.settings, (s) => {
       const qualityChanged = s.quality !== this.settings.quality
@@ -674,7 +748,7 @@ export class App {
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY[s.quality].maxPixelRatio) * s.renderScale)
         this.resize()
       }
-    }, () => this.screens.closeModal())
+    }, () => this.screens.closeModal(), this.match || this.state !== 'menu' ? undefined : () => void this.showBenchmark())
   }
 
   private showControls(): void {

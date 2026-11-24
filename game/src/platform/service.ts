@@ -20,7 +20,7 @@ import {
   type ServerPush,
 } from '../shared/platform/messages'
 import { challengeGain, dailyChallenges, dayKey, levelFromXp, matchXp, mmrDelta, skinUnlocked, SKIN_UNLOCK_LEVEL, titleById, type MatchPerformance } from '../shared/progression'
-import { Matchmaker, type MatchmakerOptions } from './matchmaker'
+import { Matchmaker, type FormedMatch, type MatchmakerOptions, type QueueEntry } from './matchmaker'
 import { GameServerPool, type GameServer, type PoolOptions } from './pool'
 import { RateLimiter } from './rate-limit'
 import type { PlatformStore } from './store'
@@ -114,6 +114,10 @@ export class PlatformService {
   private readonly loginLimit: RateLimiter
   private readonly socialLimit: RateLimiter
   private readonly timers: ReturnType<typeof setInterval>[] = []
+  /** Partidas formadas esperando o nó remoto confirmar o servidor (por id do servidor). */
+  private readonly allocating = new Map<string, FormedMatch>()
+  /** Salas esperando o nó remoto: quem pediu fica aguardando a resposta. */
+  private readonly roomWaiters = new Map<string, { ok: () => void; fail: (why: string) => void }[]>()
   private nextParty = 1
   private lastBusyNotice = 0
   /** Encerrado: conexões que ainda fecharem depois disto são ignoradas. */
@@ -131,6 +135,8 @@ export class PlatformService {
       onResult: (s, r) => this.onResult(s, r),
       onMatchEnd: (s, m) => this.onMatchEnd(s, m),
       onReleased: (s) => this.onReleased(s),
+      onReady: (s, err) => this.onServerReady(s, err),
+      onAdopted: () => this.refreshPresence(),
     })
     this.msgLimit = new RateLimiter(40, 20, this.clock)
     this.loginLimit = new RateLimiter(10, 1 / 6, this.clock)
@@ -216,15 +222,20 @@ export class PlatformService {
       return
     }
     const rid = Number.isInteger(msg.rid) ? (msg.rid as number) : undefined
-    try {
-      const data = this.handle(st, msg)
-      if (rid !== undefined) st.link.send({ t: 'ok', rid, data })
-    } catch (err) {
+    const fail = (err: unknown) => {
       if (err instanceof UserError) st.link.send({ t: 'error', rid, message: err.message })
       else {
         this.log.warn(`erro tratando "${msg.t}": ${err instanceof Error ? err.stack ?? err.message : err}`)
         st.link.send({ t: 'error', rid, message: 'Erro interno da plataforma' })
       }
+    }
+    try {
+      const data = this.handle(st, msg)
+      // pedidos que dependem de um nó remoto (salas) respondem quando ele confirma
+      if (data instanceof Promise) data.then((d) => rid !== undefined && st.link.send({ t: 'ok', rid, data: d }), fail)
+      else if (rid !== undefined) st.link.send({ t: 'ok', rid, data })
+    } catch (err) {
+      fail(err)
     }
   }
 
@@ -588,7 +599,7 @@ export class PlatformService {
   private cancelQueue(uid: number, why: string): void {
     const qid = this.queuedAs.get(uid)
     if (!qid) return
-    const e = this.matchmaker.dequeue(qid)
+    const e = this.matchmaker.dequeue(qid) ?? this.allocatingEntry(qid)
     const members = e?.members ?? [uid]
     for (const m of members) {
       this.queuedAs.delete(m)
@@ -598,9 +609,14 @@ export class PlatformService {
     this.refreshPresence()
   }
 
+  private allocatingEntry(qid: string): QueueEntry | undefined {
+    for (const fm of this.allocating.values()) for (const e of fm.entries) if (e.id === qid) return e
+    return undefined
+  }
+
   private queueState(uid: number): QueueState | null {
     const qid = this.queuedAs.get(uid)
-    const e = qid ? this.matchmaker.get(qid) : undefined
+    const e = qid ? this.matchmaker.get(qid) ?? this.allocatingEntry(qid) : undefined
     if (!e) return null
     return { searching: true, teamSize: e.teamSize, region: e.region, waitedMs: this.clock() - e.since, inQueue: this.matchmaker.waiting(e.teamSize, e.region) }
   }
@@ -624,23 +640,75 @@ export class PlatformService {
         continue
       }
       server.avgMmr = fm.avgMmr
-      server.matchId = this.store.createMatch('publico', server.host.map.def.id, fm.teamSize, fm.region)
-      this.log.info(`partida ${server.matchId} em ${server.id}: ${fm.humans} pessoas + ${fm.bots} bots, equipes de ${fm.teamSize} (${fm.region})`)
-      this.store.audit('partida-formada', null, '', `${server.matchId} ${server.id} ${fm.humans}+${fm.bots}`)
-      fm.teams.forEach((team, t) => {
-        for (const uid of team) {
-          this.queuedAs.delete(uid)
-          const ticket = this.ticketFor(uid, server, fm.teamSize > 1 ? t : -1)
-          const match: MatchTicket = { path: server.path, ticket, kind: 'publico', teamSize: fm.teamSize }
-          this.activeMatch.set(uid, match)
-          this.push(uid, { t: 'queue', queue: null })
-          this.push(uid, { t: 'matchFound', match })
-        }
-      })
+      if (server.ready) this.startPublic(server, fm)
+      else this.allocating.set(server.id, fm)
     }
     // quem está na fila vê o tempo e quantos esperam
     for (const [uid] of this.queuedAs) this.push(uid, { t: 'queue', queue: this.queueState(uid) })
     this.pool.sweep()
+  }
+
+  /** Servidor pronto: registra a partida e entrega os bilhetes a quem ainda está na fila. */
+  private startPublic(server: GameServer, fm: FormedMatch): void {
+    server.matchId = this.store.createMatch('publico', server.mapId, fm.teamSize, fm.region)
+    this.pool.updateMeta(server)
+    this.log.info(`partida ${server.matchId} em ${server.id} (${server.node}): ${fm.humans} pessoas + ${fm.bots} bots, equipes de ${fm.teamSize} (${fm.region})`)
+    this.store.audit('partida-formada', null, '', `${server.matchId} ${server.id} ${server.node} ${fm.humans}+${fm.bots}`)
+    const entryOf = new Map<number, string>()
+    for (const e of fm.entries) for (const m of e.members) entryOf.set(m, e.id)
+    fm.teams.forEach((team, t) => {
+      for (const uid of team) {
+        // quem cancelou enquanto o servidor subia não entra
+        if (this.queuedAs.get(uid) !== entryOf.get(uid)) continue
+        this.queuedAs.delete(uid)
+        const ticket = this.ticketFor(uid, server, fm.teamSize > 1 ? t : -1)
+        const match = this.matchTicket(server, ticket, fm.teamSize)
+        this.activeMatch.set(uid, match)
+        this.push(uid, { t: 'queue', queue: null })
+        this.push(uid, { t: 'matchFound', match })
+      }
+    })
+    this.refreshPresence()
+  }
+
+  private matchTicket(server: GameServer, ticket: string, teamSize: number): MatchTicket {
+    const m: MatchTicket = { path: server.path, ticket, kind: server.kind, teamSize }
+    if (server.url) m.url = server.url
+    if (server.code) m.code = server.code
+    return m
+  }
+
+  /** Nó remoto confirmou (ou não) um servidor pedido. */
+  private onServerReady(server: GameServer, error: string | null): void {
+    const fm = this.allocating.get(server.id)
+    if (fm) {
+      this.allocating.delete(server.id)
+      if (!error) return this.startPublic(server, fm)
+      // volta para a fila, sem perder o lugar (só quem ainda estava esperando)
+      for (const e of fm.entries) {
+        if (!e.members.every((m) => this.queuedAs.get(m) === e.id && this.online.has(m))) continue
+        this.matchmaker.enqueue(e)
+        for (const m of e.members) this.push(m, { t: 'notice', text: 'O servidor da partida falhou; procurando outro', level: 'info' })
+      }
+      return
+    }
+    const waiters = this.roomWaiters.get(server.id)
+    if (!waiters) return
+    this.roomWaiters.delete(server.id)
+    for (const w of waiters) {
+      if (error) w.fail(error)
+      else w.ok()
+    }
+  }
+
+  /** Espera a sala ficar pronta (nós remotos); já pronta, segue na hora. */
+  private whenReady<T>(server: GameServer, value: () => T): T | Promise<T> {
+    if (server.ready) return value()
+    return new Promise<T>((ok, fail) => {
+      const list = this.roomWaiters.get(server.id) ?? []
+      list.push({ ok: () => ok(value()), fail: () => fail(new UserError('O servidor da sala não pôde ser criado. Tente de novo.')) })
+      this.roomWaiters.set(server.id, list)
+    })
   }
 
   private ticketFor(uid: number, server: GameServer, team: number): string {
@@ -660,23 +728,25 @@ export class PlatformService {
     throw new UserError('Não foi possível gerar um código de sala')
   }
 
-  private roomCreate(uid: number): MatchTicket {
+  private roomCreate(uid: number): MatchTicket | Promise<MatchTicket> {
     if (this.queuedAs.has(uid)) throw new UserError('Cancele a busca antes de criar uma sala')
     if (!this.socialLimit.take(`r${uid}`, 3)) throw new UserError('Salas demais em pouco tempo. Espere um pouco.')
     const code = this.newCode()
     const server = this.pool.createRoom(code, this.regions[0].id, String(uid))
     if (!server) throw new UserError('Todos os servidores estão ocupados. Tente de novo em instantes.')
-    this.store.audit('sala-criada', uid, '', `${code} ${server.id}`)
-    const match: MatchTicket = { path: server.path, ticket: this.ticketFor(uid, server, -1), kind: 'privado', teamSize: 1, code }
-    this.activeMatch.set(uid, match)
-    // o grupo recebe o código
-    const g = this.groupOf(uid)
-    const me = this.store.brief(uid)!
-    for (const m of g.members) if (m !== uid) this.push(m, { t: 'roomInvite', code, from: { id: uid, name: me.name } })
-    return match
+    this.store.audit('sala-criada', uid, '', `${code} ${server.id} ${server.node}`)
+    return this.whenReady(server, () => {
+      const match = this.matchTicket(server, this.ticketFor(uid, server, -1), 1)
+      this.activeMatch.set(uid, match)
+      // o grupo recebe o código
+      const g = this.groupOf(uid)
+      const me = this.store.brief(uid)!
+      for (const m of g.members) if (m !== uid) this.push(m, { t: 'roomInvite', code, from: { id: uid, name: me.name } })
+      return match
+    })
   }
 
-  private roomJoin(uid: number, raw: string): MatchTicket {
+  private roomJoin(uid: number, raw: string): MatchTicket | Promise<MatchTicket> {
     const code = normalizeRoomCode(raw)
     if (code.length !== ROOM_CODE_LENGTH) throw new UserError(`O código tem ${ROOM_CODE_LENGTH} letras e números`)
     if (!this.socialLimit.take(`j${uid}`)) throw new UserError('Tentativas demais. Espere um pouco.')
@@ -686,9 +756,11 @@ export class PlatformService {
       throw new UserError('Sala não encontrada (o código pode ter expirado)')
     }
     if (this.queuedAs.has(uid)) this.cancelQueue(uid, 'Busca cancelada: alguém do grupo entrou numa sala')
-    const match: MatchTicket = { path: server.path, ticket: this.ticketFor(uid, server, -1), kind: 'privado', teamSize: 1, code }
-    this.activeMatch.set(uid, match)
-    return match
+    return this.whenReady(server, () => {
+      const match = this.matchTicket(server, this.ticketFor(uid, server, -1), 1)
+      this.activeMatch.set(uid, match)
+      return match
+    })
   }
 
   // ---- cosméticos -------------------------------------------------------------------------
@@ -715,7 +787,10 @@ export class PlatformService {
   // ---- resultados (vindos dos servidores de jogo) -------------------------------------------
 
   private ensureMatchRow(server: GameServer, teamSize: number): number {
-    if (server.matchId === null) server.matchId = this.store.createMatch(server.kind, server.host.map.def.id, teamSize, server.region)
+    if (server.matchId === null) {
+      server.matchId = this.store.createMatch(server.kind, server.mapId, teamSize, server.region)
+      this.pool.updateMeta(server)
+    }
     return server.matchId
   }
 
@@ -758,7 +833,10 @@ export class PlatformService {
     this.store.endMatch(matchId, s.teams, s.humans, s.bots, s.winners)
     this.log.info(`partida ${matchId} (${server.id}) terminou: venceu ${s.winners.join(', ') || '—'}`)
     // sala privada: a próxima partida da sala é outra linha
-    if (server.kind === 'privado') server.matchId = null
+    if (server.kind === 'privado') {
+      server.matchId = null
+      this.pool.updateMeta(server)
+    }
   }
 
   private onReleased(server: GameServer): void {
@@ -766,17 +844,32 @@ export class PlatformService {
     this.refreshPresence()
   }
 
-  /** Números para /api/online/status. */
-  status(): { online: number; searching: number; servers: { id: string; kind: string; players: number; phase: number; code: boolean; tickMs: number; alive: number }[]; maxServers: number; users: number; matches: number } {
+  /** Números para /api/online/status e /metrics. */
+  status(): PlatformStatus {
     const totals = this.store.totals()
-    return {
-      online: this.online.size,
-      searching: this.matchmaker.size,
-      servers: [...this.pool.servers.values()].map((s) => ({ id: s.id, kind: s.kind, players: s.host.playerCount, phase: s.host.phase, code: !!s.code, tickMs: Number(s.host.tickMs.toFixed(3)), alive: s.host.sim.aliveCount })),
-      maxServers: this.opts.pool?.maxServers ?? 8,
-      ...totals,
-    }
+    const servers = [...this.pool.servers.values()].map((s) => {
+      const st = s.status()
+      return { id: s.id, node: s.node, kind: s.kind, region: s.region, ready: s.ready, players: st.players, phase: st.phase, code: !!s.code, tickMs: Number(st.tickMs.toFixed(3)), alive: st.alive }
+    })
+    const nodes = [...this.pool.nodes.values()].map((n) => ({
+      name: n.name, region: n.region, connected: !!n.link, draining: n.draining, capacity: n.capacity,
+      servers: servers.filter((s) => s.node === n.name).length, rssMb: n.rssMb, load: n.load,
+    }))
+    return { online: this.online.size, searching: this.matchmaker.size, servers, nodes, maxServers: this.opts.pool?.maxServers ?? 8, capacity: this.pool.capacity, ...totals }
   }
+}
+
+export interface PlatformStatus {
+  online: number
+  searching: number
+  servers: { id: string; node: string; kind: string; region: string; ready: boolean; players: number; phase: number; code: boolean; tickMs: number; alive: number }[]
+  nodes: { name: string; region: string; connected: boolean; draining: boolean; capacity: number; servers: number; rssMb: number; load: number }[]
+  /** Servidores neste processo. */
+  maxServers: number
+  /** Servidores possíveis somando os nós conectados. */
+  capacity: number
+  users: number
+  matches: number
 }
 
 function str(v: unknown, max: number): string {

@@ -1,0 +1,21 @@
+# Proxy TLS da Última Chama: um domínio para tudo.
+#   https://DOMÍNIO/           cliente + plataforma (WebSocket /platform)
+#   wss://DOMÍNIO/n/no-1/...   nó de servidor de jogo 1 (o prefixo é retirado)
+{$UC_DOMAIN} {
+	encode zstd gzip
+
+	# métricas só pela rede interna (o Prometheus fala direto com os contêineres)
+	handle /metrics {
+		respond 404
+	}
+
+	handle_path /n/no-1/* {
+		reverse_proxy no-1:7380
+	}
+	handle_path /n/no-2/* {
+		reverse_proxy no-2:7380
+	}
+	handle {
+		reverse_proxy plataforma:7370
+	}
+}

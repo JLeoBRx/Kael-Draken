@@ -153,6 +153,11 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       res.end(JSON.stringify({ ...host.info(), tickMs: Number(host.tickMs.toFixed(3)) }))
       return
     }
+    if (path === '/api/health') {
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+      res.end(JSON.stringify({ ok: true, players: host.playerCount, phase: host.phase, tickMs: Number(host.tickMs.toFixed(3)) }))
+      return
+    }
     if (path === '/api/lan') {
       // partidas encontradas na rede local (este servidor + os anunciados)
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*', 'cache-control': 'no-store' })

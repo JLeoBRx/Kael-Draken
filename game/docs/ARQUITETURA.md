@@ -404,7 +404,7 @@ tela "Rede local" mostra. O app desktop (Fase 8) poderá ouvir direto.
  navegador ─────►│ /platform (JSON)   PlatformService: sessões, presença, amigos, grupos,         │
    (HTTPS/wss)   │                    convites, fila, salas, resultados → XP/desafios             │
                  │                       │ Matchmaker (fila por modo+região, janela de habilidade)│
-                 │                       │ GameServerPool ──► GameHost s1, s2… (laço próprio)      │
+                 │                       │ GameServerPool ──► GameHost <id>… (reserva) e nós (§11) │
  navegador ─────►│ /game/<id> (binário) ─┘   bilhete HMAC verificado pelo próprio GameHost         │
                  │ PlatformStore (node:sqlite, data/plataforma.db)                                  │
                  └──────────────────────────────────────────────────────────────────────────────────┘
@@ -517,11 +517,15 @@ protocolo binário já é independente do transporte.
 ```
 game/
 ├── index.html                 entrada do cliente
-├── package.json               scripts (dev, build, server, host, platform, online, test, test:e2e)
-├── scripts/bench-net.ts       medição de banda por cliente
+├── package.json               scripts (dev, build, build:all, server, host, platform, online, game-node, desktop, test…)
+├── Dockerfile                 imagem única dos servidores (plataforma, nó, dedicado)
+├── docker-compose.yml         plataforma + 2 nós; deploy/ (TLS com Caddy, .env de exemplo)
+├── CHANGELOG.md               histórico de versões
+├── scripts/                   build-server.ts (pacotes .mjs), load-test.ts, bench-net.ts, export-assets.ts
+├── desktop/                   aplicativo Electron: src/main.ts, src/preload.ts, assets/, tests/smoke.mjs
 ├── vite.config.ts             build do cliente (e proxy /ws para o servidor em dev)
 ├── playwright.config.ts       testes de navegador
-├── docs/                      ARQUITETURA.md (este), ROADMAP.md
+├── docs/                      ARQUITETURA.md (este), ROADMAP.md, INSTALACAO.md, OPERACAO.md, GUIA-DO-JOGADOR.md
 ├── src/
 │   ├── shared/                código comum cliente/servidor
 │   │   ├── config/            game.ts (identidade), movement.ts, items.ts (catálogo), building.ts
@@ -536,11 +540,13 @@ game/
 │   │   ├── net/               binary, protocol (snapshots em delta)
 │   │   ├── platform/          messages.ts (mensagens da plataforma online)
 │   │   └── progression.ts     níveis, XP, habilidade, visuais, títulos, desafios
-│   ├── platform/              store (SQLite), service, matchmaker, pool, tickets, rate-limit, server, main (CLI)
+│   ├── platform/              store (SQLite), service, matchmaker, pool (local + nós), game-spec, tickets, rate-limit,
+│   │                          node-protocol, node-agent + node-main (nó remoto), metrics, server, main (CLI)
+│   ├── desktop/               site.ts: site local e descoberta do aplicativo (sem Electron, testável)
 │   ├── server/
 │   │   ├── core/              simulation.ts, game-host.ts, battle-royale.ts, loot.ts (sem dependências de ambiente)
 │   │   │   └── bots/          nav-grid.ts (grade + A*), bot.ts (cérebro), bot-manager.ts, profiles.ts
-│   │   └── node/              server.ts (HTTP + WebSocket), discovery.ts (UDP), main.ts (CLI)
+│   │   └── node/              server.ts (HTTP + WebSocket), discovery.ts (UDP), paths.ts (raiz do jogo), main.ts (CLI)
 │   └── client/
 │       ├── app.ts, main.ts    casca e estados
 │       ├── game/              match.ts (laço da partida), world-items.ts, effects.ts
@@ -555,6 +561,8 @@ game/
 │       ├── online/            platform-client.ts, online-screens.ts, online.ts (fluxo online)
 │       ├── accessibility.ts   daltonismo, teclas, paleta
 │       ├── photo.ts           modo foto (?foto=…)
+│       ├── benchmark.ts       teste de desempenho (percurso por qualidade); benchmark-score.ts (recomendação)
+│       ├── desktop.ts         ponte com o aplicativo (window.ucDesktop)
 │       ├── history.ts         histórico local de partidas
 │       └── settings.ts
 └── tests/
@@ -665,4 +673,92 @@ Nada usa nomes, personagens, arte ou sons de outros jogos.
 | Execução TS no servidor | tsx | 4 |
 | Testes | Vitest (unidade/integração), Playwright (navegador) | 5 / 1.63 |
 | Persistência | navegador (offline/LAN); `node:sqlite` embutido no Node (plataforma online) | Node 22 |
-| Desktop (planejado) | Electron ou Tauri (inclui o servidor Node para LAN e descoberta UDP) | Fase 8 |
+| Pacotes do servidor | esbuild (um `.mjs` por programa, sem `node_modules`) | 0.28 |
+| Aplicativo para computador | Electron + electron-builder (NSIS, zip, AppImage, deb) | 45 / 26 |
+| Contêineres | Docker (imagem multiestágio `node:22-bookworm-slim`), Docker Compose, Caddy (TLS) | — / 2.10 |
+| Métricas | texto do Prometheus (`/metrics`), sem dependências | — |
+
+## 11. Lançamento: nós remotos, produção e aplicativo (Fase 8)
+
+### Nós de servidor de jogo
+
+```
+ plataforma ── /nodes (JSON) ─────────── nó "no-1" (outra máquina)
+   GameServerPool                          GameNode
+   ├─ local: GameHost (reserva)            ├─ GameHost <id> ◄── jogadores (wss://…/game/<id>)
+   └─ nós: RemoteNode {região, capacidade} └─ HTTP: /api/health, /metrics
+```
+
+- **Registro**: ao conectar, a plataforma manda um desafio (`nonce`); o nó
+  responde `hello` com nome, região, endereço público, capacidade, versões e
+  `HMAC(segredo, nonce|nome)`. O segredo é o mesmo dos bilhetes de entrada.
+- **Alocação** (`pool.pick`): nós com vaga da região pedida → remotos antes
+  do local (reserva) → menor ocupação. A plataforma cria o registro do
+  servidor e manda `create {id, spec, meta}`; o `ServerSpec`
+  (`platform/game-spec.ts`) é a mesma descrição usada para montar o GameHost
+  local, validada campo a campo no nó. Os bilhetes só são entregues depois do
+  `created` (salas: a resposta ao pedido espera; partidas públicas: quem
+  cancelou nesse meio tempo fica de fora; falha = volta à fila).
+- **Situação**: `report` a cada 2 s (pessoas, fase, tick, vivos, contas
+  conectadas — base da presença dos amigos), memória e carga da máquina.
+- **Resultados**: `result`, `matchEnd` e `finished` vão por uma fila com
+  entrega garantida no nó (até 20 mil mensagens) enquanto a plataforma estiver
+  fora; a plataforma grava cada resultado uma vez por partida e pessoa.
+- **Quedas**: nó desconectado fica 60 s em espera (partidas mantidas); ao
+  voltar, o `hello` lista o que ainda roda (spec + meta + situação) e a
+  plataforma readota — inclusive depois de reiniciar, com ids que trazem um
+  prefixo por processo para não colidir. Sem volta, as partidas dele são
+  encerradas. O nó fecha sozinho servidores vazios há 10 min (rede de
+  segurança se a plataforma sumir).
+- **Desligamento**: `SIGTERM` → `drain` (sem partidas novas) → espera as
+  atuais até `DRAIN_TIMEOUT` → `finished` de cada uma → sai.
+
+### Produção
+
+- `scripts/build-server.ts`: esbuild gera `plataforma.mjs`, `no-de-jogo.mjs`
+  e `servidor.mjs` (ESM, Node 22, `ws` embutido, `require` real pelo banner
+  para os módulos do Node). `server/node/paths.ts` acha a raiz do jogo subindo
+  até o `package.json` (ou `UC_ROOT`), igual no código-fonte, no pacote e no
+  contêiner.
+- `Dockerfile`: estágio de build (`npm ci`, cliente + pacotes) e estágio final
+  só com `package.json` e `dist/` (usuário `node`, volume `/app/data`,
+  `HEALTHCHECK` em `/api/health` na `PORT`). A CA de redes com proxy entra como
+  segredo de build, sem ficar na imagem.
+- `docker-compose.yml` + `deploy/docker-compose.tls.yml` (Caddy na frente,
+  portas internas fechadas com `!reset`, `TRUST_PROXY=1`, nós em
+  `wss://DOMÍNIO/n/<nó>` — o endereço público do nó aceita prefixo de caminho).
+- `platform/metrics.ts`: formato de texto do Prometheus, sem dependências.
+
+### Aplicativo para computador
+
+```
+ Electron (processo principal, desktop/src/main.ts)
+ ├─ site local 127.0.0.1:7349 (src/desktop/site.ts): dist/client + /api/lan + /api/desktop
+ │    └─ LanDiscovery só escutando (UDP 7351)
+ ├─ utilityProcess: servidor.mjs --lobby (porta 7350, anuncia na rede) ── só ao hospedar
+ └─ BrowserWindow (isolada, sandbox) ── preload: window.ucDesktop {host, stopHost, hosting, quit…}
+```
+
+- A página é a mesma do navegador; `client/desktop.ts` só acrescenta o que
+  existe no aplicativo (hospedar, sair, plataforma padrão). Sem a ponte, tudo
+  funciona como antes.
+- Segurança: `contextIsolation` e `sandbox`, sem `nodeIntegration`; o processo
+  principal só atende pedidos vindos da origem do site local; navegação para
+  fora é bloqueada (links abrem no navegador do sistema); permissões só para
+  prender o mouse e tela cheia.
+- Empacotado, `client/` e `server/` ficam em `resources/` (fora do asar),
+  porque o `utilityProcess` executa o `servidor.mjs` como arquivo comum.
+
+### Teste de desempenho
+
+`client/benchmark.ts` cria, para cada qualidade, um renderizador próprio
+(antisserrilhamento é atributo do contexto WebGL) e percorre três tomadas
+fixas com 10 personagens animados e explosões a cada 2 s, depois de 1,5 s de
+aquecimento (compilação dos shaders). Mede o intervalo entre quadros do
+`requestAnimationFrame` (limitado pela taxa do monitor), o tempo de CPU de
+atualização + envio do quadro e as chamadas/triângulos do renderizador. A
+recomendação (`benchmark-score.ts`) é a maior qualidade com média ≥ 50 e 1%
+piores ≥ 30 quadros/s; se nem a baixa chega lá, sugere uma escala de
+resolução proporcional (custo de preenchimento ∝ escala²). Qualidades mais
+pesadas são puladas quando uma mais leve já fica abaixo de 12 quadros/s.
+
