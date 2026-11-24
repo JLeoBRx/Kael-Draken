@@ -27,7 +27,9 @@ test('dois jogadores reais no servidor dedicado se veem e se movem', async ({ br
   expect((await state(a)).mode).toContain('127.0.0.1')
 
   // A nome do outro jogador aparece como placa acima da cabeça (sprite), e B vê A andar
+  // cada lado cria o modelo do outro no próprio quadro: espera os dois
   await expect.poll(async () => (await state(b)).remotePositions.length).toBe(1)
+  await expect.poll(async () => (await state(a)).remotePositions.length).toBe(1)
   expect((await state(b)).remotePositions[0].name).toBe('Ana')
   expect((await state(a)).remotePositions[0].name).toBe('Bruno')
   const aStart = await state(a)
@@ -62,6 +64,8 @@ test('dois jogadores reais no servidor dedicado se veem e se movem', async ({ br
  * é decidido pelo servidor dedicado e chega aos dois clientes.
  */
 test('A pega um fuzil e acerta B; o servidor aplica o dano e os dois veem', async ({ browser }) => {
+  // dois navegadores com renderização por software: lento, mas o teste é de rede e combate
+  test.setTimeout(420_000)
   const ctxA = await browser.newContext()
   const ctxB = await browser.newContext()
   const a = await ctxA.newPage()

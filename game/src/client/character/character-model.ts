@@ -166,8 +166,22 @@ export class CharacterModel {
     this.root.add(sprite)
   }
 
-  /** Atualiza posição e animação. `dt` em segundos de quadro. */
-  update(p: PoseInput, dt: number): void {
+  private lodCounter = Math.floor(Math.random() * 3)
+  private pendingDt = 0
+
+  /**
+   * Atualiza posição e animação. `dt` em segundos de quadro. `every` > 1:
+   * animação só a cada N quadros (personagens longe), com o tempo acumulado;
+   * a posição anda em todos.
+   */
+  update(p: PoseInput, dt: number, every = 1): void {
+    if (every > 1 && this.initialized && ++this.lodCounter % every !== 0) {
+      this.pendingDt += dt
+      this.root.position.set(p.x, p.y, p.z)
+      return
+    }
+    dt += this.pendingDt
+    this.pendingDt = 0
     const grounded = (p.flags & CharFlag.Grounded) !== 0
     const crouched = (p.flags & CharFlag.Crouched) !== 0
     const sliding = (p.flags & CharFlag.Sliding) !== 0
@@ -295,6 +309,8 @@ export class CharacterModel {
 
     for (const [name, action] of this.actions) {
       const w = (lower.get(name) ?? 0) + (W.get(name) ?? 0)
+      // clipe sem peso não é avaliado (com 17 clipes, a maioria está parada)
+      action.enabled = w > 0.0005
       action.setEffectiveWeight(w)
     }
   }

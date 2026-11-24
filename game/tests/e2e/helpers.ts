@@ -24,7 +24,8 @@ export async function prepare(page: Page, name: string): Promise<string[]> {
     if (m.type() === 'error') errors.push(`console: ${m.text()}`)
   })
   await page.addInitScript((n) => {
-    localStorage.setItem('ultima-chama:configuracoes:v1', JSON.stringify({ quality: 'baixa', playerName: n }))
+    // renderização por software nos testes: qualidade baixa e metade da resolução
+    localStorage.setItem('ultima-chama:configuracoes:v1', JSON.stringify({ quality: 'baixa', playerName: n, renderScale: 0.5 }))
   }, name)
   return errors
 }

@@ -115,7 +115,7 @@ export class Screens {
           emblem,
           h('h1', { class: 'title' }, GAME.title),
           h('p', { class: 'tagline' }, GAME.tagline),
-          h('span', { class: 'badge' }, h('span', { class: 'dot' }), `${GAME.phase} · contas, amigos, grupos e matchmaking`),
+          h('span', { class: 'badge' }, h('span', { class: 'dot' }), `${GAME.phase} · gráficos, animação, som e acessibilidade`),
           webglError ? h('p', { class: 'status error' }, webglError) : null),
         h('div', { class: 'actions' },
           playBtn,
@@ -128,7 +128,7 @@ export class Screens {
             h('button', { class: 'btn small', 'data-action': 'history', onclick: () => a.history() }, h('span', { class: 'label' }, 'Histórico'))))),
       h('div', { class: 'footer' },
         h('span', {}, `v${GAME.version} · protocolo ${PROTOCOL_VERSION}`),
-        h('span', {}, 'Próxima fase: polimento (arte, som e efeitos finais)'))))
+        h('span', {}, 'Próxima fase: lançamento (app desktop, instaladores e servidor em container)'))))
     playBtn.focus()
   }
 
@@ -397,7 +397,7 @@ export class Screens {
   settings(s: Settings, onChange: (s: Settings) => void, onClose: () => void): void {
     const next = { ...s }
     const commit = () => onChange({ ...next })
-    const range = (key: 'sensitivity' | 'aimSensitivity' | 'fov' | 'volume' | 'uiScale' | 'crosshairSize', label: string, min: number, max: number, step: number, fmt: (v: number) => string, hint?: string) => {
+    const range = (key: 'sensitivity' | 'aimSensitivity' | 'fov' | 'volume' | 'uiScale' | 'crosshairSize' | 'renderScale', label: string, min: number, max: number, step: number, fmt: (v: number) => string, hint?: string) => {
       const out = h('output', {}, fmt(next[key]))
       const input = h('input', { type: 'range', min, max, step, value: next[key], 'aria-label': label })
       input.addEventListener('input', () => {
@@ -454,6 +454,7 @@ export class Screens {
         check('showFps', 'Mostrar quadros por segundo'),
         h('div', { class: 'field' }, h('label', {}, 'Qualidade gráfica'), h('span'), quality,
           h('small', {}, 'Baixa: sem pós-processamento nem grama (computadores fracos). Média: brilho, cores e grama. Alta: + oclusão ambiente, sombras e grama mais longe. Vale na próxima partida; antisserrilhamento ao recarregar a página.')),
+        range('renderScale', 'Escala da resolução', 0.5, 1, 0.05, (v) => `${Math.round(v * 100)}%`, 'Menos pixels = mais quadros por segundo em placas de vídeo fracas (a interface continua nítida).'),
         h('h3', { class: 'settings-section' }, 'Acessibilidade'),
         selectField('colorVision', 'Daltonismo', (Object.keys(COLOR_VISION_LABEL) as ColorVision[]).map((k): [string, string] => [k, COLOR_VISION_LABEL[k]]), 'Corrige as cores da imagem e troca as cores de raridade e dos colegas.'),
         check('soundCues', 'Mostrar de onde vêm os sons', 'Arcos em volta da mira: tiros (vermelho), passos (branco), explosões (laranja), baús (amarelo), construções (azul).'),

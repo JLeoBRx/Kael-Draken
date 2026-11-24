@@ -73,7 +73,7 @@ export class MenuStage {
     const m = this.model!
     // parado com o fuzil, girando devagar (ou para onde a pessoa arrastou)
     const yaw = Math.PI + 0.45 + Math.sin(this.t * 0.25) * 0.25 + this.turn
-    m.update({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw, pitch: -0.05, flags: CharFlag.Grounded }, dt)
+    m.update({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw, pitch: 0.12, flags: CharFlag.Grounded }, dt)
     this.emberTimer -= dt
     while (this.emberTimer <= 0) {
       this.emberTimer += 0.08

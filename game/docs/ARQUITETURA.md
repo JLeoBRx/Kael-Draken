@@ -546,13 +546,15 @@ game/
 │       ├── game/              match.ts (laço da partida), world-items.ts, effects.ts
 │       ├── net/               transport, session, prediction, predicted-buildings, interpolation
 │       ├── worker/            servidor local (offline)
-│       ├── render/            world-view, sky, terrain-mesh, static-geometry, props, item-models, buildings-view, zone-view, airship-view, materials, textures
-│       ├── character/         character-model.ts
+│       ├── render/            world-view, sky, terrain-mesh/-material/-textures, grass, post, particles, menu-stage, static-geometry, props, item-models, buildings-view, zone-view, airship-view, materials, textures
+│       ├── character/         rig.ts (ossos, malha, clipes), character-assets.ts (GLB), glb-writer.ts, character-model.ts
 │       ├── camera/            third-person-camera.ts
 │       ├── input/             input.ts
 │       ├── audio/             audio.ts
 │       ├── ui/                screens, hud, minimap, inventory-screen, icons, dom, styles.css
 │       ├── online/            platform-client.ts, online-screens.ts, online.ts (fluxo online)
+│       ├── accessibility.ts   daltonismo, teclas, paleta
+│       ├── photo.ts           modo foto (?foto=…)
 │       ├── history.ts         histórico local de partidas
 │       └── settings.ts
 └── tests/
@@ -560,16 +562,91 @@ game/
     └── e2e/                   Playwright: offline, combate, construção e multijogador no navegador
 ```
 
-## 8. Assets: placeholders organizados e substituíveis
+## 8. Imagem, animação, som e acessibilidade (Fase 7)
+
+**Pipeline de imagem** (`render/post.ts`, por qualidade):
+
+```
+cena (HDR linear, MSAA 4×) → GTAO (só alta) → brilho (bloom, ½ resolução)
+  → ACES + sRGB (OutputPass) → gradação, vinheta e correção para daltonismo → tela
+```
+
+Na baixa, a cena vai direto à tela. Na tela dividida, cada metade tem o seu
+pipeline, desenhado no próprio viewport. O modo foto (`?foto=<mapa>&x=&z=&h=&yaw=&pitch=&q=&chars=&fx=`)
+desenha o mapa sem partida e informa chamadas de desenho e triângulos.
+
+**Mundo**:
+
+- relevo: o PBR do three.js com a cor-base trocada por 5 camadas de detalhe
+  (pesos por vértice), mistura pela altura do detalhe, rocha triplanar,
+  variação ampla e relevo fino pela derivada da altura (com guarda contra
+  derivadas degeneradas, que geravam NaN e apagavam a tela pelo bloom);
+- grama (`render/grass.ts`): uma chamada de desenho; tufos numa grade que dá
+  a volta na câmera em coordenadas do mundo; a GPU lê altura (mesma
+  triangulação do relevo), densidade (camada de grama, fora de água e de
+  caixas apoiadas no chão) e cor do chão em texturas do mapa; vento por
+  rajadas;
+- vegetação: copas com normais "esféricas" e cor por altura; vento no
+  vértice com fase por árvore; **dois níveis de detalhe** com listas de
+  instâncias refeitas quando a câmera anda 6 m — só as de perto projetam
+  sombra (antes, todas as árvores da ilha entravam no mapa de sombras);
+- água: cor pela profundidade (lida da mesma textura de altura), espuma na
+  beira, transparência maior no raso;
+- céu: nuvens procedurais com vento.
+
+| Ilha de Brasa, campo aberto | chamadas | triângulos |
+| --- | --- | --- |
+| baixa | 37 | 0,34 M (antes dos níveis de detalhe: 1,46 M) |
+| média | 73 | 0,70 M (antes: 2,72 M) |
+| alta (GTAO desenha a cena 2×) | 135 | 2,0 M |
+
+**Personagem** (`character/rig.ts`, `character-assets.ts`, `character-model.ts`):
+uma SkinnedMesh por personagem (5 grupos de material, de ~40 malhas antes);
+juntas com pesos divididos entre dois ossos. `AnimationMixer` com duas
+camadas (cada conjunto de trilhas soma peso 1): pernas/corpo (parado, andar,
+correr, disparar, agachado, deslize, no ar, nado, queda livre, planador) e
+braços (soltos, balançando, segurando arma, mirando, picareta, golpe; nado,
+queda e planador mandam também nos braços). Clipes de passada tocam pela
+fase da passada — que anda com a velocidade real —, então a mistura não faz
+os pés escorregarem. Por cima: mira (pitch) na coluna, cabeça e braços, e o
+quadril virando para o deslocamento. Clipes sem peso ficam desligados; longe
+(> 80 m), a animação roda a 1/3 dos quadros. 50 personagens: 0,8 ms de CPU
+por quadro. O modelo vem de um GLB (exportador próprio, `glb-writer.ts`;
+carregado pelo `GLTFLoader`) — os testes fazem a ida e volta.
+
+**Efeitos** (`render/particles.ts`, `game/effects.ts`): partículas em
+quadrados instanciados (uma chamada por pool), simuladas na CPU em arrays
+fixos; brilho (aditivo) e fumaça (alfa); explosão em camadas; impacto acha a
+superfície pelo raio (normal e material): poeira da cor, faíscas no metal,
+marca de tiro (anel de decalques). `game/footsteps.ts` detecta passos (pelo
+comprimento da passada), pousos (pela velocidade de queda) e entradas na
+água de todos os personagens.
+
+**Som** (`audio/audio.ts`): barramentos de efeitos, ambiente e interface;
+compressor no master; reverb por convolução (resposta gerada) com envio que
+cresce com a distância e sob teto/entre prédios; passa-baixa pela distância.
+Passos por superfície (raio para baixo: construção/estrutura, ou a camada do
+relevo). Ambiente em laços (vento por altura e queda livre, ondas perto da
+água, pássaros na mata e no campo).
+
+**Acessibilidade** (`accessibility.ts`): correção de cores
+(simulação de Machado et al. + "daltonize") como matriz no pós-processamento
+e paleta própria de raridades e colegas; indicador visual de sons (o áudio
+avisa a posição de tiros, passos, explosões, baús e construções; a HUD
+desenha arcos na direção); reduzir movimento; tamanho da interface (CSS
+`zoom`); cor e tamanho da mira; teclas por ação, trocadas sem conflito.
+
+## 9. Assets: placeholders organizados e substituíveis
+
 
 | Asset | Hoje | Ponto de troca |
 | --- | --- | --- |
 | Texturas de estruturas | geradas em canvas (`render/textures.ts`) | `render/materials.ts` — trocar a fábrica por `TextureLoader` com o arquivo em `public/assets/textures/` |
-| Relevo | cores por altura/inclinação + textura de detalhe | `render/terrain-mesh.ts` + material do relevo (splatmap na Fase 7) |
-| Vegetação, rochas, caixotes | malhas low-poly geradas em código, instanciadas | `PART_FACTORIES` em `render/props.ts` — trocar por GLTF |
+| Relevo | cor do bioma por vértice + 5 camadas de detalhe geradas (grama, terra, rocha, areia, neve; RGB = cor, A = altura) | `render/terrain-textures.ts › terrainLayers()` — trocar por imagens no mesmo arranjo; pesos em `terrain-mesh.ts` |
+| Vegetação, rochas, caixotes | malhas geradas em código, instanciadas, com versão de perto e de longe e vento no vértice | `PART_FACTORIES` em `render/props.ts` (`near`/`far`) — trocar por GLTF |
 | Peças de construção | cubo instanciado com painéis gerados em canvas por material (`buildPanelTexture`) | `render/buildings-view.ts` — trocar por modelos GLTF por peça mantendo as caixas de colisão |
 | Picareta | modelo procedural (`buildPickaxeModel`) e golpe procedural | `render/item-models.ts` + `character/character-model.ts › swing()` |
-| Personagem | humanoide procedural com animação procedural, 8 visuais | `character/character-model.ts` — um modelo GLTF com esqueleto implementa a mesma interface (`update`, `setName`, `setHeld`, `muzzleWorld`, `dispose`) |
+| Personagem | **GLB** `public/arte/personagens/personagem.glb` (gerado por `npm run assets` a partir de `character/rig.ts`): 18 ossos, malha com pesos, 5 materiais por nome, 17 clipes | substituir o GLB por um feito por artista com os mesmos nomes de ossos (`BONE_NAMES`), materiais (`MATERIAL_SLOTS`: recebem as cores do visual) e clipes (`CLIP_NAMES`); o jogo confere ao carregar e volta ao gerado se faltar algo |
 | Armas, itens e baús | modelos procedurais com cores de raridade | `render/item-models.ts` — trocar por GLTF mantendo a orientação (cano para −Z, empunhadura na origem) |
 | Ícones do HUD | silhuetas SVG originais | `ui/icons.ts` |
 | Interface | CSS próprio, emblema SVG original | `ui/` |
@@ -577,7 +654,7 @@ game/
 
 Nada usa nomes, personagens, arte ou sons de outros jogos.
 
-## 9. Tecnologias
+## 10. Tecnologias
 
 | Camada | Tecnologia | Versão |
 | --- | --- | --- |

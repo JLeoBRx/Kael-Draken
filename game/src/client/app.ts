@@ -193,7 +193,7 @@ export class App {
     if (!r) return
     const preset = QUALITY[this.settings.quality]
     r.shadowMap.enabled = preset.shadows
-    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, preset.maxPixelRatio))
+    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, preset.maxPixelRatio) * this.settings.renderScale)
     this.resize()
   }
 
@@ -663,14 +663,15 @@ export class App {
   private showSettings(): void {
     this.screens.settings(this.settings, (s) => {
       const qualityChanged = s.quality !== this.settings.quality
+      const scaleChanged = s.renderScale !== this.settings.renderScale
       this.settings = s
       saveSettings(s)
       this.applyAccessibility(s)
       this.input.updateSettings(s)
       this.audio.setVolume(s.volume)
       this.match?.applySettings(s)
-      if (qualityChanged && this.renderer) {
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY[s.quality].maxPixelRatio))
+      if ((qualityChanged || scaleChanged) && this.renderer) {
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY[s.quality].maxPixelRatio) * s.renderScale)
         this.resize()
       }
     }, () => this.screens.closeModal())

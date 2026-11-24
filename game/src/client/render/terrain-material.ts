@@ -59,9 +59,14 @@ const SPLAT_FRAGMENT = /* glsl */ `
   vec4 macro = texture2D(uMacro, tuv / 260.0);
   vec4 lg = texture2D(uLayer0, tuv / 3.0);
   vec4 ld = texture2D(uLayer1, tuv / 3.4);
+  #ifdef SPLAT_TRIPLANAR
   vec3 bw = pow(abs(normalize(vSplatNormal)), vec3(4.0));
   bw /= (bw.x + bw.y + bw.z);
   vec4 lr = texture2D(uLayer2, vSplatPos.zy / 5.5) * bw.x + texture2D(uLayer2, vSplatPos.xz / 5.5) * bw.y + texture2D(uLayer2, vSplatPos.xy / 5.5) * bw.z;
+  #else
+  // qualidade baixa: rocha só de cima (2 leituras de textura a menos por pixel)
+  vec4 lr = texture2D(uLayer2, vSplatPos.xz / 5.5);
+  #endif
   vec4 ls = texture2D(uLayer3, tuv / 3.8);
   vec4 ln = texture2D(uLayer4, tuv / 5.0);
   vec4 w = clamp(vSplat, 0.0, 1.0);
@@ -94,6 +99,7 @@ const SPLAT_FRAGMENT = /* glsl */ `
 export function createTerrainMaterial(lowQuality = false): THREE.MeshStandardMaterial {
   const tex = terrainLayers()
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 })
+  if (!lowQuality) m.defines = { SPLAT_TRIPLANAR: '' }
   m.name = 'terreno'
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uLayer0 = { value: tex.layers[0] }

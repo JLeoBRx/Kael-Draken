@@ -5,7 +5,18 @@ Battle royale 3D em terceira pessoa, com partidas **offline**, em **rede local
 armas, mapas e interface originais. *(Título provisório — definido em
 `src/shared/config/game.ts`.)*
 
-> **Estado: Fase 6 concluída — online.** Plataforma online (`npm run online`)
+> **Estado: Fase 7 concluída — polimento.** Mundo com pós-processamento
+> (brilho, gradação de cor, oclusão ambiente), nuvens, relevo com camadas de
+> detalhe, **grama 3D** e árvores com vento (com níveis de detalhe), água pela
+> profundidade; **personagem com esqueleto** e animações misturadas (clipes em
+> GLB, trocáveis por arte final); partículas, explosões, marcas de tiro;
+> **som** com passos por superfície, ambiente (vento, ondas, pássaros), reverb e
+> distância; vitrine 3D no menu, **armário** de visuais; **acessibilidade**
+> (daltonismo, indicador visual de sons, tamanho da interface, mira, reduzir
+> movimento) e **teclas configuráveis**. Próximo: lançamento (app desktop,
+> instaladores, servidor em container) — veja o [roteiro](docs/ROADMAP.md).
+>
+> **Fase 6 — online.** Plataforma online (`npm run online`)
 > com entrada **só pelo nome** (o nome é a conta), amigos com presença, grupos
 > com convite, **matchmaking** de partidas públicas (solo, dupla, trio ou
 > esquadrão, por região e habilidade, completando com bots), **salas privadas
@@ -13,8 +24,7 @@ armas, mapas e interface originais. *(Título provisório — definido em
 > assinados**, resultados reportados pelo servidor de jogo, **XP, níveis,
 > estatísticas, histórico, classificação, desafios do dia e visuais/títulos
 > desbloqueáveis** guardados em banco (SQLite). A rede ficou ~10× mais leve:
-> snapshots em delta por conexão e gerência de interesse. Próximo: polimento
-> (arte, som e efeitos finais) — veja o [roteiro](docs/ROADMAP.md).
+> snapshots em delta por conexão e gerência de interesse.
 >
 > **Fase 5 — multijogador local.** Sala de espera na rede local, descoberta
 > automática das partidas, duplas/trios/esquadrões com fogo amigo opcional,
@@ -29,6 +39,16 @@ armas, mapas e interface originais. *(Título provisório — definido em
 > jogador. Somam-se à construção (Fase 3), às armas, inventário e loot
 > (Fase 2) e ao mapa principal **Ilha de Brasa**. Próximo: lobby LAN e equipes
 > — veja o [roteiro](docs/ROADMAP.md) e a [arquitetura](docs/ARQUITETURA.md).
+
+![Campo da Ilha de Brasa com grama 3D, árvores, nuvens e montanhas nevadas](docs/imagens/fase7-campo.webp)
+
+| Menu com a vitrine 3D | Armário (visual do personagem) |
+| --- | --- |
+| ![Menu principal com o personagem numa plataforma iluminada](docs/imagens/fase7-menu.webp) | ![Armário com 8 visuais e o personagem trocando de cor](docs/imagens/fase7-armario.webp) |
+| **Mata Fechada (vegetação com vento e níveis de detalhe)** | **Lago Azul (cor pela profundidade, espuma na beira)** |
+| ![Pinheiros e árvores na grama alta](docs/imagens/fase7-mata.webp) | ![Píer sobre o lago turquesa](docs/imagens/fase7-lago.webp) |
+| **Personagens com esqueleto e animação** | **Explosão: bola de fogo, fumaça e marcas de tiro** |
+| ![Três personagens correndo e segurando armas na grama](docs/imagens/fase7-personagens.webp) | ![Explosão numa rua da cidade com fumaça e marcas de tiro no meio-fio](docs/imagens/fase7-explosao.webp) |
 
 ![A bordo do dirigível sobre a Ilha de Brasa, com a zona no horizonte e o aviso "Espaço — saltar"](docs/imagens/dirigivel.webp)
 
@@ -203,6 +223,25 @@ O agachar usa **C** (e não Ctrl) porque Ctrl+W fecha a aba no navegador. No
 modo construção a roda do mouse troca a peça e qualquer tecla de espaço (1–6)
 volta às armas.
 
+## Gráficos, som e acessibilidade (Fase 7)
+
+| Área | O que há |
+| --- | --- |
+| Imagem | MSAA, brilho (bloom), mapeamento ACES, gradação de cor e vinheta; oclusão ambiente (GTAO) na qualidade alta |
+| Céu e mundo | nuvens procedurais com vento; relevo com grama, terra, rocha (triplanar), areia e neve misturadas pela altura do detalhe; grama 3D em volta da câmera (fora de ruas e construções); árvores e arbustos com vento e dois níveis de detalhe; água turquesa no raso, escura no fundo, com espuma na beira |
+| Personagem | esqueleto de 18 ossos, malha com pesos (cotovelos e joelhos dobram sem emenda), 17 clipes de animação misturados em duas camadas (pernas pela velocidade; braços por arma, mira, picareta) e passada sincronizada; o modelo vem de um GLB (`public/arte/personagens/personagem.glb`) que a arte final pode substituir |
+| Efeitos | partículas instanciadas (fogo e faíscas somam luz; fumaça e poeira cobrem), explosão com bola de fogo, coluna de fumaça, faíscas, onda de poeira e tremor; poeira e faíscas pela superfície atingida; marcas de tiro; poeira de passos e quedas; respingos |
+| Som | passos de todos pela superfície (grama, terra, areia, neve, pedra, concreto, madeira, metal, água); pouso, respingo, planador; vento, ondas e pássaros conforme o lugar; reverb maior sob teto e entre prédios; de longe, tiros abafados e com eco; compressor contra estouro; sons de interface e da plataforma |
+| Telas | vitrine 3D atrás do menu, do armário e da entrada online; armário de visuais (offline/LAN; online, pelo nível); resultado com quem eliminou e vitória animada |
+| Acessibilidade | daltonismo (protanopia, deuteranopia, tritanopia: correção da imagem e paleta de raridades e colegas); indicador visual de sons (arcos em volta da mira); reduzir movimento; tamanho da interface; cor e tamanho da mira; teclas configuráveis |
+
+Qualidade gráfica (Configurações): **Baixa** (sem pós-processamento nem grama,
+para computadores fracos), **Média** (brilho, cores, MSAA, grama até 28 m) e
+**Alta** (+ oclusão ambiente, grama até 40 m, sombras e árvores detalhadas
+mais longe). **Escala da resolução** (50–100%) desenha menos pixels em
+placas de vídeo fracas sem borrar a interface. Os testes de navegador rodam na
+qualidade baixa a 50%.
+
 ## O que há no jogo (Fases 2, 3 e 4)
 
 | Sistema | Detalhes |
@@ -239,6 +278,7 @@ volta às armas.
 | `npm test` | testes unitários e de integração (Vitest) |
 | `npm run test:e2e` | testes no navegador (Playwright) |
 | `npm run check` | tipos + testes unitários |
+| `npm run assets` | gera o personagem em GLB (`public/arte/personagens/personagem.glb`) a partir do código |
 | `npx tsx scripts/bench-net.ts` | banda por cliente numa partida de bots |
 | `npx tsx scripts/load-test.ts 100 120` | teste de carga: 100 pessoas simuladas pela plataforma |
 
@@ -246,7 +286,10 @@ Para os testes de navegador em uma máquina nova: `npx playwright install chromi
 
 ## Testes
 
-- **Unitários e integração (163)**: plataforma online (entrada pelo nome,
+- **Unitários e integração (171)**: personagem com esqueleto (pesos da
+  malha, clipes, ida e volta pelo GLB com o GLTFLoader, GLB publicado igual ao
+  gerado, mistura de clipes por estado, passada); acessibilidade (troca de
+  teclas sem conflito, correção de cores, paleta); plataforma online (entrada pelo nome,
   sessão, conta aberta em outro lugar, amizade, presença, grupo e permissões
   do líder, fila de dupla → servidor alocado → bilhetes → partida até o fim →
   XP, estatísticas, histórico e desafios; fila sozinho com bots; sala privada
@@ -275,7 +318,8 @@ Para os testes de navegador em uma máquina nova: `npx playwright install chromi
   autoritativa, custo e intervalo, paredes bloqueando tiros, explosões,
   picareta, coleta, sincronização), predição sem correções com 100 ms de
   latência (inclusive construindo) e servidor WebSocket real.
-- **Navegador (12)**: **plataforma online com dois navegadores** (nome curto
+- **Navegador (12)**: menu, configurações, **opções de acessibilidade,
+  troca de teclas e armário** salvos; **plataforma online com dois navegadores** (nome curto
   recusado, entrada pelo nome, amizade e presença, convite para o grupo, dupla
   pelo matchmaking na mesma equipe, partida até o fim com XP e estatísticas,
   sala privada pelo código, sair pela pausa de volta à plataforma, volta pela
@@ -320,7 +364,23 @@ Variáveis de ambiente do servidor: `PORT` e `HOST` (equivalem a `--port` e
 `PLATFORM_SECRET` (segredo dos bilhetes de entrada). Configurações do jogador ficam no navegador (`localStorage`),
 inclusive o volume.
 
-## Limitações conhecidas (Fase 6)
+## Limitações conhecidas (Fase 7)
+
+- A arte continua gerada em código (personagem, armas, árvores, texturas e
+  sons): o pipeline de troca está pronto (GLB do personagem com ossos,
+  materiais e clipes por nome; texturas e sons por receita), mas não há
+  modelos ou gravações feitos por artista.
+- Sem placa de vídeo nesta máquina de desenvolvimento, o desempenho foi medido
+  em chamadas de desenho e triângulos (modo foto, `?foto=…`), não em quadros
+  por segundo numa GPU real: Ilha de Brasa, campo aberto — baixa 37 chamadas e
+  0,34 M triângulos; média 73 e 0,70 M; alta 135 e 2,0 M (a oclusão ambiente
+  desenha a cena duas vezes). Animação de 50 personagens: 0,8 ms de CPU por
+  quadro. A meta de 60 quadros por segundo em GPU integrada na qualidade
+  média ainda precisa ser conferida em hardware real.
+- Na tela dividida, cada metade tem o próprio pós-processamento (o dobro do
+  custo); em computadores fracos, use a qualidade baixa.
+
+### Herdadas das fases anteriores
 
 - **Conta só pelo nome, sem senha** (decisão do projeto): quem souber o nome
   de alguém entra na conta dessa pessoa. Para uso público, o próximo passo é
@@ -347,9 +407,6 @@ inclusive o volume.
 - Ainda não há edição de peças (abrir portas e janelas em paredes).
 - A grade de construção é absoluta: em encostas, peças podem ficar
   parcialmente enterradas (como em outros jogos do gênero).
-- Assets (modelos, texturas, animações e sons) são placeholders procedurais;
-  a troca por arte final está prevista na Fase 7 e os pontos de troca estão
-  documentados na arquitetura.
 - O coice da arma é aplicado no cliente (como na maioria dos jogos); o servidor
   valida dispersão, cadência, munição e acertos.
 - Banda medida: ~3,4 KB/s por cliente numa partida espalhada (60 bots +

@@ -50,6 +50,8 @@ export interface Settings {
   volume: number
   /** Acessibilidade: sem tremor de câmera nem balanço. */
   reduceMotion: boolean
+  /** Escala da resolução de desenho (0,5–1): menos pixels em placas de vídeo fracas. */
+  renderScale: number
   /** Correção e paleta para daltonismo. */
   colorVision: ColorVision
   /** Mostrar de onde vêm tiros, passos e explosões. */
@@ -108,6 +110,7 @@ export const DEFAULT_SETTINGS: Settings = {
   online: { address: '', teamSize: 1, region: 'sa', fill: true },
   volume: 0.7,
   reduceMotion: false,
+  renderScale: 1,
   colorVision: 'normal',
   soundCues: false,
   uiScale: 1,
@@ -144,6 +147,7 @@ export function loadSettings(): Settings {
     serverAddress: typeof raw.serverAddress === 'string' ? raw.serverAddress.slice(0, 200) : d.serverAddress,
     volume: num(raw.volume, 0, 1, d.volume),
     reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : d.reduceMotion,
+    renderScale: num(raw.renderScale, 0.5, 1, d.renderScale),
     colorVision: raw.colorVision === 'protanopia' || raw.colorVision === 'deuteranopia' || raw.colorVision === 'tritanopia' ? raw.colorVision : 'normal',
     soundCues: typeof raw.soundCues === 'boolean' ? raw.soundCues : d.soundCues,
     uiScale: num(raw.uiScale, 0.8, 1.4, d.uiScale),

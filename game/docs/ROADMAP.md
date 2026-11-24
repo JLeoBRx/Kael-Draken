@@ -13,7 +13,7 @@ termina com uma entrega que pode ser jogada.
 | 4 — IA | bots com navegação, loot, combate, fuga, abrigo, construção e zona; níveis de dificuldade; zona segura; partida BR completa offline | 2–3 semanas | **concluída** |
 | 5 — Multijogador local | lobby LAN, equipes, descoberta na rede, reconexão, tela dividida, testes com vários jogadores | 1–2 semanas | **concluída** |
 | 6 — Online | plataforma (contas, amigos, convites, grupos, matchmaking, salas públicas/privadas, código de convite), alocação de servidores, segurança, gerência de interesse e compressão | 3–4 semanas | **concluída** |
-| 7 — Polimento | arte final (GLTF, animações esqueléticas), sons, efeitos, pós-processamento, otimização, acessibilidade, correção de bugs | 3 semanas | |
+| 7 — Polimento | arte final (GLTF, animações esqueléticas), sons, efeitos, pós-processamento, otimização, acessibilidade, correção de bugs | 3 semanas | **concluída** |
 | 8 — Lançamento | app desktop (Electron/Tauri), instaladores, servidor em container, documentação de operação, testes de carga e finais | 1–2 semanas | |
 
 **Marcos jogáveis**
@@ -286,14 +286,46 @@ Ficou para depois: taxa adaptativa por cliente, detecção estatística de mira
 automática, teste de carga com computadores reais em rede (o atual simula 100
 clientes numa máquina).
 
-## Fase 7 — Polimento
+## Fase 7 — Polimento ✅
 
-- Personagens e armas em GLTF com animações esqueléticas e mistura de animações.
-- Texturas finais, splatmap do relevo, vegetação com vento, LOD e instâncias por bloco.
-- Pós-processamento (SSAO, bloom, correção de cor), partículas, explosões.
-- Áudio espacial: ambiente, passos por superfície, armas, interface.
-- Telas: seleção de personagem/visual, histórico de partidas, vitória e derrota.
-- Otimização (meta: 60 FPS em GPU integrada na qualidade média) e acessibilidade.
+Entregue:
+
+- **Imagem**: pós-processamento por qualidade (MSAA, brilho, ACES, gradação
+  de cor, vinheta; GTAO na alta), também na tela dividida; nuvens.
+- **Mundo**: relevo com 5 camadas de detalhe (mistura pela altura, rocha
+  triplanar, relevo fino); grama 3D em volta da câmera (uma chamada de
+  desenho, sem grama em ruas e construções); árvores e arbustos novos com
+  vento; **níveis de detalhe** da vegetação (~4× menos triângulos; só as de
+  perto projetam sombra); água pela profundidade com espuma.
+- **Personagem com esqueleto**: 18 ossos, malha com pesos, 17 clipes
+  misturados em duas camadas com passada sincronizada; 5 chamadas de desenho
+  por personagem (eram ~40); modelo em **GLB** com exportador próprio
+  (`npm run assets`) e carregamento pelo GLTFLoader — a arte final troca o
+  arquivo; animação de longe a 1/3 dos quadros.
+- **Efeitos**: partículas instanciadas (brilho e fumaça), explosão em
+  camadas com tremor de câmera, impacto pela superfície com marcas de tiro,
+  poeira de passos e quedas, respingos, rastro de foguete.
+- **Som**: passos de todos pela superfície (9 tipos), pouso, respingo,
+  planador; vento, ondas e pássaros pelo lugar; reverb e abafamento pela
+  distância e pelo ambiente; compressor; sons de interface e da plataforma.
+- **Telas**: vitrine 3D no menu, armário de visuais (protocolo 7: visual no
+  Hello para offline/LAN), resultado com quem eliminou e vitória animada.
+- **Acessibilidade**: daltonismo (correção da imagem + paleta), indicador
+  visual de sons, reduzir movimento, tamanho da interface, mira, teclas
+  configuráveis.
+- **Modo foto** (`?foto=…`) para capturas e medições de desempenho.
+- **Testes**: 171 unitários (personagem/GLB, acessibilidade) e o teste de
+  navegador do menu cobrindo acessibilidade, teclas e armário.
+
+Decisões de projeto:
+
+- **Arte gerada em código, pipeline real**: sem artista, o personagem é
+  gerado — mas sai em GLB e entra pelo GLTFLoader, com convenções
+  documentadas; um GLB feito por artista entra sem mudar o jogo.
+- **Medição sem GPU**: o ambiente de desenvolvimento não tem placa de
+  vídeo; o orçamento foi controlado por chamadas de desenho e triângulos
+  (modo foto) e por tempo de CPU. A meta de 60 FPS em GPU integrada fica
+  para conferir em hardware real (Fase 8).
 
 ## Fase 8 — Lançamento
 

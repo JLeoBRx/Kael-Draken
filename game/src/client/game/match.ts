@@ -959,7 +959,10 @@ export class Match {
         this.world.scene.add(r.model.root)
       }
       r.model.setHeld(this.sampled.weapon, this.sampled.rarity)
-      r.model.update(this.sampled, frameDt)
+      // longe da câmera, a animação roda a 1/3 dos quadros (a posição, em todos)
+      const cp = this.cam.camera.position
+      const far = (this.sampled.x - cp.x) ** 2 + (this.sampled.z - cp.z) ** 2 > 80 * 80
+      r.model.update(this.sampled, frameDt, far ? 3 : 1)
       this.onStep(r.steps.update(this.sampled), false)
     }
 
