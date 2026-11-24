@@ -13,7 +13,7 @@ import { Cause, TargetKind, type EntityState, type GameEvent, type InputCommand,
 import { pickInteractable } from '../../shared/player/interact'
 import { PICKAXE_SLOT, SLOT_COUNT, currentSpread, type PlayerEvent, type PlayerState } from '../../shared/player/player'
 import { Surface, createWorldHit } from '../../shared/world/collision-world'
-import { AudioEngine, shotSoundFor } from '../audio/audio'
+import { AudioEngine, shotSoundFor, type FootSurface } from '../audio/audio'
 import { ThirdPersonCamera } from '../camera/third-person-camera'
 import { CharacterModel, SKINS, type PoseInput } from '../character/character-model'
 import { loadCharacterAsset } from '../character/character-assets'
@@ -30,6 +30,7 @@ import { QUALITY, type Settings } from '../settings'
 import type { BattleHud, Hud, MatchResult } from '../ui/hud'
 import { FullMapView, MinimapView, gridRef, renderMapImage } from '../ui/minimap'
 import { Effects } from './effects'
+import { StepTracker, type StepEvent } from './footsteps'
 import { WorldItemsView } from './world-items'
 
 /**
@@ -72,6 +73,8 @@ interface Remote {
   model: CharacterModel | null
   name: string
   skin: number
+  /** Passos e pousos (som e poeira). */
+  steps: StepTracker
 }
 
 /** Identidade de um jogador conectado (vem de PlayerInfo; some só com PlayerLeft). */
@@ -153,6 +156,12 @@ function fmtClock(seconds: number): string {
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()))
 const tmpA = new THREE.Vector3()
 const tmpB = new THREE.Vector3()
+const tmpC = new THREE.Vector3()
+/** Cor da poeira levantada por superfície. */
+const DUST_COLORS: Record<FootSurface, [number, number, number]> = {
+  grama: [0.3, 0.3, 0.2], terra: [0.36, 0.29, 0.2], pedra: [0.42, 0.41, 0.38], concreto: [0.45, 0.44, 0.42], madeira: [0.38, 0.3, 0.22],
+  metal: [0.4, 0.4, 0.42], areia: [0.62, 0.55, 0.4], neve: [0.85, 0.88, 0.92], agua: [0.8, 0.85, 0.9],
+}
 const tmpSize = new THREE.Vector2()
 
 function escapeHtml(s: string): string {
@@ -160,6 +169,8 @@ function escapeHtml(s: string): string {
 }
 
 export class Match {
+  private readonly localSteps = new StepTracker()
+  private lastLocalFlags = 0
   /** Pós-processamento (null na qualidade baixa). */
   private readonly post: PostPipeline | null
   readonly session: NetSession
@@ -284,7 +295,7 @@ export class Match {
     this.zoneView = new ZoneView(this.world.scene)
     this.airship = new AirshipView(this.world.scene)
     for (const [collider, index] of map.propColliders) this.propCollider.set(index, collider)
-    this.effects = new Effects(this.world.scene, map.world, deps.hud.fx)
+    this.effects = new Effects(this.world.scene, map.world, deps.hud.fx, quality.particles)
     const image = renderMapImage(map)
     this.minimap = new MinimapView(image, map)
     deps.hud.minimapSlot.replaceChildren(this.minimap.el)
@@ -348,7 +359,7 @@ export class Match {
     let r = this.remotes.get(id)
     if (!r) {
       const info = this.roster.get(id)
-      r = { entity: new RemoteEntity(id), model: null, name: info?.name ?? `Jogador ${id}`, skin: info?.skin ?? id % SKINS.length }
+      r = { entity: new RemoteEntity(id), model: null, name: info?.name ?? `Jogador ${id}`, skin: info?.skin ?? id % SKINS.length, steps: new StepTracker() }
       this.remotes.set(id, r)
     }
     return r
@@ -428,7 +439,7 @@ export class Match {
           for (const end of e.ends) {
             tmpB.set(end.x, end.y, end.z)
             this.effects.tracer(from, tmpB)
-            if (end.hit === 1) this.effects.impact(tmpB, 'world')
+            if (end.hit === 1) this.effects.impact(tmpB, 'world', tmpC.set(e.ox, e.oy, e.oz))
             else if (end.hit === 2) this.effects.impact(tmpB, 'flesh')
           }
           this.effects.muzzleFlash(from)
@@ -538,7 +549,7 @@ export class Match {
         case 'explosion':
           this.effects.removeProjectile(e.id)
           tmpA.set(e.x, e.y, e.z)
-          this.effects.explosion(tmpA, e.radius)
+          this.effects.explosion(tmpA, e.radius, this.cam.camera)
           audio.play('explosion', { pos: tmpA })
           break
         case 'zone':
@@ -581,7 +592,7 @@ export class Match {
             const t = hitWorld ? this.hit.t : w.range
             tmpB.set(r.ox + r.dx * t, r.oy + r.dy * t, r.oz + r.dz * t)
             this.effects.tracer(from, tmpB)
-            if (hitWorld) this.effects.impact(tmpB, 'world')
+            if (hitWorld) this.effects.impact(tmpB, 'world', tmpC.set(r.ox, r.oy, r.oz))
           }
         }
         this.effects.muzzleFlash(from, w?.category === 'shotgun' || w?.category === 'sniper' || w?.category === 'launcher')
@@ -917,6 +928,9 @@ export class Match {
     if (this.buildMode) this.local.setHeld(NO_ITEM, 0)
     else this.local.setHeld(slot.item, slot.rarity)
     this.local.update(p, frameDt)
+    if (state.alive) this.onStep(this.localSteps.update(p), true)
+    if ((c.flags & CharFlag.Gliding) && !(this.lastLocalFlags & CharFlag.Gliding)) this.deps.audio.play('planador', { volume: 0.7 })
+    this.lastLocalFlags = c.flags
 
     // Remotos: interpolados no passado
     const serverNow = this.clock.serverTimeMs(now)
@@ -934,6 +948,7 @@ export class Match {
       }
       r.model.setHeld(this.sampled.weapon, this.sampled.rarity)
       r.model.update(this.sampled, frameDt)
+      this.onStep(r.steps.update(this.sampled), false)
     }
 
     // Câmera: o próprio personagem, ou alguém em jogo (espectador)
@@ -949,6 +964,13 @@ export class Match {
     const w = this.buildMode ? undefined : weaponDef(slot.item)
     this.cam.setAimFov(w ? w.aimFov : null)
     this.cam.update(camTarget, camFlags, this.yaw, this.pitch, this.map.world, frameDt)
+    // tremor das explosões perto (desligável em "reduzir movimento")
+    const shake = this.effects.shake * (this.deps.settings.reduceMotion ? 0 : 1)
+    if (shake > 0.01) {
+      this.cam.camera.rotation.x += (Math.random() - 0.5) * 0.03 * shake
+      this.cam.camera.rotation.y += (Math.random() - 0.5) * 0.03 * shake
+    }
+    this.updateAmbient(frameDt)
     this.focus.set(camTarget.x, camTarget.y, camTarget.z)
     this.world.update(this.focus, this.cam.camera, this.elapsed)
     this.items.update(frameDt, this.focus, this.elapsed)
@@ -982,6 +1004,68 @@ export class Match {
       this.post.render(frameDt)
     } else r.render(this.world.scene, this.cam.camera)
     if (vp) r.setScissorTest(false)
+  }
+
+  /** Som (pela superfície) e poeira/respingo de um passo, pouso ou entrada na água. */
+  private onStep(ev: StepEvent | null, local: boolean): void {
+    if (!ev) return
+    const audio = this.deps.audio
+    tmpC.set(ev.x, ev.y, ev.z)
+    if (ev.kind === 'agua') {
+      this.effects.splash(ev.x, this.map.def.waterLevel, ev.z, ev.strength)
+      audio.play('respingo', { pos: local ? undefined : tmpC, volume: 0.5 + ev.strength * 0.5 })
+      return
+    }
+    const surface = this.surfaceAt(ev.x, ev.y, ev.z)
+    const soft = surface === 'terra' || surface === 'areia' || surface === 'neve'
+    if (ev.kind === 'pouso') {
+      this.effects.dust(ev.x, ev.y, ev.z, 0.6 + ev.strength, DUST_COLORS[surface])
+      audio.play('pouso', { pos: local ? undefined : tmpC, volume: 0.4 + ev.strength * 0.6 })
+      audio.footstep(surface, tmpC, ev.strength, local)
+      return
+    }
+    if (ev.sprint && soft) this.effects.dust(ev.x, ev.y, ev.z, 0.35, DUST_COLORS[surface])
+    audio.footstep(surface, tmpC, ev.strength, local)
+  }
+
+  /** Material do chão sob os pés (construção, estrutura do mapa ou camada do relevo). */
+  private surfaceAt(x: number, y: number, z: number): FootSurface {
+    if (y < this.map.def.waterLevel + 0.15) return 'agua'
+    if (this.map.world.raycast(x, y + 0.4, z, 0, -1, 0, 1.2, this.hit) && this.hit.colliderId >= 0) {
+      switch (this.hit.surface) {
+        case Surface.Wood: return 'madeira'
+        case Surface.Metal: return 'metal'
+        case Surface.Rock: return 'pedra'
+        case Surface.Foliage: return 'grama'
+        case Surface.Terrain: break
+        default: return 'concreto'
+      }
+    }
+    const layer = this.world.groundLayer(x, z)
+    return layer === 'rocha' ? 'pedra' : layer
+  }
+
+  private ambientTimer = 0
+
+  /** Vento (altura, queda livre), ondas (perto da água), pássaros (mata e campo) e eco do lugar. */
+  private updateAmbient(dt: number): void {
+    this.ambientTimer -= dt
+    if (this.ambientTimer > 0) return
+    this.ambientTimer = 0.5
+    const c = this.cam.camera.position
+    const ground = this.map.terrain.heightAt(c.x, c.z)
+    const water = this.map.def.waterLevel
+    const f = this.predictor.state.char.flags
+    const falling = (f & (CharFlag.Skydiving | CharFlag.Gliding | CharFlag.Riding)) !== 0
+    const region = regionAt(this.map, c.x, c.z)?.id ?? ''
+    const built = region === 'cidade' || region === 'fabril' || region === 'base'
+    const nearWater = Math.max(0, 1 - Math.max(0, ground - water) / 5)
+    const layer = this.world.groundLayer(c.x, c.z)
+    const birds = falling ? 0 : built ? 0.1 : layer === 'grama' ? (region === 'mata' ? 1 : 0.55) : 0.15
+    this.deps.audio.updateAmbient({ wind: Math.min(1, Math.max(0, (c.y - water - 30) / 160) + (falling ? 0.7 : 0)), waves: nearWater, birds }, 0.5)
+    // sob um teto ou entre prédios, mais eco
+    const covered = this.map.world.raycast(c.x, c.y, c.z, 0, 1, 0, 8, this.hit) && this.hit.colliderId >= 0
+    this.deps.audio.setSpace(covered ? 0.9 : built ? 0.5 : 0.12)
   }
 
   private updateHud(viewHeight: number): void {

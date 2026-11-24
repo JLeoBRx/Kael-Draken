@@ -125,7 +125,19 @@ export class App {
       }, (err) => o.onExit(`Não foi possível entrar na partida: ${err}`)),
       inMatch: () => this.state !== 'menu' && !!this.recipe?.online,
       mainMenu: () => this.showMenu(),
+      sound: (name) => this.audio.play(name),
     })
+    // sons de interface: passar o mouse e clicar (o primeiro clique também libera o áudio)
+    let hovered: Element | null = null
+    layer.addEventListener('pointerover', (e) => {
+      const t = (e.target as HTMLElement).closest('button:not([disabled]), .link, summary')
+      if (t && t !== hovered) this.audio.play('ui-hover')
+      hovered = t
+    })
+    layer.addEventListener('click', (e) => {
+      this.audio.resume()
+      if ((e.target as HTMLElement).closest('button:not([disabled]), .link, summary')) this.audio.play('ui-click')
+    }, true)
     this.input.onToggleDebug = () => this.hud.toggleDebug()
     this.input.onToggleHelp = () => this.hud.toggleHelp()
     this.canvas.addEventListener('click', () => {

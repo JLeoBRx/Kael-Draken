@@ -1,32 +1,20 @@
 import * as THREE from 'three'
 import { itemDef, weaponDef, type ProjectileDef } from '../../shared/config/items'
 import { stepProjectile, type ProjectileState } from '../../shared/combat/projectile'
-import type { CollisionWorld } from '../../shared/world/collision-world'
+import { Surface, createWorldHit, type CollisionWorld } from '../../shared/world/collision-world'
+import { DecalPool, ParticlePool, type ParticleSpec } from '../render/particles'
 
 /**
- * Efeitos visuais: traçantes, clarão do cano, poeira/faíscas de impacto,
- * explosões, projéteis em voo e números de dano. Tudo com pools fixos — nada
- * é alocado por tiro.
+ * Efeitos visuais: traçantes, clarão do cano, poeira/faíscas de impacto pela
+ * superfície, marcas de tiro, explosões (bola de fogo, coluna de fumaça,
+ * faíscas, onda de choque e tremor da câmera), poeira de passos e quedas,
+ * respingos, projéteis em voo e números de dano. Tudo com pools fixos —
+ * nada é alocado por tiro.
  */
 
 interface Tracer {
   mesh: THREE.Mesh
   life: number
-}
-
-interface Particle {
-  x: number
-  y: number
-  z: number
-  vx: number
-  vy: number
-  vz: number
-  life: number
-  max: number
-  r: number
-  g: number
-  b: number
-  size: number
 }
 
 interface Blast {
@@ -50,18 +38,28 @@ interface DamageNumber {
 /** Cor (linear) das lascas por material: madeira, pedra, metal. */
 const DEBRIS_COLORS: [number, number, number][] = [[0.62, 0.42, 0.22], [0.55, 0.54, 0.5], [0.66, 0.7, 0.74]]
 const TRACERS = 64
-const PARTICLES = 600
+/** Cor da poeira de impacto por superfície (linear). */
+const SURFACE_DUST: Record<number, [number, number, number]> = {
+  [Surface.Terrain]: [0.32, 0.27, 0.2],
+  [Surface.Concrete]: [0.5, 0.49, 0.46],
+  [Surface.Wood]: [0.42, 0.3, 0.18],
+  [Surface.Metal]: [0.45, 0.46, 0.48],
+  [Surface.Brick]: [0.5, 0.3, 0.22],
+  [Surface.Rock]: [0.45, 0.44, 0.41],
+  [Surface.Foliage]: [0.2, 0.32, 0.12],
+}
 const tmpV = new THREE.Vector3()
 const up = new THREE.Vector3(0, 1, 0)
 
 export class Effects {
   private readonly tracers: Tracer[] = []
   private tracerCursor = 0
-  private readonly particles: Particle[] = []
-  private readonly points: THREE.Points
-  private readonly pPos: Float32Array
-  private readonly pCol: Float32Array
-  private readonly pSize: Float32Array
+  private readonly glow: ParticlePool
+  private readonly smoke: ParticlePool
+  private readonly decals: DecalPool
+  private readonly hit = createWorldHit()
+  /** Tremor de câmera acumulado (explosões perto); a partida lê e aplica. */
+  shake = 0
   private readonly blasts: Blast[] = []
   private readonly flash: THREE.PointLight
   private flashLife = 0
@@ -71,7 +69,10 @@ export class Effects {
   private readonly numbers: DamageNumber[] = []
   private readonly disposables: { dispose(): void }[] = []
 
-  constructor(private readonly scene: THREE.Scene, private readonly world: CollisionWorld, private readonly overlay: HTMLElement) {
+  /** Multiplicador da quantidade de partículas (qualidade). */
+  private readonly detail: number
+
+  constructor(private readonly scene: THREE.Scene, private readonly world: CollisionWorld, private readonly overlay: HTMLElement, particleScale = 1) {
     const tracerMat = new THREE.MeshBasicMaterial({ color: 0xffe7a8, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })
     const tracerGeo = new THREE.BoxGeometry(0.025, 0.025, 1).translate(0, 0, -0.5)
     this.disposables.push(tracerMat, tracerGeo)
@@ -84,40 +85,11 @@ export class Effects {
       this.disposables.push(mesh.material as THREE.Material)
     }
 
-    this.pPos = new Float32Array(PARTICLES * 3)
-    this.pCol = new Float32Array(PARTICLES * 3)
-    this.pSize = new Float32Array(PARTICLES)
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.BufferAttribute(this.pPos, 3))
-    g.setAttribute('color', new THREE.BufferAttribute(this.pCol, 3))
-    g.setAttribute('size', new THREE.BufferAttribute(this.pSize, 1))
-    const pm = new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      vertexShader: /* glsl */ `
-        attribute float size;
-        attribute vec3 color;
-        varying vec3 vColor;
-        void main() {
-          vColor = color;
-          vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = size * 300.0 / max(0.1, -mv.z);
-          gl_Position = projectionMatrix * mv;
-        }`,
-      fragmentShader: /* glsl */ `
-        varying vec3 vColor;
-        void main() {
-          float d = length(gl_PointCoord - 0.5);
-          if (d > 0.5) discard;
-          gl_FragColor = vec4(vColor * (1.0 - d * 1.6), 1.0);
-        }`,
-    })
-    this.points = new THREE.Points(g, pm)
-    this.points.frustumCulled = false
-    scene.add(this.points)
-    this.disposables.push(g, pm)
-
+    const scale = Math.max(0.2, particleScale)
+    this.glow = new ParticlePool(scene, Math.round(900 * scale), 'brilho')
+    this.smoke = new ParticlePool(scene, Math.round(700 * scale), 'fumaca')
+    this.decals = new DecalPool(scene, Math.round(160 * scale))
+    this.detail = scale
     this.flash = new THREE.PointLight(0xffb36b, 0, 14, 2)
     scene.add(this.flash)
     const muzzleTex = makeFlashTexture()
@@ -151,38 +123,116 @@ export class Effects {
     this.flashLife = 0.06
   }
 
-  private spawnParticle(x: number, y: number, z: number, vx: number, vy: number, vz: number, life: number, r: number, g: number, b: number, size: number): void {
-    if (this.particles.length >= PARTICLES) this.particles.shift()
-    this.particles.push({ x, y, z, vx, vy, vz, life, max: life, r, g, b, size })
+  private n(count: number): number {
+    return Math.max(1, Math.round(count * this.detail))
   }
 
-  impact(pos: THREE.Vector3, kind: 'world' | 'flesh'): void {
-    const n = kind === 'world' ? 7 : 5
-    for (let k = 0; k < n; k++) {
-      const s = kind === 'world' ? 1.6 : 2.2
-      const bright = kind === 'world' ? [0.55, 0.5, 0.42] : [1.0, 0.75, 0.35]
-      this.spawnParticle(pos.x, pos.y, pos.z, (Math.random() - 0.5) * s, Math.random() * s, (Math.random() - 0.5) * s, 0.35 + Math.random() * 0.25, bright[0], bright[1], bright[2], kind === 'world' ? 0.12 : 0.08)
+  private puff(p: ParticleSpec): void {
+    this.smoke.spawn(p)
+  }
+
+  private spark(p: ParticleSpec): void {
+    this.glow.spawn(p)
+  }
+
+  /**
+   * Impacto de bala. No mundo, com a origem do tiro, acha a superfície
+   * (normal e material): poeira da cor certa, faíscas no metal e marca de tiro.
+   */
+  impact(pos: THREE.Vector3, kind: 'world' | 'flesh', origin?: THREE.Vector3): void {
+    if (kind === 'flesh') {
+      for (let k = 0; k < this.n(8); k++) {
+        this.spark({ x: pos.x, y: pos.y, z: pos.z, vx: (Math.random() - 0.5) * 3, vy: Math.random() * 2.5, vz: (Math.random() - 0.5) * 3, life: 0.25 + Math.random() * 0.2, size: 0.09, sizeEnd: 0.02, r: 1.6, g: 0.85, b: 0.35, gravity: 6, drag: 2 })
+      }
+      this.puff({ x: pos.x, y: pos.y, z: pos.z, vy: 0.4, life: 0.5, size: 0.25, sizeEnd: 0.6, r: 0.9, g: 0.7, b: 0.45, alpha: 0.35 })
+      return
+    }
+    let nx = 0
+    let ny = 1
+    let nz = 0
+    let surface: number = Surface.Terrain
+    if (origin) {
+      const dx = pos.x - origin.x
+      const dy = pos.y - origin.y
+      const dz = pos.z - origin.z
+      const len = Math.hypot(dx, dy, dz)
+      if (len > 0.01 && this.world.raycast(origin.x, origin.y, origin.z, dx / len, dy / len, dz / len, len + 0.3, this.hit)) {
+        nx = this.hit.nx
+        ny = this.hit.ny
+        nz = this.hit.nz
+        surface = this.hit.surface
+        this.decals.add(this.hit.x, this.hit.y, this.hit.z, nx, ny, nz, surface === Surface.Terrain ? 0.22 : 0.13)
+      }
+    }
+    const c = SURFACE_DUST[surface] ?? SURFACE_DUST[Surface.Terrain]
+    for (let k = 0; k < this.n(3); k++) {
+      const sp = 0.6 + Math.random() * 1.4
+      this.puff({ x: pos.x, y: pos.y, z: pos.z, vx: nx * sp + (Math.random() - 0.5) * 0.6, vy: ny * sp + Math.random() * 0.4, vz: nz * sp + (Math.random() - 0.5) * 0.6, life: 0.6 + Math.random() * 0.5, size: 0.18, sizeEnd: 0.65, r: c[0], g: c[1], b: c[2], alpha: 0.75, drag: 3, gravity: 0.6, spin: (Math.random() - 0.5) * 2 })
+    }
+    const sparks = surface === Surface.Metal ? 8 : surface === Surface.Concrete || surface === Surface.Rock || surface === Surface.Brick ? 3 : 0
+    for (let k = 0; k < this.n(sparks); k++) {
+      const sp = 2 + Math.random() * 4
+      this.spark({ x: pos.x, y: pos.y, z: pos.z, vx: nx * sp + (Math.random() - 0.5) * 3, vy: ny * sp + Math.random() * 2, vz: nz * sp + (Math.random() - 0.5) * 3, life: 0.15 + Math.random() * 0.25, size: 0.05, sizeEnd: 0.01, r: 2.2, g: 1.5, b: 0.6, gravity: 9, drag: 1 })
     }
   }
 
-  explosion(pos: THREE.Vector3, radius: number): void {
+  explosion(pos: THREE.Vector3, radius: number, camera?: THREE.Camera): void {
     const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 2), new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }))
     mesh.position.copy(pos)
     mesh.scale.setScalar(0.2)
     this.scene.add(mesh)
-    this.blasts.push({ mesh, life: 0.45, radius })
-    for (let k = 0; k < 60; k++) {
+    this.blasts.push({ mesh, life: 0.35, radius: radius * 0.7 })
+    // bola de fogo: núcleo claro que vira laranja e sobe
+    for (let k = 0; k < this.n(26); k++) {
       const a = Math.random() * Math.PI * 2
-      const e = Math.random() * Math.PI - Math.PI / 4
-      const sp = 4 + Math.random() * radius * 2
-      const fire = k < 35
-      this.spawnParticle(pos.x, pos.y, pos.z, Math.cos(a) * Math.cos(e) * sp, Math.abs(Math.sin(e)) * sp + 1, Math.sin(a) * Math.cos(e) * sp,
-        fire ? 0.4 + Math.random() * 0.3 : 0.9 + Math.random() * 0.6, fire ? 1 : 0.35, fire ? 0.55 : 0.33, fire ? 0.2 : 0.3, fire ? 0.35 : 0.6)
+      const e = (Math.random() - 0.2) * Math.PI * 0.5
+      const sp = (1 + Math.random() * 2.5) * radius * 0.6
+      this.spark({ x: pos.x, y: pos.y + 0.3, z: pos.z, vx: Math.cos(a) * Math.cos(e) * sp, vy: Math.sin(e) * sp + 1.5, vz: Math.sin(a) * Math.cos(e) * sp, life: 0.35 + Math.random() * 0.35, size: radius * 0.45, sizeEnd: radius * 0.9, r: 1.7, g: 0.62, b: 0.16, drag: 4, gravity: -2, spin: (Math.random() - 0.5) * 3 })
+    }
+    // faíscas e estilhaços
+    for (let k = 0; k < this.n(30); k++) {
+      const a = Math.random() * Math.PI * 2
+      const sp = 6 + Math.random() * 10
+      this.spark({ x: pos.x, y: pos.y + 0.2, z: pos.z, vx: Math.cos(a) * sp, vy: 2 + Math.random() * 8, vz: Math.sin(a) * sp, life: 0.5 + Math.random() * 0.7, size: 0.08, sizeEnd: 0.02, r: 2.5, g: 1.6, b: 0.6, gravity: 12, drag: 0.6 })
+    }
+    // coluna de fumaça escura que sobe e se espalha
+    for (let k = 0; k < this.n(22); k++) {
+      const a = Math.random() * Math.PI * 2
+      const r = Math.random() * radius * 0.5
+      const g = 0.08 + Math.random() * 0.08
+      this.puff({ x: pos.x + Math.cos(a) * r, y: pos.y + Math.random() * radius * 0.6, z: pos.z + Math.sin(a) * r, vx: Math.cos(a) * 1.2, vy: 1.5 + Math.random() * 2.5, vz: Math.sin(a) * 1.2, life: 2.2 + Math.random() * 2, size: radius * 0.5, sizeEnd: radius * 1.6, r: g, g: g, b: g * 1.05, alpha: 0.85, drag: 0.8, gravity: -0.4, spin: (Math.random() - 0.5) * 0.8 })
+    }
+    // onda de poeira no chão
+    for (let k = 0; k < this.n(16); k++) {
+      const a = (k / 16) * Math.PI * 2
+      this.puff({ x: pos.x, y: pos.y + 0.2, z: pos.z, vx: Math.cos(a) * radius * 2.2, vy: 0.3, vz: Math.sin(a) * radius * 2.2, life: 0.9 + Math.random() * 0.4, size: radius * 0.35, sizeEnd: radius * 0.9, r: 0.42, g: 0.37, b: 0.3, alpha: 0.55, drag: 3 })
     }
     this.flash.position.copy(pos)
-    this.flash.intensity = 120
-    this.flash.distance = radius * 6
-    this.flashLife = 0.18
+    this.flash.intensity = 160
+    this.flash.distance = radius * 7
+    this.flashLife = 0.22
+    if (camera) {
+      const d = camera.position.distanceTo(pos)
+      this.shake = Math.min(1.5, this.shake + Math.max(0, 1 - d / (radius * 8)) * 1.2)
+    }
+  }
+
+  /** Poeira de passos fortes, pouso e deslize. */
+  dust(x: number, y: number, z: number, amount: number, color: [number, number, number] = [0.36, 0.31, 0.24]): void {
+    for (let k = 0; k < this.n(Math.ceil(4 * amount)); k++) {
+      const a = Math.random() * Math.PI * 2
+      const sp = 0.6 + Math.random() * 1.2 * amount
+      this.puff({ x: x + Math.cos(a) * 0.2, y: y + 0.08, z: z + Math.sin(a) * 0.2, vx: Math.cos(a) * sp, vy: 0.3 + Math.random() * 0.4, vz: Math.sin(a) * sp, life: 0.6 + Math.random() * 0.5, size: 0.25, sizeEnd: 0.8 * Math.max(0.6, amount), r: color[0], g: color[1], b: color[2], alpha: 0.5, drag: 3, spin: (Math.random() - 0.5) * 1.5 })
+    }
+  }
+
+  /** Respingo na água. */
+  splash(x: number, y: number, z: number, amount: number): void {
+    for (let k = 0; k < this.n(Math.ceil(10 * amount)); k++) {
+      const a = Math.random() * Math.PI * 2
+      const sp = 0.5 + Math.random() * 1.5 * amount
+      this.puff({ x, y: y + 0.05, z, vx: Math.cos(a) * sp, vy: 1.5 + Math.random() * 3 * amount, vz: Math.sin(a) * sp, life: 0.5 + Math.random() * 0.4, size: 0.12, sizeEnd: 0.35, r: 0.85, g: 0.92, b: 0.95, alpha: 0.7, gravity: 9, drag: 0.5 })
+    }
   }
 
   spawnProjectile(id: number, item: number, x: number, y: number, z: number, vx: number, vy: number, vz: number): void {
@@ -210,22 +260,30 @@ export class Effects {
   /** Lascas e poeira de construção quebrando/desabando, na cor do material. */
   debris(min: THREE.Vector3, max: THREE.Vector3, material: number, amount = 1): void {
     const color = DEBRIS_COLORS[material] ?? DEBRIS_COLORS[0]
-    const n = Math.round(26 * amount)
-    for (let k = 0; k < n; k++) {
+    for (let k = 0; k < this.n(Math.round(16 * amount)); k++) {
       const x = min.x + Math.random() * (max.x - min.x)
       const y = min.y + Math.random() * (max.y - min.y)
       const z = min.z + Math.random() * (max.z - min.z)
-      const v = 0.8 + Math.random() * 0.4
-      this.spawnParticle(x, y, z, (Math.random() - 0.5) * 3, Math.random() * 3.5, (Math.random() - 0.5) * 3, 0.6 + Math.random() * 0.6, color[0] * v, color[1] * v, color[2] * v, 0.14 + Math.random() * 0.12)
+      const v = 0.75 + Math.random() * 0.4
+      this.puff({ x, y, z, vx: (Math.random() - 0.5) * 2, vy: Math.random() * 1.5, vz: (Math.random() - 0.5) * 2, life: 0.9 + Math.random() * 0.8, size: 0.35, sizeEnd: 1.2, r: color[0] * v, g: color[1] * v, b: color[2] * v, alpha: 0.6, drag: 2, gravity: 0.5, spin: (Math.random() - 0.5) * 1.5 })
+    }
+    for (let k = 0; k < this.n(Math.round(14 * amount)); k++) {
+      const x = min.x + Math.random() * (max.x - min.x)
+      const y = min.y + Math.random() * (max.y - min.y)
+      const z = min.z + Math.random() * (max.z - min.z)
+      // lascas: pequenas e opacas, caem rápido
+      this.puff({ x, y, z, vx: (Math.random() - 0.5) * 4, vy: Math.random() * 4, vz: (Math.random() - 0.5) * 4, life: 0.6 + Math.random() * 0.5, size: 0.09, sizeEnd: 0.07, r: color[0], g: color[1], b: color[2], alpha: 1, gravity: 12, drag: 0.3, spin: (Math.random() - 0.5) * 12 })
     }
   }
 
   /** Lascas de um golpe de picareta (madeira, pedra ou metal). */
   chips(pos: THREE.Vector3, material: number): void {
     const color = DEBRIS_COLORS[material] ?? DEBRIS_COLORS[0]
-    for (let k = 0; k < 8; k++) {
-      this.spawnParticle(pos.x, pos.y, pos.z, (Math.random() - 0.5) * 2.4, Math.random() * 2.6, (Math.random() - 0.5) * 2.4, 0.35 + Math.random() * 0.3, color[0], color[1], color[2], 0.08)
+    for (let k = 0; k < this.n(7); k++) {
+      this.puff({ x: pos.x, y: pos.y, z: pos.z, vx: (Math.random() - 0.5) * 3, vy: Math.random() * 3, vz: (Math.random() - 0.5) * 3, life: 0.45 + Math.random() * 0.3, size: 0.07, sizeEnd: 0.05, r: color[0], g: color[1], b: color[2], alpha: 1, gravity: 12, drag: 0.4, spin: (Math.random() - 0.5) * 10 })
     }
+    this.puff({ x: pos.x, y: pos.y, z: pos.z, vy: 0.3, life: 0.7, size: 0.2, sizeEnd: 0.6, r: color[0] * 0.8, g: color[1] * 0.8, b: color[2] * 0.8, alpha: 0.4, drag: 2 })
+    if (material === 2) for (let k = 0; k < this.n(5); k++) this.spark({ x: pos.x, y: pos.y, z: pos.z, vx: (Math.random() - 0.5) * 5, vy: Math.random() * 4, vz: (Math.random() - 0.5) * 5, life: 0.2 + Math.random() * 0.2, size: 0.05, sizeEnd: 0.01, r: 2.2, g: 1.5, b: 0.6, gravity: 10 })
   }
 
   /** Texto flutuante (ex.: "+8 Madeira" ao coletar). */
@@ -265,43 +323,15 @@ export class Effects {
         this.flash.distance = 14
       }
     }
-    // partículas
-    let n = 0
-    for (let k = this.particles.length - 1; k >= 0; k--) {
-      const p = this.particles[k]
-      p.life -= dt
-      if (p.life <= 0) {
-        this.particles.splice(k, 1)
-        continue
-      }
-      p.vy -= 6 * dt
-      p.vx *= 1 - 2 * dt
-      p.vz *= 1 - 2 * dt
-      p.x += p.vx * dt
-      p.y += p.vy * dt
-      p.z += p.vz * dt
-    }
-    for (const p of this.particles) {
-      const f = p.life / p.max
-      this.pPos[n * 3] = p.x
-      this.pPos[n * 3 + 1] = p.y
-      this.pPos[n * 3 + 2] = p.z
-      this.pCol[n * 3] = p.r * f
-      this.pCol[n * 3 + 1] = p.g * f
-      this.pCol[n * 3 + 2] = p.b * f
-      this.pSize[n] = p.size * (1.4 - f * 0.4)
-      n++
-    }
-    const g = this.points.geometry
-    g.setDrawRange(0, n)
-    g.attributes.position.needsUpdate = true
-    g.attributes.color.needsUpdate = true
-    g.attributes.size.needsUpdate = true
+    // partículas e tremor
+    this.glow.update(dt)
+    this.smoke.update(dt)
+    this.shake *= Math.exp(-dt * 6)
     // explosões
     for (let k = this.blasts.length - 1; k >= 0; k--) {
       const b = this.blasts[k]
       b.life -= dt
-      const t = 1 - b.life / 0.45
+      const t = 1 - b.life / 0.35
       b.mesh.scale.setScalar(0.2 + b.radius * Math.min(1, t * 2.5))
       ;(b.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.9 * (1 - t))
       if (b.life <= 0) {
@@ -320,7 +350,11 @@ export class Effects {
       p.mesh.position.set(p.s.x, p.s.y, p.s.z)
       tmpV.set(p.s.vx, p.s.vy, p.s.vz)
       if (tmpV.lengthSq() > 0.01) p.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), tmpV.normalize())
-      if (p.def.fuse <= 0 && Math.random() < 0.6) this.spawnParticle(p.s.x, p.s.y, p.s.z, 0, 0.3, 0, 0.5, 0.4, 0.38, 0.35, 0.25)
+      // rastro do foguete: fumaça clara e um fio de fogo
+      if (p.def.fuse <= 0) {
+        this.puff({ x: p.s.x, y: p.s.y, z: p.s.z, vy: 0.3, life: 0.9 + Math.random() * 0.5, size: 0.25, sizeEnd: 0.9, r: 0.6, g: 0.58, b: 0.55, alpha: 0.55, drag: 1.5, spin: (Math.random() - 0.5) * 2 })
+        this.spark({ x: p.s.x, y: p.s.y, z: p.s.z, life: 0.08, size: 0.22, sizeEnd: 0.08, r: 2.5, g: 1.2, b: 0.4 })
+      }
     }
     // números de dano
     for (let k = this.numbers.length - 1; k >= 0; k--) {
@@ -349,6 +383,9 @@ export class Effects {
     }
     for (const d of this.numbers) d.el.remove()
     for (const d of this.disposables) d.dispose()
+    this.glow.dispose()
+    this.smoke.dispose()
+    this.decals.dispose()
     void up
   }
 }

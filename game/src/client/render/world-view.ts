@@ -7,7 +7,7 @@ import { buildPropMeshes, windUniform, type PropMeshes } from './props'
 import { createSky, updateSky } from './sky'
 import { buildStaticMeshes } from './static-geometry'
 import { createTerrainMaterial } from './terrain-material'
-import { buildTerrainMeshes, computeTerrainFields } from './terrain-mesh'
+import { buildTerrainMeshes, computeTerrainFields, type TerrainFields } from './terrain-mesh'
 import { GrassField } from './grass'
 import { textTexture, waterNormalTexture } from './textures'
 
@@ -31,6 +31,7 @@ export class WorldView {
   private readonly props: PropMeshes
   private readonly terrainMaterial: THREE.MeshStandardMaterial
   private readonly grass: GrassField | null
+  private readonly fields: TerrainFields
 
   constructor(readonly map: GameMap, renderer: THREE.WebGLRenderer, quality: QualityPreset) {
     const atm = map.def.atmosphere
@@ -79,6 +80,7 @@ export class WorldView {
 
     this.terrainMaterial = createTerrainMaterial(quality.post === 'nenhum')
     const fields = computeTerrainFields(map.terrain, map.def.biome, map.def.waterLevel)
+    this.fields = fields
     for (const mesh of buildTerrainMeshes(map.terrain, fields, this.terrainMaterial)) this.add(mesh)
     this.grass = quality.grass > 0 ? new GrassField(map.terrain, fields, map.boxes, map.def.waterLevel, quality.grass, quality.grassRadius) : null
     if (this.grass) this.scene.add(this.grass.mesh)
@@ -176,6 +178,18 @@ export class WorldView {
         this.disposables.push(post.geometry)
       }
     }
+  }
+
+  /** Camada dominante do chão de terra em (x, z): grama, terra, rocha, areia ou neve. */
+  groundLayer(x: number, z: number): 'grama' | 'terra' | 'rocha' | 'areia' | 'neve' {
+    const hf = this.map.terrain
+    const i = Math.max(0, Math.min(hf.n - 1, Math.round((x - hf.min) / hf.cell)))
+    const j = Math.max(0, Math.min(hf.n - 1, Math.round((z - hf.min) / hf.cell)))
+    const o = (j * hf.n + i) * 4
+    const w = this.fields.splat
+    const grass = 1 - (w[o] + w[o + 1] + w[o + 2] + w[o + 3])
+    const opts: [number, 'grama' | 'terra' | 'rocha' | 'areia' | 'neve'][] = [[grass, 'grama'], [w[o], 'terra'], [w[o + 1], 'rocha'], [w[o + 2], 'areia'], [w[o + 3], 'neve']]
+    return opts.reduce((a, b) => (b[0] > a[0] ? b : a))[1]
   }
 
   /** Adereço quebrado (árvore cortada, rocha minerada, caixote destruído). */

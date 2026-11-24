@@ -5,6 +5,7 @@ import { ITEM } from '../shared/config/items'
 import { CharacterModel, SKINS } from './character/character-model'
 import { loadCharacterAsset } from './character/character-assets'
 import { PostPipeline } from './render/post'
+import { Effects } from './game/effects'
 import { WorldView } from './render/world-view'
 import { QUALITY, type Quality } from './settings'
 
@@ -84,6 +85,12 @@ export async function startPhotoMode(root: HTMLElement, params: URLSearchParams)
     chars.push({ model, pose, x: cx, z: cz })
   }
 
+  // fx=1: explosão e tiros na frente da câmera, repetidos (para ver partículas e marcas)
+  const fx = params.get('fx') === '1' ? new Effects(world.scene, map.world, root, quality.particles) : null
+  ;(window as unknown as { __FX__?: unknown }).__FX__ = fx
+  const fxAt = new THREE.Vector3(x + fwd.x * num('dist', 9), 0, z + fwd.z * num('dist', 9))
+  fxAt.y = map.terrain.heightAt(fxAt.x, fxAt.z) + 0.3
+  let fxTimer = 0
   const focus = new THREE.Vector3(x, ground, z)
   const t0 = performance.now()
   let frames = 0
@@ -107,6 +114,18 @@ export async function startPhotoMode(root: HTMLElement, params: URLSearchParams)
         x: c.x, y: map.terrain.heightAt(c.x, c.z), z: c.z,
         vx: facing.x * sp, vy: 0, vz: facing.z * sp, yaw, pitch: c.pose.aim ? -0.05 : 0, flags: c.pose.flags,
       }, dt)
+    }
+    if (fx) {
+      fxTimer -= dt
+      if (fxTimer <= 0) {
+        fxTimer = num('fxEvery', 3)
+        fx.explosion(fxAt, 4.5)
+        for (let k = 0; k < 6; k++) {
+          const target = fxAt.clone().add(new THREE.Vector3(side.x * (k - 2.5) * 1.2, 0.2 - fxAt.y + map.terrain.heightAt(fxAt.x + side.x * (k - 2.5) * 1.2, fxAt.z + side.z * (k - 2.5) * 1.2), side.z * (k - 2.5) * 1.2))
+          fx.impact(target, 'world', camera.position)
+        }
+      }
+      fx.update(dt, camera, window.innerWidth, window.innerHeight)
     }
     world.update(focus, camera, t)
     renderer.info.reset()

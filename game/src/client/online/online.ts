@@ -22,6 +22,8 @@ export interface OnlineShell {
   /** Está numa partida (carregando, jogando, pausado, resultado). */
   inMatch(): boolean
   mainMenu(): void
+  /** Som de interface (avisos da plataforma). */
+  sound(name: 'partida-encontrada' | 'nivel' | 'ui-aviso' | 'ui-error' | 'ui-confirm'): void
 }
 
 const SESSION_KEY = 'ultima-chama:plataforma:'
@@ -204,21 +206,26 @@ export class OnlineController {
     switch (m.t) {
       case 'matchFound':
         if (this.view === 'match' || this.shell.inMatch()) return
+        this.shell.sound('partida-encontrada')
         this.play(m.match)
         return
       case 'partyInvite':
+        this.shell.sound('ui-aviso')
         if (this.home) this.home.addInvite('party', m.partyId, m.from.name)
         if (this.view !== 'home') this.shell.screens.toast(`${m.from.name} convidou você para o grupo — aceite na plataforma`, 'info', 6000)
         return
       case 'roomInvite':
+        this.shell.sound('ui-aviso')
         if (this.home) this.home.addInvite('room', m.code, m.from.name)
         if (this.view !== 'home') this.shell.screens.toast(`${m.from.name} criou a sala ${m.code}`, 'info', 6000)
         return
       case 'notice':
+        this.shell.sound(m.level === 'error' ? 'ui-error' : 'ui-aviso')
         this.shell.screens.toast(m.text, m.level, m.level === 'error' ? 7000 : 4500)
         return
       case 'reward': {
         const r = m.reward
+        this.shell.sound(r.levelAfter > r.levelBefore ? 'nivel' : 'ui-confirm')
         this.home?.showReward(r)
         if (this.view === 'match') {
           const lvl = r.levelAfter > r.levelBefore ? ` — nível ${r.levelAfter}!` : ''

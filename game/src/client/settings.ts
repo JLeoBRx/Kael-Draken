@@ -45,6 +45,8 @@ export interface Settings {
   online: OnlinePrefs
   /** Volume geral (0–1). */
   volume: number
+  /** Acessibilidade: sem tremor de câmera nem balanço. */
+  reduceMotion: boolean
 }
 
 export interface QualityPreset {
@@ -90,6 +92,7 @@ export const DEFAULT_SETTINGS: Settings = {
   offline: { mode: 'br', bots: 23, difficulty: 'normal', zone: 'normal', teamSize: 1, localPlayers: 1 },
   online: { address: '', teamSize: 1, region: 'sa', fill: true },
   volume: 0.7,
+  reduceMotion: false,
 }
 
 const KEY = 'ultima-chama:configuracoes:v1'
@@ -118,6 +121,7 @@ export function loadSettings(): Settings {
     showFps: typeof raw.showFps === 'boolean' ? raw.showFps : d.showFps,
     serverAddress: typeof raw.serverAddress === 'string' ? raw.serverAddress.slice(0, 200) : d.serverAddress,
     volume: num(raw.volume, 0, 1, d.volume),
+    reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : d.reduceMotion,
     offline: loadOffline(raw.offline, d.offline),
     online: loadOnline(raw.online, d.online),
   }
