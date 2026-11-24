@@ -67,7 +67,7 @@ export class NetSession {
   }
 
   /** `ticket`: bilhete da plataforma (servidores online). */
-  handshake(name: string, token = '', ticket = '', timeoutMs = 8000): Promise<Greeting> {
+  handshake(name: string, token = '', ticket = '', skin = 255, timeoutMs = 8000): Promise<Greeting> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('O servidor não respondeu ao handshake')), timeoutMs)
       this.welcomeWaiter = (g) => {
@@ -78,7 +78,7 @@ export class NetSession {
         clearTimeout(timer)
         reject(e)
       }
-      this.send(encodeHello(name, token, ticket))
+      this.send(encodeHello(name, token, ticket, skin))
     })
   }
 

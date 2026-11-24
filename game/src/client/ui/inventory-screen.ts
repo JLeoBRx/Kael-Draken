@@ -1,4 +1,5 @@
 import { AMMO_INFO, MATERIAL_INFO, NO_ITEM, RARITIES, itemDef } from '../../shared/config/items'
+import { rarityCss } from '../accessibility'
 import type { PlayerState } from '../../shared/player/player'
 import { h } from './dom'
 import { itemIconSvg } from './icons'
@@ -57,7 +58,7 @@ export class InventoryScreen {
       const def = itemDef(s.item)
       if (s.item === NO_ITEM || !def) return h('div', { class: 'inv-slot empty' }, h('i', {}, String(k + 1)), h('span', {}, 'Vazio'))
       const rarity = def.kind === 'consumable' ? def.rarity : s.rarity
-      const color = `#${(RARITIES[rarity]?.color ?? 0x888888).toString(16).padStart(6, '0')}`
+      const color = rarityCss(rarity)
       const detail = def.kind === 'weapon' ? `${s.ammo}/${def.magSize} · ${AMMO_INFO[def.ammoType].short}` : `×${s.count}`
       const card = h('div', { class: `inv-slot${k === p.selected ? ' selected' : ''}`, style: `--rarity:${color}`, 'data-slot': k },
         h('i', {}, String(k + 1)),

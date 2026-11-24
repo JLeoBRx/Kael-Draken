@@ -15,7 +15,7 @@ import { BinaryReader, BinaryWriter, ProtocolError } from './binary'
  * inventário). O servidor executa a simulação e devolve o estado oficial.
  */
 
-export const PROTOCOL_VERSION = 6
+export const PROTOCOL_VERSION = 7
 
 export const C2S = { Hello: 1, Input: 2, Ping: 3, Inventory: 4, Lobby: 5 } as const
 export const S2C = { Welcome: 10, Snapshot: 11, Pong: 12, PlayerInfo: 13, PlayerLeft: 14, Kick: 15, Events: 16, Lobby: 17 } as const
@@ -178,7 +178,7 @@ export const MAX_LOBBY_TEAMS = 25
 export type InventoryAction = { action: 'drop'; slot: number } | { action: 'swap'; a: number; b: number }
 
 export type ClientMessage =
-  | { type: 'hello'; version: number; name: string; token: string; ticket: string }
+  | { type: 'hello'; version: number; name: string; token: string; ticket: string; skin: number }
   | { type: 'lobby'; action: LobbyAction }
   | { type: 'input'; commands: InputCommand[] }
   | { type: 'ping'; time: number }
@@ -265,8 +265,15 @@ export const MAX_TICKET_LENGTH = 1024
  * `token`: volta ao mesmo personagem depois de uma queda. `ticket`: bilhete
  * assinado pela plataforma (servidores online só aceitam quem tem um).
  */
-export function encodeHello(name: string, token = '', ticket = ''): Uint8Array {
-  return new BinaryWriter(128 + ticket.length).u8(C2S.Hello).u16(PROTOCOL_VERSION).string(name).string(token.slice(0, 64)).string(ticket.slice(0, MAX_TICKET_LENGTH)).finish()
+/** Visual pedido no Hello quando a pessoa não escolheu (o servidor sorteia). */
+export const NO_SKIN = 255
+
+/**
+ * `token`: volta ao mesmo personagem. `ticket`: bilhete da plataforma (online:
+ * nome e visual vêm dele). `skin`: visual escolhido no armário (offline/LAN).
+ */
+export function encodeHello(name: string, token = '', ticket = '', skin = NO_SKIN): Uint8Array {
+  return new BinaryWriter(128 + ticket.length).u8(C2S.Hello).u16(PROTOCOL_VERSION).string(name).string(token.slice(0, 64)).string(ticket.slice(0, MAX_TICKET_LENGTH)).u8(skin & 0xff).finish()
 }
 
 function writeLobbyConfig(w: BinaryWriter, c: LobbyConfig): void {
@@ -340,7 +347,7 @@ export function decodeClientMessage(data: Uint8Array): ClientMessage {
   let msg: ClientMessage
   switch (type) {
     case C2S.Hello:
-      msg = { type: 'hello', version: r.u16(), name: r.string(128), token: r.string(64), ticket: r.string(MAX_TICKET_LENGTH) }
+      msg = { type: 'hello', version: r.u16(), name: r.string(128), token: r.string(64), ticket: r.string(MAX_TICKET_LENGTH), skin: r.u8() }
       break
     case C2S.Lobby: {
       const op = r.u8()

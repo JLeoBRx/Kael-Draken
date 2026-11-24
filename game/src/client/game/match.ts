@@ -30,6 +30,7 @@ import { QUALITY, type Settings } from '../settings'
 import type { BattleHud, Hud, MatchResult } from '../ui/hud'
 import { FullMapView, MinimapView, gridRef, renderMapImage } from '../ui/minimap'
 import { Effects } from './effects'
+import { colorVision, correctionMatrix, rarityCss } from '../accessibility'
 import { StepTracker, type StepEvent } from './footsteps'
 import { WorldItemsView } from './world-items'
 
@@ -287,6 +288,15 @@ export class Match {
     const size = deps.renderer.getSize(new THREE.Vector2())
     this.cam = new ThirdPersonCamera(size.x / Math.max(1, size.y), deps.settings.fov, quality.drawDistance)
     this.post = quality.post !== 'nenhum' ? new PostPipeline(deps.renderer, this.world.scene, this.cam.camera, quality.post) : null
+    this.post?.setColorCorrection(correctionMatrix(colorVision()))
+    // indicador visual de som: direção relativa à câmera
+    deps.audio.onCue = (kind, x, _y, z, loud) => {
+      if (!this.deps.settings.soundCues || this.ended) return
+      const c = this.cam.camera.position
+      if (Math.hypot(x - c.x, z - c.z) < 1.5 || Math.hypot(x - c.x, z - c.z) > 120) return
+      const ang = wrapAngle(Math.atan2(-(x - c.x), -(z - c.z)) - this.yaw)
+      this.deps.hud.soundCue(-ang, kind, loud)
+    }
     this.predictor = new Predictor(map.world, this.dt, playerId)
     this.local = new CharacterModel(SKINS[0])
     this.world.scene.add(this.local.root)
@@ -622,8 +632,9 @@ export class Match {
   private finish(victory: boolean, place: number): void {
     if (this.result || this.gameMode !== GameMode.BattleRoyale) return
     const seconds = this.startedTick >= 0 ? Math.max(0, (this.serverTick - this.startedTick) / this.tickRate) : 0
-    this.result = { victory, place, total: Math.max(this.participants, place), kills: this.kills, damage: this.damageDealt, seconds }
-    if (victory) this.deps.audio.play('chest')
+    const by = !victory && this.death?.killer ? this.nameOf(this.death.killer) : null
+    this.result = { victory, place, total: Math.max(this.participants, place), kills: this.kills, damage: this.damageDealt, seconds, eliminatedBy: by }
+    this.deps.audio.play(victory ? 'nivel' : 'ui-error')
     this.deps.hud.setDeath(null)
     this.onResult?.(this.result)
   }
@@ -855,6 +866,7 @@ export class Match {
 
   applySettings(s: Settings): void {
     this.cam.setBaseFov(s.fov)
+    this.post?.setColorCorrection(correctionMatrix(s.colorVision))
   }
 
   sendInventory(op: InventoryAction): void {
@@ -1096,7 +1108,7 @@ export class Match {
         const it = this.items.items.get(pick.id)
         if (it) {
           const idef = itemDef(it.item)
-          const color = `#${(RARITIES[idef?.kind === 'consumable' ? idef.rarity : it.rarity]?.color ?? 0xffffff).toString(16).padStart(6, '0')}`
+          const color = rarityCss(idef?.kind === 'consumable' ? idef.rarity : it.rarity)
           const n = idef?.kind === 'weapon' ? '' : ` ×${it.count}`
           this.prompt = `<kbd>E</kbd> Pegar <b style="color:${color}">${escapeHtml(itemLabel(it.item, idef?.kind === 'weapon' ? it.rarity : undefined))}</b>${n}`
         }

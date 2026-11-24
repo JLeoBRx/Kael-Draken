@@ -1,4 +1,5 @@
 import { BuildKind } from '../../shared/config/building'
+import { DEFAULT_KEYS, type Action } from '../accessibility'
 import { Buttons } from '../../shared/movement/character'
 import { PICKAXE_SLOT } from '../../shared/player/player'
 import type { Settings } from '../settings'
@@ -32,32 +33,12 @@ export interface InputFrame {
   cycleMaterial: boolean
 }
 
-export const KEYBINDINGS = {
-  forward: ['KeyW', 'ArrowUp'],
-  back: ['KeyS', 'ArrowDown'],
-  left: ['KeyA', 'ArrowLeft'],
-  right: ['KeyD', 'ArrowRight'],
-  jump: ['Space'],
-  sprint: ['ShiftLeft', 'ShiftRight'],
-  crouch: ['KeyC'],
-  walk: ['AltLeft', 'KeyX'],
-  reload: ['KeyR'],
-  use: ['KeyE', 'KeyF'],
-  buildWall: ['KeyQ'],
-  buildFloor: ['KeyZ'],
-  buildRamp: ['KeyV'],
-  buildRoof: ['KeyT'],
-  material: ['KeyG'],
-} as const
+/** Teclas padrão (as da pessoa vêm das configurações). */
+export const KEYBINDINGS = DEFAULT_KEYS
 
 /** Tecla 1 = picareta; 2–6 = espaços do inventário. */
 const SLOT_KEYS: Record<string, number> = { Digit1: PICKAXE_SLOT, Digit2: 0, Digit3: 1, Digit4: 2, Digit5: 3, Digit6: 4 }
-const BUILD_KEYS: Record<string, number> = {
-  KeyQ: BuildKind.Wall,
-  KeyZ: BuildKind.Floor,
-  KeyV: BuildKind.Ramp,
-  KeyT: BuildKind.Roof,
-}
+const BUILD_ACTIONS: [Action, number][] = [['buildWall', BuildKind.Wall], ['buildFloor', BuildKind.Floor], ['buildRamp', BuildKind.Ramp], ['buildRoof', BuildKind.Roof]]
 
 /** Radianos por pixel de mouse com sensibilidade 1. */
 const MOUSE_RAD_PER_PX = 0.0022
@@ -283,16 +264,16 @@ export class InputManager {
     const slot = SLOT_KEYS[e.code]
     if (slot !== undefined) this.slotDirect = slot
     if (!e.repeat) {
-      const build = BUILD_KEYS[e.code]
-      if (build !== undefined) this.buildDirect = build
-      if ((KEYBINDINGS.reload as readonly string[]).includes(e.code)) this.rotateLatch = true
-      if ((KEYBINDINGS.material as readonly string[]).includes(e.code)) this.materialLatch = true
+      const K = this.settings.keys
+      for (const [action, kind] of BUILD_ACTIONS) if (K[action].includes(e.code)) this.buildDirect = kind
+      if (K.reload.includes(e.code)) this.rotateLatch = true
+      if (K.material.includes(e.code)) this.materialLatch = true
     }
-    if (!e.repeat && (KEYBINDINGS.use as readonly string[]).includes(e.code)) this.tickLatch |= Buttons.Use
-    if (!e.repeat && (KEYBINDINGS.reload as readonly string[]).includes(e.code)) this.tickLatch |= Buttons.Reload
+    if (!e.repeat && this.settings.keys.use.includes(e.code)) this.tickLatch |= Buttons.Use
+    if (!e.repeat && this.settings.keys.reload.includes(e.code)) this.tickLatch |= Buttons.Reload
     // Evita rolagem da página, menu do Alt e afins durante o jogo.
-    if (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'AltLeft' || e.code === 'Tab') e.preventDefault()
-    if (!e.repeat && (KEYBINDINGS.jump as readonly string[]).includes(e.code)) this.tickLatch |= Buttons.Jump
+    if (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'AltLeft' || e.code === 'Tab' || this.settings.keys.walk.includes(e.code)) e.preventDefault()
+    if (!e.repeat && this.settings.keys.jump.includes(e.code)) this.tickLatch |= Buttons.Jump
     this.keys.add(e.code)
   }
 
@@ -342,19 +323,19 @@ export class InputManager {
       return out
     }
 
-    let f = (this.any(KEYBINDINGS.forward) ? 1 : 0) - (this.any(KEYBINDINGS.back) ? 1 : 0)
-    let r = (this.any(KEYBINDINGS.right) ? 1 : 0) - (this.any(KEYBINDINGS.left) ? 1 : 0)
+    let f = (this.any(this.settings.keys.forward) ? 1 : 0) - (this.any(this.settings.keys.back) ? 1 : 0)
+    let r = (this.any(this.settings.keys.right) ? 1 : 0) - (this.any(this.settings.keys.left) ? 1 : 0)
     let buttons = 0
-    if (this.any(KEYBINDINGS.jump)) buttons |= Buttons.Jump
+    if (this.any(this.settings.keys.jump)) buttons |= Buttons.Jump
     buttons |= this.tickLatch
-    if (this.any(KEYBINDINGS.sprint)) buttons |= Buttons.Sprint
-    if (this.any(KEYBINDINGS.walk)) buttons |= Buttons.Walk
+    if (this.any(this.settings.keys.sprint)) buttons |= Buttons.Sprint
+    if (this.any(this.settings.keys.walk)) buttons |= Buttons.Walk
     if (this.mouseButtons & (1 << 2)) buttons |= Buttons.Aim
     if (this.mouseButtons & 1) buttons |= Buttons.Fire
-    if (this.any(KEYBINDINGS.reload)) buttons |= Buttons.Reload
-    if (this.any(KEYBINDINGS.use)) buttons |= Buttons.Use
+    if (this.any(this.settings.keys.reload)) buttons |= Buttons.Reload
+    if (this.any(this.settings.keys.use)) buttons |= Buttons.Use
 
-    let crouchHeld = this.any(KEYBINDINGS.crouch)
+    let crouchHeld = this.any(this.settings.keys.crouch)
     let crouchEdge = crouchHeld && !this.crouchHeldPrev
     this.crouchHeldPrev = crouchHeld
     if (pad) {

@@ -1,5 +1,6 @@
 import { BUILD, BUILD_KIND_NAMES, BUILD_MATERIALS, BuildKind } from '../../shared/config/building'
-import { AMMO_INFO, ITEM, MATERIAL_INFO, NO_ITEM, RARITIES, itemDef } from '../../shared/config/items'
+import { AMMO_INFO, ITEM, MATERIAL_INFO, NO_ITEM, itemDef } from '../../shared/config/items'
+import { rarityCss } from '../accessibility'
 import { MAX_HEALTH, MAX_SHIELD, PICKAXE_SLOT, type Slot } from '../../shared/player/player'
 import { h } from './dom'
 import { buildIconSvg, itemIconSvg } from './icons'
@@ -79,6 +80,8 @@ export interface MatchResult {
   kills: number
   damage: number
   seconds: number
+  /** Quem eliminou (derrota), se foi alguém. */
+  eliminatedBy?: string | null
 }
 
 /** Tecla de cada peça (mesma ordem de BuildKind). */
@@ -191,6 +194,7 @@ export class Hud {
     this.crossEl = h('div', { class: 'crosshair' }, ...this.cross)
     this.hitEl = h('div', { class: 'hitmarker', 'data-hud': 'hitmarker' }, h('i'), h('i'), h('i'), h('i'))
     this.dirLayer = h('div', { class: 'damage-dirs' })
+    this.cueLayer = h('div', { class: 'sound-cues', 'data-hud': 'sound-cues' })
 
     this.shieldFill = h('span', { class: 'fill' })
     this.shieldText = h('b')
@@ -253,6 +257,7 @@ export class Hud {
       this.targetEl,
       this.hitEl,
       this.dirLayer,
+      this.cueLayer,
       h('div', { class: 'compass' }, this.strip, h('div', { class: 'needle' })),
       this.headingEl,
       this.phaseEl,
@@ -293,6 +298,26 @@ export class Hud {
   }
 
   /** Indicador de dano vindo de `angle` (rad, relativo à frente da câmera; 0 = frente). */
+  private readonly cueLayer: HTMLElement
+  private readonly cueAt = new Map<string, number>()
+
+  /**
+   * Indicador visual de som (acessibilidade): um arco em volta da mira na
+   * direção do som (`angle` relativo à câmera, 0 = à frente), com a cor do tipo.
+   */
+  soundCue(angle: number, kind: string, strength: number): void {
+    // um por tipo e direção a cada 0,25 s (rajadas não viram uma parede de arcos)
+    const key = `${kind}:${Math.round(angle / 0.3)}`
+    const now = performance.now()
+    if ((this.cueAt.get(key) ?? 0) > now - 250) return
+    this.cueAt.set(key, now)
+    const el = h('div', { class: `sound-cue ${kind}` })
+    el.style.transform = `rotate(${(angle * 180) / Math.PI}deg)`
+    el.style.opacity = String(0.45 + Math.min(1, strength) * 0.55)
+    this.cueLayer.append(el)
+    setTimeout(() => el.remove(), 1300)
+  }
+
   damageFrom(angle: number): void {
     const el = h('div', { class: 'dmg-dir' })
     el.style.transform = `rotate(${(angle * 180) / Math.PI}deg)`
@@ -312,7 +337,7 @@ export class Hud {
 
   pickupToast(text: string, rarity: number): void {
     const el = h('div', { class: 'pickup-line' }, text)
-    el.style.borderLeftColor = `#${(RARITIES[rarity]?.color ?? 0xffffff).toString(16).padStart(6, '0')}`
+    el.style.borderLeftColor = rarityCss(rarity)
     this.toastsEl.append(el)
     while (this.toastsEl.children.length > 4) this.toastsEl.firstElementChild?.remove()
     setTimeout(() => el.remove(), 2600)
@@ -347,6 +372,7 @@ export class Hud {
       h('div', { class: 'results-panel' },
         h('div', { class: 'results-place', 'data-result': r.victory ? 'vitoria' : 'derrota' }, r.victory ? 'Vitória!' : `#${r.place}`),
         h('div', { class: 'results-sub' }, r.victory ? `A última chama de ${r.total}` : `Você ficou em ${r.place}º de ${r.total}`),
+        !r.victory && r.eliminatedBy ? h('div', { class: 'results-by' }, `Eliminado por ${r.eliminatedBy}`) : null,
         h('div', { class: 'results-stats' },
           h('div', {}, h('b', {}, String(r.kills)), h('span', {}, r.kills === 1 ? 'eliminação' : 'eliminações')),
           h('div', {}, h('b', {}, String(Math.round(r.damage))), h('span', {}, 'de dano')),
@@ -368,7 +394,7 @@ export class Hud {
       const el = this.slotEls[k]
       const def = itemDef(s.item)
       el.className = `slot${k === selected && !building ? ' selected' : ''}${s.item === NO_ITEM ? ' empty' : ''}`
-      const color = s.item === NO_ITEM ? '' : `#${(RARITIES[def?.kind === 'consumable' ? def.rarity : s.rarity]?.color ?? 0x888888).toString(16).padStart(6, '0')}`
+      const color = s.item === NO_ITEM ? '' : rarityCss(def?.kind === 'consumable' ? def.rarity : s.rarity)
       el.style.setProperty('--rarity', color || 'transparent')
       el.innerHTML = s.item === NO_ITEM ? `<i>${k + 2}</i>` : `<i>${k + 2}</i>${itemIconSvg(s.item)}<small>${def?.kind === 'weapon' ? s.ammo : `×${s.count}`}</small>`
       el.title = def ? def.name : 'Vazio'

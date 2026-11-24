@@ -440,7 +440,7 @@ export class GameHost {
     }
     switch (msg.type) {
       case 'hello':
-        this.handleHello(slot, msg.version, msg.name, msg.token, msg.ticket)
+        this.handleHello(slot, msg.version, msg.name, msg.token, msg.ticket, msg.skin)
         break
       case 'input':
         if (slot.player) this.sim.enqueue(slot.player.id, msg.commands)
@@ -457,7 +457,7 @@ export class GameHost {
     }
   }
 
-  private handleHello(slot: ClientSlot, version: number, rawName: string, token: string, ticket: string): void {
+  private handleHello(slot: ClientSlot, version: number, rawName: string, token: string, ticket: string, skin = 255): void {
     if (slot.hello) return
     if (version !== PROTOCOL_VERSION) {
       this.kick(slot, `Versão incompatível (servidor ${PROTOCOL_VERSION}, cliente ${version})`)
@@ -510,7 +510,8 @@ export class GameHost {
     }
     slot.hello = true
     slot.name = claims ? sanitizeName(claims.name) : sanitizeName(rawName)
-    slot.skin = claims ? ((claims.skin % SKINS) + SKINS) % SKINS : (this.sim.tick + slot.conn.id) % SKINS
+    // online: o visual é o da conta (bilhete); offline/LAN: o escolhido no armário, ou sorteado
+    slot.skin = claims ? ((claims.skin % SKINS) + SKINS) % SKINS : skin < SKINS ? skin : (this.sim.tick + slot.conn.id) % SKINS
     if (claims) slot.wantTeam = Math.max(-1, Math.min(MAX_LOBBY_TEAMS - 1, claims.team))
     if (this.lobbyEnabled) {
       if (!this.owner || (this.opts.ownerUid && slot.uid === this.opts.ownerUid)) this.owner = slot.conn.id

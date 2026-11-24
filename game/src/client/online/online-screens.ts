@@ -72,7 +72,7 @@ export function loginScreen(defaults: { name: string; address: string }, a: Logi
   const enter = h('button', { class: 'btn primary small', type: 'submit', 'data-action': 'online-login' }, h('span', { class: 'label' }, 'Entrar'))
   const advanced = h('details', { class: 'advanced' }, h('summary', {}, 'Outro endereço de plataforma'), h('label', {}, 'Endereço da plataforma', address))
   if (defaults.address) advanced.open = true
-  const el = h('div', { class: 'screen', 'data-screen': 'online-login' },
+  const el = h('div', { class: 'screen stage', 'data-screen': 'online-login' },
     h('div', { class: 'panel', style: 'width:min(520px,100%)' },
       h('h2', {}, 'Jogar online'),
       h('p', { class: 'hint' }, 'Sem senha: o seu nome é a sua conta. Entre com o mesmo nome em qualquer computador para continuar com o seu nível, amigos e estatísticas.'),

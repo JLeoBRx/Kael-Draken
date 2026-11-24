@@ -5,6 +5,7 @@
  */
 
 import { isBotDifficulty, type BotDifficulty } from '../server/core/bots/profiles'
+import { ACTIONS, DEFAULT_KEYS, RESERVED_KEYS, type ColorVision, type KeyMap } from './accessibility'
 
 export type Quality = 'baixa' | 'media' | 'alta'
 
@@ -31,6 +32,8 @@ export interface OnlinePrefs {
 
 export interface Settings {
   playerName: string
+  /** Visual escolhido no armário (offline/LAN; online vale o da conta). */
+  skin: number
   /** Multiplicador da sensibilidade do mouse/controle. */
   sensitivity: number
   /** Multiplicador extra ao mirar. */
@@ -47,6 +50,17 @@ export interface Settings {
   volume: number
   /** Acessibilidade: sem tremor de câmera nem balanço. */
   reduceMotion: boolean
+  /** Correção e paleta para daltonismo. */
+  colorVision: ColorVision
+  /** Mostrar de onde vêm tiros, passos e explosões. */
+  soundCues: boolean
+  /** Escala da interface (0,8–1,4). */
+  uiScale: number
+  crosshairColor: string
+  /** Tamanho da mira (0,6–1,8). */
+  crosshairSize: number
+  /** Teclas por ação. */
+  keys: KeyMap
 }
 
 export interface QualityPreset {
@@ -81,6 +95,7 @@ export const QUALITY: Record<Quality, QualityPreset> = {
 
 export const DEFAULT_SETTINGS: Settings = {
   playerName: '',
+  skin: 0,
   sensitivity: 1,
   aimSensitivity: 0.7,
   invertY: false,
@@ -93,6 +108,12 @@ export const DEFAULT_SETTINGS: Settings = {
   online: { address: '', teamSize: 1, region: 'sa', fill: true },
   volume: 0.7,
   reduceMotion: false,
+  colorVision: 'normal',
+  soundCues: false,
+  uiScale: 1,
+  crosshairColor: '#ffffff',
+  crosshairSize: 1,
+  keys: DEFAULT_KEYS,
 }
 
 const KEY = 'ultima-chama:configuracoes:v1'
@@ -112,6 +133,7 @@ export function loadSettings(): Settings {
   const d = DEFAULT_SETTINGS
   return {
     playerName: typeof raw.playerName === 'string' ? raw.playerName.slice(0, 16) : d.playerName,
+    skin: Number.isInteger(raw.skin) && (raw.skin as number) >= 0 && (raw.skin as number) < 8 ? (raw.skin as number) : d.skin,
     sensitivity: num(raw.sensitivity, 0.1, 4, d.sensitivity),
     aimSensitivity: num(raw.aimSensitivity, 0.2, 1.5, d.aimSensitivity),
     invertY: typeof raw.invertY === 'boolean' ? raw.invertY : d.invertY,
@@ -122,9 +144,26 @@ export function loadSettings(): Settings {
     serverAddress: typeof raw.serverAddress === 'string' ? raw.serverAddress.slice(0, 200) : d.serverAddress,
     volume: num(raw.volume, 0, 1, d.volume),
     reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : d.reduceMotion,
+    colorVision: raw.colorVision === 'protanopia' || raw.colorVision === 'deuteranopia' || raw.colorVision === 'tritanopia' ? raw.colorVision : 'normal',
+    soundCues: typeof raw.soundCues === 'boolean' ? raw.soundCues : d.soundCues,
+    uiScale: num(raw.uiScale, 0.8, 1.4, d.uiScale),
+    crosshairColor: typeof raw.crosshairColor === 'string' && /^#[0-9a-f]{6}$/i.test(raw.crosshairColor) ? raw.crosshairColor : d.crosshairColor,
+    crosshairSize: num(raw.crosshairSize, 0.6, 1.8, d.crosshairSize),
+    keys: loadKeys(raw.keys),
     offline: loadOffline(raw.offline, d.offline),
     online: loadOnline(raw.online, d.online),
   }
+}
+
+/** Teclas salvas: só códigos de tecla válidos, sem as reservadas; o que faltar volta ao padrão. */
+function loadKeys(v: unknown): KeyMap {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
+  const out = {} as Record<(typeof ACTIONS)[number], readonly string[]>
+  for (const a of ACTIONS) {
+    const list = Array.isArray(o[a]) ? (o[a] as unknown[]).filter((c): c is string => typeof c === 'string' && /^[A-Za-z0-9]{2,20}$/.test(c) && !RESERVED_KEYS.has(c)) : []
+    out[a] = list.length ? list.slice(0, 3) : DEFAULT_KEYS[a]
+  }
+  return out
 }
 
 function loadOnline(v: unknown, d: OnlinePrefs): OnlinePrefs {

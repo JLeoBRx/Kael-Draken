@@ -127,8 +127,8 @@ kbd { display: inline-block; min-width: 26px; padding: 3px 8px; margin: 0 2px; b
 /* ---------- HUD ---------- */
 .hud { position: absolute; inset: 0; pointer-events: none; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
 .hud[hidden] { display: none; }
-.crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
-.crosshair i { position: absolute; background: #fff; box-shadow: 0 0 2px rgba(0,0,0,0.9); border-radius: 1px; transition: transform 0.06s linear; }
+.crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform: scale(var(--crosshair-scale, 1)); }
+.crosshair i { position: absolute; background: var(--crosshair-color, #fff); box-shadow: 0 0 2px rgba(0,0,0,0.9); border-radius: 1px; transition: transform 0.06s linear; }
 .crosshair .t, .crosshair .b { width: 2px; height: 8px; left: -1px; }
 .crosshair .l, .crosshair .r { width: 8px; height: 2px; top: -1px; }
 .crosshair .dot { width: 3px; height: 3px; left: -1.5px; top: -1.5px; border-radius: 50%; }
@@ -343,7 +343,7 @@ kbd { display: inline-block; min-width: 26px; padding: 3px 8px; margin: 0 2px; b
 
 /* ===================== Fase 5: equipes e sala de espera ===================== */
 .team-panel { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
-.team-panel .mate { display: grid; grid-template-columns: 110px 120px; align-items: center; gap: 8px; font-size: 12px; padding: 4px 8px; border-radius: 6px; background: rgba(10,14,20,0.6); border-left: 3px solid #5cf08a; }
+.team-panel .mate { display: grid; grid-template-columns: 110px 120px; align-items: center; gap: 8px; font-size: 12px; padding: 4px 8px; border-radius: 6px; background: rgba(10,14,20,0.6); border-left: 3px solid var(--mate-color, #5cf08a); }
 .team-panel .mate.out { opacity: 0.45; border-left-color: #888; }
 .team-panel .mate b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .team-panel .bars { display: flex; flex-direction: column; gap: 2px; }
@@ -454,3 +454,56 @@ table.history th { text-align: left; color: var(--muted); font-weight: 600; padd
 table.history td { padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-variant-numeric: tabular-nums; }
 table.history td.ok { color: var(--ok); font-weight: 700; }
 .online-meta .btn, .code-row > .btn { width: auto; flex: 0 0 auto; }
+
+/* ---------- vitrine 3D (menu, armário, entrada online) ---------- */
+.screen.stage {
+  background: linear-gradient(90deg, rgba(9, 12, 17, 0.94) 0%, rgba(9, 12, 17, 0.82) 38%, rgba(9, 12, 17, 0.15) 62%, rgba(9, 12, 17, 0) 100%);
+  justify-content: flex-start;
+}
+.screen.stage::before { display: none; }
+.screen.stage .menu { grid-template-columns: 1fr; width: min(520px, 100%); gap: 26px; margin-left: max(0px, 4vw); }
+.screen.stage .panel { margin-left: max(0px, 4vw); }
+@media (max-width: 760px) { .screen.stage { background: rgba(9, 12, 17, 0.88); } }
+.locker { width: min(460px, 100%); }
+.locker-name { font-family: var(--display); font-style: italic; text-transform: uppercase; font-size: 30px; color: var(--accent); margin: 6px 0 12px; }
+.locker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.skin.big { aspect-ratio: 1; border-width: 3px; border-radius: 12px; }
+
+/* ---------- acessibilidade ---------- */
+.ui-layer > .hud, .ui-layer > .screen > *, .ui-layer > .toast { zoom: var(--ui-scale, 1); }
+.sound-cues { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.sound-cue { position: absolute; left: -95px; top: -95px; width: 190px; height: 190px; border-radius: 50%; border-top: 5px solid rgba(255,255,255,0.85); animation: fade-out 1.3s ease forwards; filter: drop-shadow(0 0 3px rgba(0,0,0,0.9)); }
+.sound-cue.tiro { border-top-color: #ff5a5a; }
+.sound-cue.passo { border-top-color: #f2f5f8; border-top-width: 3px; }
+.sound-cue.explosao { border-top-color: #ff9a2f; border-top-width: 8px; }
+.sound-cue.bau { border-top-color: #ffd23f; }
+.sound-cue.construcao { border-top-color: #4fc3ff; }
+.keymap { width: 100%; border-collapse: collapse; font-size: 14px; }
+.keymap td { padding: 5px 6px; border-bottom: 1px solid var(--line); }
+.keymap td:last-child { text-align: right; white-space: nowrap; }
+.keymap button.key { min-width: 64px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.06); color: var(--text); font-weight: 700; cursor: pointer; }
+.keymap button.key.listening { border-color: var(--accent); color: var(--accent); animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: 0.5; } }
+.settings-section { margin: 18px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-2); }
+.screen.stage .title { font-size: clamp(36px, 5.2vw, 64px); }
+.screen.stage .menu .row > .btn { flex: 1 1 96px; }
+.screen.stage .menu .btn .sub { font-size: 12px; }
+/* resultado: entrada em etapas; vitória com raios */
+.results-panel { position: relative; overflow: hidden; }
+.results-place { animation: place-pop 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+@keyframes place-pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.results-sub, .results-by { animation: toast-in 0.4s 0.25s ease both; }
+.results-by { margin-top: 4px; color: #ff8f7a; font-size: 14px; }
+.results-stats div { animation: toast-in 0.35s ease both; }
+.results-stats div:nth-child(1) { animation-delay: 0.4s; }
+.results-stats div:nth-child(2) { animation-delay: 0.55s; }
+.results-stats div:nth-child(3) { animation-delay: 0.7s; }
+.results.victory .results-panel::before {
+  content: ""; position: absolute; left: 50%; top: 40px; width: 900px; height: 900px; margin: -450px 0 0 -450px; z-index: -1; opacity: 0.35;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 190, 80, 0.55) 0deg 8deg, transparent 8deg 24deg);
+  mask-image: radial-gradient(circle, #000 0%, transparent 60%); animation: rays 14s linear infinite;
+}
+.results.victory .results-panel { border-color: rgba(255, 190, 80, 0.55); box-shadow: 0 0 60px rgba(255, 140, 40, 0.25); }
+@keyframes rays { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .results.victory .results-panel::before { animation: none; } }
+.results-panel { isolation: isolate; }

@@ -2,6 +2,7 @@ import { GAME } from '../../shared/config/game'
 import { MOVE } from '../../shared/config/movement'
 import { PROTOCOL_VERSION, type LobbyState } from '../../shared/net/protocol'
 import { QUALITY, type OfflinePrefs, type Quality, type Settings } from '../settings'
+import { ACTIONS, ACTION_LABEL, COLOR_VISION_LABEL, DEFAULT_KEYS, RESERVED_KEYS, keyLabel, rebind, type Action, type ColorVision } from '../accessibility'
 import { BOT_DIFFICULTIES, BOT_PROFILES } from '../../server/core/bots/profiles'
 import { historyTotals, type MatchRecord } from '../history'
 import { EMBLEM_SVG, h } from './dom'
@@ -31,6 +32,7 @@ export interface MainMenuActions {
   playOffline(): void
   online(): void
   join(): void
+  locker(): void
   settings(): void
   controls(): void
   history(): void
@@ -107,7 +109,7 @@ export class Screens {
       onlineBtn.disabled = true
       joinBtn.disabled = true
     }
-    this.show(h('div', { class: 'screen', 'data-screen': 'menu' },
+    this.show(h('div', { class: 'screen stage', 'data-screen': 'menu' },
       h('div', { class: 'menu' },
         h('div', { class: 'brand' },
           emblem,
@@ -120,6 +122,7 @@ export class Screens {
           onlineBtn,
           joinBtn,
           h('div', { class: 'row' },
+            h('button', { class: 'btn small', 'data-action': 'locker', onclick: () => a.locker() }, h('span', { class: 'label' }, 'Armário')),
             h('button', { class: 'btn small', 'data-action': 'settings', onclick: () => a.settings() }, h('span', { class: 'label' }, 'Configurações')),
             h('button', { class: 'btn small', 'data-action': 'controls', onclick: () => a.controls() }, h('span', { class: 'label' }, 'Controles')),
             h('button', { class: 'btn small', 'data-action': 'history', onclick: () => a.history() }, h('span', { class: 'label' }, 'Histórico'))))),
@@ -127,6 +130,29 @@ export class Screens {
         h('span', {}, `v${GAME.version} · protocolo ${PROTOCOL_VERSION}`),
         h('span', {}, 'Próxima fase: polimento (arte, som e efeitos finais)'))))
     playBtn.focus()
+  }
+
+  /** Armário: escolhe o visual (offline/LAN; online usa o da conta, liberado por nível). */
+  locker(skins: readonly { name: string; armor: number; suit: number; accent: number }[], current: number, a: { pick(skin: number): void; back(): void }): void {
+    const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`
+    const name = h('div', { class: 'locker-name', 'data-hud': 'locker-name' }, skins[current]?.name ?? '')
+    const grid = h('div', { class: 'locker-grid' }, ...skins.map((sk, k) => h('button', {
+      class: `skin big${k === current ? ' on' : ''}`, 'data-skin': k, title: sk.name, 'aria-label': `Visual ${sk.name}`,
+      style: `background:linear-gradient(135deg, ${hex(sk.armor)} 0 50%, ${hex(sk.suit)} 50%);border-color:${hex(sk.accent)}`,
+      onclick: (e: Event) => {
+        grid.querySelectorAll('.skin').forEach((b) => b.classList.remove('on'))
+        ;(e.currentTarget as HTMLElement).classList.add('on')
+        name.textContent = sk.name
+        a.pick(k)
+      },
+    })))
+    this.show(h('div', { class: 'screen stage', 'data-screen': 'locker' },
+      h('div', { class: 'panel locker' },
+        h('h2', {}, 'Armário'),
+        h('p', { class: 'hint' }, 'Escolha o visual do seu personagem. Vale nas partidas offline e na rede local; online, cada visual libera com o nível da conta.'),
+        name,
+        grid,
+        h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn small', 'data-action': 'back', onclick: () => a.back() }, h('span', { class: 'label' }, 'Voltar'))))))
   }
 
   join(defaults: { name: string; address: string }, onConnect: (name: string, address: string) => void, onBack: () => void): { setStatus(text: string, error?: boolean): void; setBusy(busy: boolean): void; setLan(list: LanEntry[] | null): void } {
@@ -371,7 +397,7 @@ export class Screens {
   settings(s: Settings, onChange: (s: Settings) => void, onClose: () => void): void {
     const next = { ...s }
     const commit = () => onChange({ ...next })
-    const range = (key: 'sensitivity' | 'aimSensitivity' | 'fov' | 'volume', label: string, min: number, max: number, step: number, fmt: (v: number) => string, hint?: string) => {
+    const range = (key: 'sensitivity' | 'aimSensitivity' | 'fov' | 'volume' | 'uiScale' | 'crosshairSize', label: string, min: number, max: number, step: number, fmt: (v: number) => string, hint?: string) => {
       const out = h('output', {}, fmt(next[key]))
       const input = h('input', { type: 'range', min, max, step, value: next[key], 'aria-label': label })
       input.addEventListener('input', () => {
@@ -381,14 +407,24 @@ export class Screens {
       })
       return h('div', { class: 'field' }, h('label', {}, label), out, input, hint ? h('small', {}, hint) : null)
     }
-    const check = (key: 'invertY' | 'crouchToggle' | 'showFps', label: string, hint?: string) => {
-      const input = h('input', { type: 'checkbox', 'aria-label': label })
+    const check = (key: 'invertY' | 'crouchToggle' | 'showFps' | 'reduceMotion' | 'soundCues', label: string, hint?: string) => {
+      const input = h('input', { type: 'checkbox', 'aria-label': label, 'data-field': key })
       input.checked = next[key]
       input.addEventListener('change', () => {
         next[key] = input.checked
         commit()
       })
       return h('div', { class: 'field' }, h('label', {}, label), input, hint ? h('small', {}, hint) : null)
+    }
+    const selectField = (key: 'colorVision' | 'crosshairColor', label: string, options: [string, string][], hint?: string) => {
+      const el = h('select', { 'aria-label': label, 'data-field': key }, ...options.map(([v, l]) => h('option', { value: v }, l))) as HTMLSelectElement
+      el.value = next[key]
+      el.addEventListener('change', () => {
+        if (key === 'colorVision') next.colorVision = el.value as ColorVision
+        else next.crosshairColor = el.value
+        commit()
+      })
+      return h('div', { class: 'field' }, h('label', {}, label), h('span'), el, hint ? h('small', {}, hint) : null)
     }
     const quality = h('select', { 'aria-label': 'Qualidade gráfica' }, ...(Object.keys(QUALITY) as Quality[]).map((q) => {
       const o = h('option', { value: q }, QUALITY[q].label)
@@ -417,41 +453,74 @@ export class Screens {
         check('crouchToggle', 'Agachar alterna (C)', 'Desligado: segure C para agachar.'),
         check('showFps', 'Mostrar quadros por segundo'),
         h('div', { class: 'field' }, h('label', {}, 'Qualidade gráfica'), h('span'), quality,
-          h('small', {}, 'Resolução muda na hora; sombras na próxima partida; antisserrilhamento ao recarregar a página.')),
+          h('small', {}, 'Baixa: sem pós-processamento nem grama (computadores fracos). Média: brilho, cores e grama. Alta: + oclusão ambiente, sombras e grama mais longe. Vale na próxima partida; antisserrilhamento ao recarregar a página.')),
+        h('h3', { class: 'settings-section' }, 'Acessibilidade'),
+        selectField('colorVision', 'Daltonismo', (Object.keys(COLOR_VISION_LABEL) as ColorVision[]).map((k): [string, string] => [k, COLOR_VISION_LABEL[k]]), 'Corrige as cores da imagem e troca as cores de raridade e dos colegas.'),
+        check('soundCues', 'Mostrar de onde vêm os sons', 'Arcos em volta da mira: tiros (vermelho), passos (branco), explosões (laranja), baús (amarelo), construções (azul).'),
+        check('reduceMotion', 'Reduzir movimento', 'Sem tremor de câmera nas explosões.'),
+        range('uiScale', 'Tamanho da interface', 0.8, 1.4, 0.05, (v) => `${Math.round(v * 100)}%`),
+        selectField('crosshairColor', 'Cor da mira', [['#ffffff', 'Branca'], ['#ffe14d', 'Amarela'], ['#3ef0ff', 'Ciano'], ['#ff4dff', 'Magenta'], ['#5cff6a', 'Verde']]),
+        range('crosshairSize', 'Tamanho da mira', 0.6, 1.8, 0.1, (v) => `${Math.round(v * 100)}%`),
         h('div', { class: 'row', style: 'margin-top:18px' },
           h('button', { class: 'btn primary small', 'data-action': 'close-settings', onclick: onClose }, h('span', { class: 'label' }, 'Concluir'))))))
   }
 
-  controls(onClose: () => void): void {
-    const row = (action: string, ...keys: string[]) => h('tr', {}, h('td', {}, action), h('td', { html: keys.map((k) => `<kbd>${k}</kbd>`).join(' ') }))
-    this.showModal(h('div', { class: 'screen overlay', 'data-screen': 'controls', onclick: (e: Event) => { if (e.target === e.currentTarget) onClose() } },
-      h('div', { class: 'panel' },
+  /** Controles: teclas de cada ação (clique e aperte a nova tecla) e a referência do controle. */
+  controls(s: Settings, onChange: (s: Settings) => void, onClose: () => void): void {
+    let keys = s.keys
+    let listening: { action: Action; btn: HTMLButtonElement } | null = null
+    const label = (a: Action) => keys[a].map(keyLabel).join(' / ')
+    const buttons = new Map<Action, HTMLButtonElement>()
+    const refresh = () => {
+      for (const [a, b] of buttons) b.textContent = label(a)
+    }
+    const capture = (e: KeyboardEvent) => {
+      if (!listening) return
+      e.preventDefault()
+      e.stopPropagation()
+      const { action, btn } = listening
+      listening = null
+      btn.classList.remove('listening')
+      if (e.code !== 'Escape' && !RESERVED_KEYS.has(e.code)) {
+        keys = rebind(keys, action, e.code)
+        onChange({ ...s, keys })
+      }
+      refresh()
+    }
+    window.addEventListener('keydown', capture, true)
+    const close = () => {
+      window.removeEventListener('keydown', capture, true)
+      onClose()
+    }
+    const keyRows = ACTIONS.map((a) => {
+      const b = h('button', { class: 'key', 'data-key': a, title: 'Clique e aperte a nova tecla (Esc cancela)' }, label(a)) as HTMLButtonElement
+      b.addEventListener('click', () => {
+        if (listening) listening.btn.classList.remove('listening')
+        listening = { action: a, btn: b }
+        b.classList.add('listening')
+        b.textContent = 'aperte…'
+      })
+      buttons.set(a, b)
+      return h('tr', {}, h('td', {}, ACTION_LABEL[a]), h('td', {}, b))
+    })
+    const row = (action: string, ...k: string[]) => h('tr', {}, h('td', {}, action), h('td', { html: k.map((x) => `<kbd>${x}</kbd>`).join(' ') }))
+    this.showModal(h('div', { class: 'screen overlay', 'data-screen': 'controls', onclick: (e: Event) => { if (e.target === e.currentTarget) close() } },
+      h('div', { class: 'panel', style: 'width:min(640px,100%)' },
         h('h2', {}, 'Controles'),
-        h('p', { class: 'hint' }, `Teclado e mouse ou controle (padrão Xbox/PlayStation). Pulo de ~${(MOVE.jumpSpeed ** 2 / (2 * MOVE.gravity)).toFixed(2).replace('.', ',')} m; rampas de até ${Math.round(MOVE.maxWalkableSlope * 180 / Math.PI)}°.`),
-        h('table', { class: 'keys' },
-          row('Mover', 'W', 'A', 'S', 'D'),
-          row('Olhar / mirar', 'Mouse', 'Botão direito'),
-          row('Atirar / usar item / golpear / construir', 'Botão esquerdo'),
-          row('Recarregar', 'R'),
-          row('Pegar item / abrir baú', 'E'),
-          row('Picareta', '1'),
-          row('Escolher espaço', '2', '3', '4', '5', '6', 'Roda'),
-          row('Construir parede / piso / rampa / telhado', 'Q', 'Z', 'V', 'T'),
-          row('Girar peça / trocar material', 'R', 'G'),
-          row('Inventário', 'Tab'),
-          row('Mapa', 'M'),
-          row('Correr (sprint)', 'Shift'),
-          row('Caminhar devagar', 'Alt', 'X'),
-          row('Pular', 'Espaço'),
-          row('Agachar / deslizar (correndo)', 'C'),
-          row('Pausa / liberar mouse', 'Esc'),
-          row('Painel técnico', 'F3'),
-          row('Mostrar/ocultar ajuda', 'H'),
+        h('p', { class: 'hint' }, `Clique numa tecla para trocar (se ela já era de outra ação, as duas trocam). Pulo de ~${(MOVE.jumpSpeed ** 2 / (2 * MOVE.gravity)).toFixed(2).replace('.', ',')} m; rampas de até ${Math.round(MOVE.maxWalkableSlope * 180 / Math.PI)}°.`),
+        h('table', { class: 'keymap', 'data-panel': 'keymap' }, ...keyRows),
+        h('table', { class: 'keys', style: 'margin-top:12px' },
+          row('Olhar / mirar / atirar', 'Mouse', 'Botão direito', 'Botão esquerdo'),
+          row('Picareta / espaços', '1', '2–6', 'Roda'),
+          row('Inventário / mapa / pausa', 'Tab', 'M', 'Esc'),
+          row('Painel técnico / ajuda', 'F3', 'H'),
           row('Controle: mover / olhar', 'Analógico esq.', 'Analógico dir.'),
           row('Controle: pular / agachar / correr / mirar', 'A', 'B', 'L3', 'LT'),
           row('Controle: atirar / pegar / recarregar / espaços', 'RT', 'X', 'Y', 'LB/RB'),
           row('Controle: construir / girar / material', 'D↑', 'D←', 'D→')),
         h('div', { class: 'row', style: 'margin-top:18px' },
-          h('button', { class: 'btn primary small', onclick: onClose }, h('span', { class: 'label' }, 'Fechar'))))))
+          h('button', { class: 'btn small', 'data-action': 'reset-keys', onclick: () => { keys = DEFAULT_KEYS; onChange({ ...s, keys }); refresh() } }, h('span', { class: 'label' }, 'Teclas padrão')),
+          h('button', { class: 'btn primary small', 'data-action': 'close-controls', onclick: close }, h('span', { class: 'label' }, 'Fechar'))))))
   }
+
 }

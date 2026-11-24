@@ -10,6 +10,9 @@ import { InputManager } from './input/input'
 import { NetSession } from './net/session'
 import { OnlineController } from './online/online'
 import { loadCharacterAsset } from './character/character-assets'
+import { SKINS } from './character/character-model'
+import { MenuStage } from './render/menu-stage'
+import { mateCss, setColorVision } from './accessibility'
 import { TRAINING_MATCH, connectWebSocket, normalizeServerUrl, startLocalServer, startLocalServers, type LocalMatchOptions, type Transport } from './net/transport'
 import { QUALITY, loadSettings, saveSettings, type OfflinePrefs, type Settings } from './settings'
 import type { MatchResult } from './ui/hud'
@@ -83,6 +86,8 @@ export class App {
   private session: NetSession | null = null
   private lanTimer: ReturnType<typeof setInterval> | null = null
   private readonly online: OnlineController
+  /** Vitrine 3D atrás do menu, do armário e da entrada online. */
+  private stage: MenuStage | null = null
 
   constructor(root: HTMLElement) {
     this.settings = loadSettings()
@@ -94,6 +99,7 @@ export class App {
     this.screens = new Screens(layer)
     this.input = new InputManager(this.canvas, this.settings)
     this.audio.setVolume(this.settings.volume)
+    this.applyAccessibility(this.settings)
     this.inventory = new InventoryScreen(layer, {
       drop: (slot) => this.match?.sendInventory({ action: 'drop', slot }),
       swap: (a, b) => this.match?.sendInventory({ action: 'swap', a, b }),
@@ -213,10 +219,22 @@ export class App {
       playOffline: () => this.showMapSelect(),
       online: () => void this.online.open(),
       join: () => this.showJoin(),
+      locker: () => this.showLocker(),
       settings: () => this.showSettings(),
       controls: () => this.showControls(),
       history: () => this.screens.history(loadHistory(), () => this.screens.closeModal()),
     }, this.webglError)
+  }
+
+  private showLocker(): void {
+    this.screens.locker(SKINS, this.settings.skin, {
+      pick: (skin) => {
+        this.settings = { ...this.settings, skin }
+        saveSettings(this.settings)
+        this.stage?.setSkin(skin)
+      },
+      back: () => this.showMenu(),
+    })
   }
 
   private playerName(): string {
@@ -260,7 +278,7 @@ export class App {
       const transports = await startLocalServers(mapId, matchOpts, 2)
       for (const t of transports) sessions.push(new NetSession(t))
       const names = [this.playerName(), sanitizeName(`${this.playerName().slice(0, 13)} 2`)]
-      const greet = await Promise.all(sessions.map((s, k) => s.handshake(names[k])))
+      const greet = await Promise.all(sessions.map((s, k) => s.handshake(names[k], '', '', k === 0 ? this.settings.skin : (this.settings.skin + 1) % 8)))
       // camadas e HUDs das duas metades
       const layers = ['left', 'right'].map((side) => h('div', { class: `split-layer ${side}`, 'data-split': side }))
       this.layer.prepend(...layers)
@@ -396,7 +414,7 @@ export class App {
       s.onLobby = (st) => this.showLobbyState(st)
       s.onClose = (reason) => this.onSessionClosed(s, reason)
       loading.step('Conectando ao servidor…')
-      const greeting = await s.handshake(recipe.online?.name ?? this.playerName(), recipe.url ? loadToken(recipe.url) : '', recipe.ticket ?? '')
+      const greeting = await s.handshake(recipe.online?.name ?? this.playerName(), recipe.url ? loadToken(recipe.url) : '', recipe.ticket ?? '', this.settings.skin)
       if (greeting.kind === 'lobby') {
         this.state = 'lobby'
         this.showLobbyState(greeting.state)
@@ -632,11 +650,22 @@ export class App {
     if (notice) this.screens.toast(notice, 'error', 7000)
   }
 
+  /** Escala da interface, mira, paleta para daltonismo (valem na hora, também no meio da partida). */
+  private applyAccessibility(s: Settings): void {
+    const root = document.documentElement.style
+    root.setProperty('--ui-scale', String(s.uiScale))
+    root.setProperty('--crosshair-color', s.crosshairColor)
+    root.setProperty('--crosshair-scale', String(s.crosshairSize))
+    setColorVision(s.colorVision)
+    root.setProperty('--mate-color', mateCss())
+  }
+
   private showSettings(): void {
     this.screens.settings(this.settings, (s) => {
       const qualityChanged = s.quality !== this.settings.quality
       this.settings = s
       saveSettings(s)
+      this.applyAccessibility(s)
       this.input.updateSettings(s)
       this.audio.setVolume(s.volume)
       this.match?.applySettings(s)
@@ -648,13 +677,23 @@ export class App {
   }
 
   private showControls(): void {
-    this.screens.controls(() => this.screens.closeModal())
+    this.screens.controls(this.settings, (s) => {
+      this.settings = s
+      saveSettings(s)
+      this.input.updateSettings(s)
+    }, () => this.screens.closeModal())
   }
 
   private loop = (t: number): void => {
     requestAnimationFrame(this.loop)
     const dt = this.lastFrame ? Math.min(0.1, (t - this.lastFrame) / 1000) : 1 / 60
     this.lastFrame = t
+    // vitrine: só quando a tela da frente é transparente (menu, armário, entrada online)
+    if (!this.match && this.renderer && this.layer.querySelector('.screen.stage')) {
+      this.stage ??= new MenuStage()
+      this.stage.setSkin(this.settings.skin)
+      this.stage.render(this.renderer, dt, window.innerWidth, window.innerHeight)
+    }
     if (this.match && this.state !== 'menu' && this.state !== 'loading') {
       this.match.frame(dt, performance.now())
       this.split?.p2?.frame(dt, performance.now())

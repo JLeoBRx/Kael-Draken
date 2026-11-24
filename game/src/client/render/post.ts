@@ -44,6 +44,8 @@ const GradeShader = {
     /** Tela tingida (dano forte, fora da zona): cor e intensidade. */
     uTint: { value: new THREE.Color(0, 0, 0) },
     uTintAmount: { value: 0 },
+    /** Correção para daltonismo (identidade = desligada). */
+    uCvd: { value: new THREE.Matrix3() },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -61,9 +63,10 @@ const GradeShader = {
     uniform float uAspect;
     uniform vec3 uTint;
     uniform float uTintAmount;
+    uniform mat3 uCvd;
     varying vec2 vUv;
     void main() {
-      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      vec3 c = uCvd * texture2D(tDiffuse, vUv).rgb;
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
       // saturação e contraste em torno do cinza médio
       c = mix(vec3(l), c, uSaturation);
@@ -120,6 +123,11 @@ export class PostPipeline {
     u.uContrast.value = g.contrast
     u.uVignette.value = g.vignette
     u.uSplit.value = g.splitTone
+  }
+
+  /** Correção de cores para daltonismo (matriz por linhas; identidade = desligada). */
+  setColorCorrection(rows: readonly number[]): void {
+    ;(this.grade.uniforms.uCvd.value as THREE.Matrix3).set(rows[0], rows[1], rows[2], rows[3], rows[4], rows[5], rows[6], rows[7], rows[8])
   }
 
   /** Tinge as bordas da tela (0 = nada). */
