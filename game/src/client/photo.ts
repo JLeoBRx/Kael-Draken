@@ -3,6 +3,7 @@ import { MAIN_MAP_ID, loadMap } from '../shared/maps'
 import { CharFlag } from '../shared/movement/character'
 import { ITEM } from '../shared/config/items'
 import { CharacterModel, SKINS } from './character/character-model'
+import { loadCharacterAsset } from './character/character-assets'
 import { PostPipeline } from './render/post'
 import { WorldView } from './render/world-view'
 import { QUALITY, type Quality } from './settings'
@@ -32,7 +33,8 @@ const POSES: { flags: number; speed: number; item: number; aim: boolean }[] = [
   { flags: CharFlag.Grounded, speed: 4.5, item: 255, aim: false },
 ]
 
-export function startPhotoMode(root: HTMLElement, params: URLSearchParams): void {
+export async function startPhotoMode(root: HTMLElement, params: URLSearchParams): Promise<void> {
+  await loadCharacterAsset()
   const num = (k: string, d: number) => {
     const v = Number(params.get(k))
     return params.has(k) && Number.isFinite(v) ? v : d

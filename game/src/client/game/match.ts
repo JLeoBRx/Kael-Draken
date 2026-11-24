@@ -16,6 +16,7 @@ import { Surface, createWorldHit } from '../../shared/world/collision-world'
 import { AudioEngine, shotSoundFor } from '../audio/audio'
 import { ThirdPersonCamera } from '../camera/third-person-camera'
 import { CharacterModel, SKINS, type PoseInput } from '../character/character-model'
+import { loadCharacterAsset } from '../character/character-assets'
 import type { InputManager } from '../input/input'
 import { RemoteEntity, ServerClock } from '../net/interpolation'
 import { Predictor } from '../net/prediction'
@@ -242,6 +243,8 @@ export class Match {
    * continua viva quando a partida termina e todos voltam à sala de espera.
    */
   static async start(session: NetSession, welcome: WelcomeMessage, deps: MatchDeps, progress: (step: string) => void): Promise<Match> {
+    progress('Carregando personagens…')
+    await loadCharacterAsset()
     progress(`Gerando o mapa "${welcome.mapId}"…`)
     await nextFrame()
     const map = loadMap(welcome.mapId)

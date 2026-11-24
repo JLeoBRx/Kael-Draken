@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "assets": "tsx scripts/export-assets.ts",
     "server": "tsx src/server/node/main.ts",
     "host": "vite build && tsx src/server/node/main.ts --lobby --static dist/client",
     "platform": "tsx --disable-warning=ExperimentalWarning src/platform/main.ts",

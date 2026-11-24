@@ -9,6 +9,7 @@ import { Match, type DebugState } from './game/match'
 import { InputManager } from './input/input'
 import { NetSession } from './net/session'
 import { OnlineController } from './online/online'
+import { loadCharacterAsset } from './character/character-assets'
 import { TRAINING_MATCH, connectWebSocket, normalizeServerUrl, startLocalServer, startLocalServers, type LocalMatchOptions, type Transport } from './net/transport'
 import { QUALITY, loadSettings, saveSettings, type OfflinePrefs, type Settings } from './settings'
 import type { MatchResult } from './ui/hud'
@@ -136,6 +137,8 @@ export class App {
   }
 
   start(): void {
+    // o modelo do personagem (GLB) começa a baixar já, enquanto o menu aparece
+    void loadCharacterAsset()
     this.input.attach()
     try {
       this.ensureRenderer()

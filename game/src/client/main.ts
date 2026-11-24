@@ -15,7 +15,7 @@ declare global {
 
 if (params.has('foto')) {
   // modo foto (ferramenta de desenvolvimento): só o mapa, sem partida
-  startPhotoMode(root, params)
+  void startPhotoMode(root, params)
 } else {
   const app = new App(root)
   app.start()
